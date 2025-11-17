@@ -21,7 +21,7 @@ export default async function VisasPage() {
       },
       visas: {
         where: { isActive: true },
-        select: { slug: true },
+        select: { slug: true, heroImageUrl: true },
       },
     },
   });
@@ -33,9 +33,8 @@ export default async function VisasPage() {
     region: country.region || "",
     flagUrl: country.flagUrl || "",
     heroImage:
-      country.visas[0]?.slug
-        ? `/api/og/visa/${country.visas[0].slug}`
-        : "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=600&q=80",
+      country.visas[0]?.heroImageUrl ||
+      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=600&q=80",
     visaCount: country._count.visas,
   }));
 

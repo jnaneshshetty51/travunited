@@ -33,6 +33,25 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = bookingSchema.parse(body);
 
+    const tourRecord = await prisma.tour.findFirst({
+      where: {
+        OR: [{ id: data.tourId }, { slug: data.tourId }],
+      },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        advancePercentage: true,
+      },
+    });
+
+    if (!tourRecord) {
+      return NextResponse.json(
+        { error: "Selected tour not found. Please refresh and try again." },
+        { status: 400 }
+      );
+    }
+
     // Get user - must be logged in
     const session = await getServerSession(authOptions);
 
@@ -46,7 +65,10 @@ export async function POST(req: Request) {
     const userId = session.user.id;
 
     // Calculate amounts
-    const basePrice = data.tourPrice;
+    const basePrice =
+      typeof data.tourPrice === "number" && data.tourPrice > 0
+        ? data.tourPrice
+        : tourRecord.price || 0;
     const totalTravellers = data.numberOfAdults + (data.numberOfChildren || 0);
     const baseAmount = basePrice * totalTravellers;
 
@@ -54,8 +76,8 @@ export async function POST(req: Request) {
     const booking = await prisma.booking.create({
       data: {
         userId,
-        tourId: data.tourId,
-        tourName: data.tourName,
+        tourId: tourRecord.id,
+        tourName: data.tourName || tourRecord.name,
         status: "DRAFT",
         totalAmount: baseAmount, // Store full amount (will be updated after payment)
         currency: "INR",
