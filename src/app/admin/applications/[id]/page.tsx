@@ -284,12 +284,17 @@ export default function AdminApplicationDetailPage() {
     const applicationDocs: Document[] = [];
 
     application.documents.forEach((doc) => {
-      const traveller = application.travellers.find(t => t.traveller.id === doc.travellerId);
-      if (traveller) {
-        if (!travellerDocs[doc.travellerId]) {
-          travellerDocs[doc.travellerId] = [];
+      const travellerId = doc.travellerId;
+      const traveller = travellerId
+        ? application.travellers.find((t) => t.traveller.id === travellerId)
+        : null;
+
+      if (traveller && typeof travellerId === "string") {
+        const key = travellerId;
+        if (!travellerDocs[key]) {
+          travellerDocs[key] = [];
         }
-        travellerDocs[doc.travellerId].push(doc);
+        travellerDocs[key].push(doc);
       } else {
         applicationDocs.push(doc);
       }

@@ -6,6 +6,9 @@ import { Testimonials } from "@/components/home/Testimonials";
 import { BlogHighlights } from "@/components/home/BlogHighlights";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function Home() {
   const latestPosts = await prisma.blogPost.findMany({
     where: { isPublished: true },

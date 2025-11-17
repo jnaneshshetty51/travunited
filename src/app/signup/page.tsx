@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { motion } from "framer-motion";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Mail, Lock, User, ArrowRight, AlertCircle } from "lucide-react";
 
-export default function SignupPage() {
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
+function SignupPageContent() {
   const searchParams = useSearchParams();
   const [name, setName] = useState("");
   const [email, setEmail] = useState(searchParams.get("email") || "");
@@ -192,6 +195,25 @@ export default function SignupPage() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+function SignupLoadingState() {
+  return (
+    <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+      <div className="text-center space-y-3">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+        <p className="text-neutral-600">Loading signup form...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<SignupLoadingState />}>
+      <SignupPageContent />
+    </Suspense>
   );
 }
 

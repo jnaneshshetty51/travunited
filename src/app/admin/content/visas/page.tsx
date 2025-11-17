@@ -140,7 +140,7 @@ export default function AdminVisasPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !visa.isActive }),
       });
-      fetchVisas();
+      fetchVisas(filters);
     } catch (error) {
       console.error("Failed to toggle visa status", error);
     }

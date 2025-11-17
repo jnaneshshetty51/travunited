@@ -87,7 +87,8 @@ export async function POST(req: Request) {
     // Create travellers
     const travellerMappings: { inputIndex: number; travellerId: string }[] = [];
 
-    for (const [index, travellerData] of data.travellers.entries()) {
+    for (let index = 0; index < data.travellers.length; index += 1) {
+      const travellerData = data.travellers[index];
       // Find or create traveller
       let traveller = await prisma.traveller.findFirst({
         where: {

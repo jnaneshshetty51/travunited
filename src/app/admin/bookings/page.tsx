@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { Suspense, useEffect, useState, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -8,6 +8,9 @@ import { motion } from "framer-motion";
 import { Eye, Filter, Calendar, CheckCircle, X, AlertCircle, Download, Mail, Trash2, UserCheck, ArrowRight } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { formatDate } from "@/lib/dateFormat";
+
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 interface Booking {
   id: string;
@@ -22,7 +25,7 @@ interface Booking {
   pendingBalance?: number;
 }
 
-export default function AdminBookingsPage() {
+function AdminBookingsPageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -495,5 +498,26 @@ export default function AdminBookingsPage() {
         )}
       </div>
     </AdminLayout>
+  );
+}
+
+function AdminBookingsSuspenseFallback() {
+  return (
+    <AdminLayout>
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="text-neutral-600">Loading bookings...</p>
+        </div>
+      </div>
+    </AdminLayout>
+  );
+}
+
+export default function AdminBookingsPage() {
+  return (
+    <Suspense fallback={<AdminBookingsSuspenseFallback />}>
+      <AdminBookingsPageContent />
+    </Suspense>
   );
 }

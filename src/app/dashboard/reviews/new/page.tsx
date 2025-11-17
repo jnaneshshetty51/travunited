@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Star } from "lucide-react";
 
-export default function NewReviewPage() {
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
+function NewReviewContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -144,6 +147,25 @@ export default function NewReviewPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function ReviewPageLoadingState() {
+  return (
+    <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+      <div className="text-center space-y-3">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+        <p className="text-neutral-600">Loading review form...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function NewReviewPage() {
+  return (
+    <Suspense fallback={<ReviewPageLoadingState />}>
+      <NewReviewContent />
+    </Suspense>
   );
 }
 

@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { CheckCircle, FileText, ArrowRight, Download, Printer } from "lucide-react";
 import { formatDate } from "@/lib/dateFormat";
 
-export default function BookingThankYouPage() {
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
+function BookingThankYouContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const bookingId = searchParams.get("bookingId");
@@ -137,6 +140,25 @@ export default function BookingThankYouPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+function BookingThankYouLoadingState() {
+  return (
+    <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+      <div className="text-center space-y-3">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+        <p className="text-neutral-600">Loading booking confirmation...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function BookingThankYouPage() {
+  return (
+    <Suspense fallback={<BookingThankYouLoadingState />}>
+      <BookingThankYouContent />
+    </Suspense>
   );
 }
 

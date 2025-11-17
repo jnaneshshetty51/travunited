@@ -70,7 +70,7 @@ export async function POST(
 
       case "docs_rejected":
         const rejectedDocs = application.documents.map(doc => ({
-          type: doc.documentType,
+          type: doc.documentType || "Document",
           reason: doc.rejectionReason || "Document does not meet requirements",
         }));
         await sendVisaDocumentRejectedEmail(

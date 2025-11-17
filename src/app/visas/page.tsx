@@ -1,7 +1,8 @@
-"use server";
-
 import { prisma } from "@/lib/prisma";
 import VisasGridClient from "./VisasGridClient";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function VisasPage() {
   const countries = await prisma.country.findMany({

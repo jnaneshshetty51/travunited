@@ -1,7 +1,8 @@
-"use server";
-
 import { prisma } from "@/lib/prisma";
 import ToursGridClient from "./ToursGridClient";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function ToursPage() {
   const tours = await prisma.tour.findMany({

@@ -7,6 +7,9 @@ import Link from "next/link";
 import { FileText, Calendar, Clock, CheckCircle, X, AlertCircle, Eye, ArrowRight, BarChart3, FileSearch, Globe, BookOpen } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface DashboardStats {
   visasToday: {
     newSubmitted: number;

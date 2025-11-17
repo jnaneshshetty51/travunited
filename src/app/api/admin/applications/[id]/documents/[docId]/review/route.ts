@@ -85,7 +85,7 @@ export async function PUT(
         document.applicationId,
         document.application.country || "",
         document.application.visaType || "",
-        [{ type: document.documentType, reason: rejectionReason }]
+        [{ type: document.documentType || "Document", reason: rejectionReason }]
       );
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { Suspense, useEffect, useState, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -8,6 +8,9 @@ import { motion } from "framer-motion";
 import { Eye, Filter, FileText, CheckCircle, X, Clock, AlertCircle, MoreVertical, Download, Mail, Trash2, UserCheck, ArrowUpDown } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { formatDate } from "@/lib/dateFormat";
+
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 interface Application {
   id: string;
@@ -20,7 +23,7 @@ interface Application {
   user: { name: string; email: string };
 }
 
-export default function AdminApplicationsPage() {
+function AdminApplicationsPageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -526,5 +529,26 @@ export default function AdminApplicationsPage() {
         )}
       </div>
     </AdminLayout>
+  );
+}
+
+function AdminApplicationsSuspenseFallback() {
+  return (
+    <AdminLayout>
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="text-neutral-600">Loading applications...</p>
+        </div>
+      </div>
+    </AdminLayout>
+  );
+}
+
+export default function AdminApplicationsPage() {
+  return (
+    <Suspense fallback={<AdminApplicationsSuspenseFallback />}>
+      <AdminApplicationsPageContent />
+    </Suspense>
   );
 }
