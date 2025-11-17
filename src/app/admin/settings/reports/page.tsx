@@ -153,10 +153,10 @@ export default function ReportsPage() {
 
         {/* Date Range Filter */}
         <div className="bg-white rounded-2xl shadow-medium p-6 border border-neutral-200 mb-6">
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:space-x-4">
             <Calendar size={20} className="text-neutral-600" />
-            <div className="flex items-center space-x-4 flex-1">
-              <div>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:space-x-4 flex-1">
+              <div className="w-full">
                 <label className="block text-sm font-medium text-neutral-700 mb-2">Date From</label>
                 <input
                   type="date"
@@ -165,7 +165,7 @@ export default function ReportsPage() {
                   className="px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                 />
               </div>
-              <div>
+              <div className="w-full">
                 <label className="block text-sm font-medium text-neutral-700 mb-2">Date To</label>
                 <input
                   type="date"
@@ -174,7 +174,7 @@ export default function ReportsPage() {
                   className="px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                 />
               </div>
-              <div className="self-end">
+              <div className="self-stretch sm:self-end">
                 <button
                   onClick={fetchReports}
                   className="px-4 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700"
@@ -188,7 +188,7 @@ export default function ReportsPage() {
 
         {/* Revenue Summary */}
         {revenueSummary && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
             <div className="bg-white rounded-2xl shadow-medium p-6 border border-neutral-200">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-neutral-600">Visa Revenue</h3>
@@ -233,7 +233,7 @@ export default function ReportsPage() {
             {/* Status Counts */}
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-neutral-900 mb-4">Applications by Status</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 {Object.entries(visaReport.statusCounts).map(([status, count]) => (
                   <div key={status} className="bg-neutral-50 rounded-lg p-4">
                     <div className="text-sm text-neutral-600 mb-1">{status}</div>
@@ -262,7 +262,7 @@ export default function ReportsPage() {
             {/* Conversion Stats */}
             <div>
               <h3 className="text-lg font-semibold text-neutral-900 mb-4">Conversion Statistics</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-blue-50 rounded-lg p-4">
                   <div className="text-sm text-neutral-600 mb-1">Started</div>
                   <div className="text-2xl font-bold text-blue-700">{visaReport.conversion.started}</div>

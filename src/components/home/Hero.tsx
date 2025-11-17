@@ -94,10 +94,10 @@ export function Hero() {
         >
           {/* Mode Toggle */}
           <div className="flex items-center justify-center mb-6">
-            <div className="bg-neutral-100 rounded-lg p-1 inline-flex">
+            <div className="bg-neutral-100 rounded-lg p-1 flex flex-col gap-2 w-full max-w-md sm:inline-flex sm:flex-row sm:w-auto">
               <button
                 onClick={() => setMode("visa")}
-                className={`px-6 py-2 rounded-md font-medium transition-all ${
+                className={`px-4 py-2 rounded-md font-medium text-sm sm:text-base transition-all w-full sm:w-auto ${
                   mode === "visa"
                     ? "bg-white text-primary-600 shadow-soft"
                     : "text-neutral-600 hover:text-neutral-900"
@@ -108,7 +108,7 @@ export function Hero() {
               </button>
               <button
                 onClick={() => setMode("tour")}
-                className={`px-6 py-2 rounded-md font-medium transition-all ${
+                className={`px-4 py-2 rounded-md font-medium text-sm sm:text-base transition-all w-full sm:w-auto ${
                   mode === "tour"
                     ? "bg-white text-primary-600 shadow-soft"
                     : "text-neutral-600 hover:text-neutral-900"

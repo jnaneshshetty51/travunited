@@ -27,7 +27,7 @@ export default function RootLayout({
         <MetaPixel pixelId={process.env.NEXT_PUBLIC_META_PIXEL_ID} />
         <SessionProvider>
           <Navbar />
-          <main className="min-h-screen">
+          <main className="min-h-screen pt-16">
             {children}
           </main>
           <Footer />

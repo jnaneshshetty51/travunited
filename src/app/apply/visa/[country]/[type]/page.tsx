@@ -1285,14 +1285,14 @@ export default function VisaApplicationPage({ params }: { params: { country: str
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Progress Steps */}
         <div className="mb-8">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between flex-wrap gap-4 sm:gap-0">
             {steps.map((step, index) => {
               const Icon = step.icon;
               const isActive = currentStep === step.id;
               const isCompleted = currentStep > step.id;
 
               return (
-                <div key={step.id} className="flex items-center flex-1">
+                <div key={step.id} className="flex items-center flex-1 min-w-[160px]">
                   <div className="flex flex-col items-center flex-1">
                     <div
                       className={`w-10 h-10 rounded-full flex items-center justify-center ${
@@ -1317,7 +1317,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                     <div
                       className={`h-1 flex-1 mx-2 ${
                         isCompleted ? "bg-green-500" : "bg-neutral-200"
-                      }`}
+                    } hidden sm:block`}
                     />
                   )}
                 </div>
@@ -1327,7 +1327,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         </div>
 
         {/* Step Content */}
-        <div className="bg-white rounded-2xl shadow-medium p-8 mb-6">
+        <div className="bg-white rounded-2xl shadow-medium p-5 sm:p-8 mb-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentStep}
@@ -1342,7 +1342,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         </div>
 
         {/* Navigation */}
-        <div className="flex justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
           <button
             onClick={prevStep}
             disabled={currentStep === 1}

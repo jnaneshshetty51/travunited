@@ -200,7 +200,7 @@ export default function AdminToursPage() {
         </div>
 
         {filteredTours.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             {filteredTours.map((tour, index) => (
               <motion.div
                 key={tour.id}
@@ -233,7 +233,7 @@ export default function AdminToursPage() {
                     </span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-sm text-neutral-600 mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-neutral-600 mt-4">
                   <div>
                     <div className="text-xs text-neutral-500 uppercase">Duration</div>
                     <div className="font-medium text-neutral-900">{tour.duration}</div>
