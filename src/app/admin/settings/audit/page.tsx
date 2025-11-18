@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import { Filter, Calendar, User, FileText, Plane, Shield, Settings, Search } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface AuditLog {
   id: string;
   timestamp: string;

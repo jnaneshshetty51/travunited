@@ -9,6 +9,9 @@ import { Eye, CheckCircle, X, Upload, FileText, User, Mail, Phone, Calendar, Dow
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { formatDate } from "@/lib/dateFormat";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 type DocScope = "PER_TRAVELLER" | "PER_APPLICATION";
 
 interface DocumentRequirementMeta {

@@ -9,6 +9,9 @@ import { Star, FileText, Plane, User, Mail, Calendar, Eye, EyeOff, Trash2, Save,
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { formatDate } from "@/lib/dateFormat";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface Review {
   id: string;
   type: string;

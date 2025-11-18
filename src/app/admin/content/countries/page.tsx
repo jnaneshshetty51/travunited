@@ -8,6 +8,9 @@ import { Plus, Edit, Globe, Search, RefreshCw, Trash2, ToggleLeft, ToggleRight }
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import Image from "next/image";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface CountryRecord {
   id: string;
   name: string;

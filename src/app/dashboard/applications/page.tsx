@@ -7,6 +7,9 @@ import { motion } from "framer-motion";
 import { ArrowLeft, FileText, Clock, CheckCircle, X, AlertCircle, Download, CreditCard, Eye } from "lucide-react";
 import { formatDate } from "@/lib/dateFormat";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface Application {
   id: string;
   country: string;

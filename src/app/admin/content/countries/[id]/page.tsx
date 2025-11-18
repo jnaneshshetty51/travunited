@@ -7,6 +7,9 @@ import { useSession } from "next-auth/react";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface CountryFormState {
   name: string;
   code: string;

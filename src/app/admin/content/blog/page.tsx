@@ -9,6 +9,9 @@ import { Plus, Edit, BookOpen } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { formatDate } from "@/lib/dateFormat";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface BlogPost {
   id: string;
   title: string;

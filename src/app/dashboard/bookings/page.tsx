@@ -7,6 +7,9 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Calendar, Clock, CheckCircle, Download, CreditCard, Eye, MessageSquare } from "lucide-react";
 import { formatDate } from "@/lib/dateFormat";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface Booking {
   id: string;
   tourName: string;

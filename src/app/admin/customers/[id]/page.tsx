@@ -9,6 +9,9 @@ import { User, Mail, Phone, Calendar, FileText, Plane, Star, Edit, Save, X, Chec
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { formatDate } from "@/lib/dateFormat";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface Application {
   id: string;
   country: string;

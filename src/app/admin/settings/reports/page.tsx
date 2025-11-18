@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import { Download, BarChart3, TrendingUp, Users, DollarSign, Calendar } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface VisaReport {
   statusCounts: Record<string, number>;
   topCountries: Array<{ country: string; count: number }>;

@@ -7,6 +7,9 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Star, MessageSquare, FileText, Calendar, Plus } from "lucide-react";
 import { formatDate } from "@/lib/dateFormat";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface Review {
   id: string;
   type: "visa" | "tour";

@@ -7,6 +7,9 @@ import Link from "next/link";
 import { FileText, Plane, Clock, CheckCircle, X, AlertCircle, ArrowRight, Settings, Users, CreditCard, Calendar, Download, MessageSquare } from "lucide-react";
 import { formatDate } from "@/lib/dateFormat";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface Application {
   id: string;
   country: string;

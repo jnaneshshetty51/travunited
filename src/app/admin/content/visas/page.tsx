@@ -17,6 +17,9 @@ import {
 } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface VisaRecord {
   id: string;
   name: string;

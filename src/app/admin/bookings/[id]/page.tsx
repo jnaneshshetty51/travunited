@@ -9,6 +9,9 @@ import { Eye, Upload, Download, User, Mail, Phone, Calendar, CreditCard, Send, C
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { formatDate } from "@/lib/dateFormat";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface Payment {
   id: string;
   amount: number;

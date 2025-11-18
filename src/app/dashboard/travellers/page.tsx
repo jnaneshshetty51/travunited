@@ -7,6 +7,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Plus, Edit, Trash2, User, X } from "lucide-react";
 import { formatDate } from "@/lib/dateFormat";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface Traveller {
   id: string;
   firstName: string;

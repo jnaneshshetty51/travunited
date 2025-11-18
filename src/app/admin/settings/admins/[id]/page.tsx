@@ -8,6 +8,9 @@ import { ArrowLeft, Shield, Mail, Calendar, FileText, Plane, Edit, Save, X } fro
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { formatDate } from "@/lib/dateFormat";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface Admin {
   id: string;
   name: string | null;

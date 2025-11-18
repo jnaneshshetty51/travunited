@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import { Save, Building2, Mail, CreditCard, BarChart3, Lock, AlertCircle } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface Settings {
   // Company Info
   companyName: string;

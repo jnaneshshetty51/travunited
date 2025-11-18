@@ -8,6 +8,9 @@ import { ArrowLeft, FileText, Upload, Download, CheckCircle, X, Clock, AlertCirc
 import { motion } from "framer-motion";
 import { formatDate } from "@/lib/dateFormat";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface Document {
   id: string;
   documentType: string;

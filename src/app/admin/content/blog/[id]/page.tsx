@@ -9,6 +9,9 @@ import { Save, ArrowLeft, Loader2 } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { getMediaProxyUrl } from "@/lib/media";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface BlogPost {
   id: string;
   title: string;

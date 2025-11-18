@@ -7,6 +7,9 @@ import Link from "next/link";
 import { ArrowLeft, Mail, Phone, User, Trash2, CheckCircle, AlertCircle, Shield, Lock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 export default function AccountSettingsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();

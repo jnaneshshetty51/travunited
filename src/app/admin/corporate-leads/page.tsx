@@ -9,6 +9,9 @@ import { Building2, Mail, Phone, Calendar, User } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { formatDate } from "@/lib/dateFormat";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+
 interface CorporateLead {
   id: string;
   companyName: string;
