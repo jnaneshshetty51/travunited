@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 import { generatePDF } from "@/lib/pdf-export";
 
 export const dynamic = "force-dynamic";

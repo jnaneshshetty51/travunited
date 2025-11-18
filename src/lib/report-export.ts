@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 
 export function exportToExcel(data: any[], filename: string) {
   const ws = XLSX.utils.json_to_sheet(data);
