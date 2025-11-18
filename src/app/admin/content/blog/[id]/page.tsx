@@ -53,6 +53,7 @@ export default function AdminBlogEditPage() {
         const data = await response.json();
         setFormData({
           ...data,
+          published: data.published ?? data.isPublished ?? false, // Handle both field names
           coverImage: getMediaProxyUrl(data.coverImage),
         });
         if (data.coverImage && !data.coverImage.startsWith("http")) {

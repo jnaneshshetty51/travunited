@@ -70,6 +70,7 @@ export async function GET(
 
     return NextResponse.json({
       ...post,
+      published: post.isPublished, // Map isPublished to published for frontend consistency
       coverImage: getMediaProxyUrl(post.coverImage),
     });
   } catch (error) {
@@ -144,7 +145,7 @@ export async function PUT(
         category: data.category !== undefined ? data.category || null : existing.category,
         readTime: data.readTime !== undefined ? data.readTime || null : existing.readTime,
         content: data.content ?? existing.content,
-        isPublished: data.published ?? existing.isPublished,
+        isPublished: data.published !== undefined ? data.published : existing.isPublished,
         publishedAt:
           data.published === undefined
             ? existing.publishedAt
@@ -154,7 +155,10 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json(updated);
+    return NextResponse.json({
+      ...updated,
+      published: updated.isPublished, // Map isPublished to published for frontend consistency
+    });
   } catch (error) {
     console.error("Error updating blog post:", error);
     if (error instanceof z.ZodError) {

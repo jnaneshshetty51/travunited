@@ -62,6 +62,7 @@ export async function GET(req: Request) {
 
     const formatted = posts.map((post) => ({
       ...post,
+      published: post.isPublished, // Map isPublished to published for frontend consistency
       coverImage: getMediaProxyUrl(post.coverImage),
     }));
 
@@ -124,7 +125,10 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json(post);
+    return NextResponse.json({
+      ...post,
+      published: post.isPublished, // Map isPublished to published for frontend consistency
+    });
   } catch (error) {
     console.error("Error creating blog post:", error);
     if (error instanceof z.ZodError) {
