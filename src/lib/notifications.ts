@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 import { sendEmail } from "./email";
-import { UserRole } from "@prisma/client";
+import { UserRole, Prisma } from "@prisma/client";
 
 export type NotificationType =
   // Customer - Visa
@@ -79,7 +79,7 @@ export async function notify(params: NotificationParams): Promise<void> {
         title,
         message,
         link: link || null,
-        data: data ?? null,
+        data: data ? (data as Prisma.InputJsonValue) : Prisma.JsonNull,
         roleScope: roleScope || null,
         channelInApp: true,
         channelEmail: shouldSendEmail,
