@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Eye, Upload, Download, User, Mail, Phone, Calendar, CreditCard, Send, Clock, CheckCircle, X, AlertCircle, ArrowLeft, UserPlus, ChevronDown, FileDown, MapPin, Globe } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { formatDate } from "@/lib/dateFormat";
@@ -356,10 +357,12 @@ export default function AdminBookingDetailPage() {
               {/* Left: Reference & Tour Info */}
               <div className="flex items-start gap-4">
                 {booking.tour?.country?.flagUrl && (
-                  <img
+                  <Image
                     src={booking.tour.country.flagUrl}
                     alt={booking.tour.country.name}
-                    className="w-12 h-8 rounded object-cover border border-neutral-200"
+                    width={48}
+                    height={32}
+                    className="rounded object-cover border border-neutral-200"
                   />
                 )}
                 <div>

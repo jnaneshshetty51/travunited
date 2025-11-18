@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
@@ -29,15 +29,7 @@ export default function NotificationsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    if (!session) {
-      router.push("/login");
-      return;
-    }
-    fetchNotifications();
-  }, [session, filter, unreadOnly, page]);
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
       setIsLoading(true);
       const params = new URLSearchParams({
@@ -59,7 +51,15 @@ export default function NotificationsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [filter, unreadOnly, page]);
+
+  useEffect(() => {
+    if (!session) {
+      router.push("/login");
+      return;
+    }
+    fetchNotifications();
+  }, [session, router, fetchNotifications]);
 
   const markAsRead = async (notificationId: string) => {
     try {
