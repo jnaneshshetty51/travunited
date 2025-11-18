@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { notifyMultiple } from "@/lib/notifications";
 export const dynamic = "force-dynamic";
 
 
@@ -140,6 +141,35 @@ export async function POST(req: Request) {
         isActive: true,
       },
     });
+
+    // Notify super admin about new admin creation
+    const superAdmins = await prisma.user.findMany({
+      where: {
+        role: "SUPER_ADMIN",
+        isActive: true,
+        id: { not: admin.id }, // Don't notify the creator
+      },
+      select: { id: true },
+    });
+
+    if (superAdmins.length > 0) {
+      await notifyMultiple(
+        superAdmins.map((a) => a.id),
+        {
+          type: "ADMIN_CREATED",
+          title: "New admin created",
+          message: `A new ${admin.role === "SUPER_ADMIN" ? "Super Admin" : "Staff Admin"} has been created: ${admin.name} (${admin.email})`,
+          link: `/admin/settings/admins`,
+          data: {
+            adminId: admin.id,
+            adminName: admin.name,
+            adminEmail: admin.email,
+            adminRole: admin.role,
+          },
+          sendEmail: false,
+        }
+      );
+    }
 
     // TODO: Send welcome email with password or reset link
     // For now, return the temp password (in production, send via email)

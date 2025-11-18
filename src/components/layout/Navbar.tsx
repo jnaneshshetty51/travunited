@@ -5,6 +5,19 @@ import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Menu, X, User, ChevronDown, LogOut, Shield } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+<<<<<<< Current (Your changes)
+import { NotificationBell } from "@/components/ui/NotificationBell";
+=======
+import { NotificationBell } from "./NotificationBell";
+>>>>>>> Incoming (Background Agent changes)
+=======
+import { NotificationBell } from "../notifications/NotificationBell";
+>>>>>>> Incoming (Background Agent changes)
+=======
+import { NotificationBell } from "../notifications/NotificationBell";
+>>>>>>> Incoming (Background Agent changes)
 
 export function Navbar() {
   const { data: session } = useSession();
@@ -50,16 +63,19 @@ export function Navbar() {
 
           {/* Auth Buttons */}
           <div className="hidden md:flex items-center space-x-4">
+            {session && <NotificationBell />}
             {session ? (
-              <div className="relative">
-                <button
-                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center space-x-2 text-neutral-700 hover:text-primary-600 font-medium transition-colors"
-                >
-                  <User size={20} />
-                  <span>{session.user?.name || session.user?.email}</span>
-                  {isAdmin && <Shield size={16} className="text-primary-600" />}
-                </button>
+              <>
+                <NotificationBell />
+                <div className="relative">
+                  <button
+                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                    className="flex items-center space-x-2 text-neutral-700 hover:text-primary-600 font-medium transition-colors"
+                  >
+                    <User size={20} />
+                    <span>{session.user?.name || session.user?.email}</span>
+                    {isAdmin && <Shield size={16} className="text-primary-600" />}
+                  </button>
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-large border border-neutral-200 py-2 z-50">
                     <Link
@@ -90,7 +106,8 @@ export function Navbar() {
                     </button>
                   </div>
                 )}
-              </div>
+                </div>
+              </>
             ) : (
               <>
                 <Link

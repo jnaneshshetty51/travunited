@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendVisaStatusUpdateEmail, sendVisaApprovedEmail, sendVisaRejectedEmail } from "@/lib/email";
 import { logAuditEvent } from "@/lib/audit";
+import { notify } from "@/lib/notifications";
 export const dynamic = "force-dynamic";
 
 
@@ -63,7 +64,7 @@ export async function PUT(
       },
     });
 
-    // Send email notifications
+    // Send email notifications and in-app notifications
     if (status === "APPROVED") {
       await sendVisaApprovedEmail(
         application.user.email,
@@ -71,6 +72,20 @@ export async function PUT(
         application.country || "",
         application.visaType || ""
       );
+      await notify({
+        userId: application.userId,
+        type: "VISA_STATUS_CHANGED",
+        title: "Visa Application Approved",
+        message: `Good news! Your visa application for ${application.country || ""} ${application.visaType || ""} has been approved.`,
+        link: `/dashboard/applications/${application.id}`,
+        data: {
+          applicationId: application.id,
+          status: "APPROVED",
+          country: application.country,
+          visaType: application.visaType,
+        },
+        sendEmail: false, // Email already sent above
+      });
     } else if (status === "REJECTED") {
       await sendVisaRejectedEmail(
         application.user.email,
@@ -79,6 +94,21 @@ export async function PUT(
         application.visaType || "",
         rejectionReason || ""
       );
+      await notify({
+        userId: application.userId,
+        type: "VISA_STATUS_CHANGED",
+        title: "Visa Application Rejected",
+        message: `Unfortunately, your visa application for ${application.country || ""} ${application.visaType || ""} was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`,
+        link: `/dashboard/applications/${application.id}`,
+        data: {
+          applicationId: application.id,
+          status: "REJECTED",
+          country: application.country,
+          visaType: application.visaType,
+          reason: rejectionReason,
+        },
+        sendEmail: false, // Email already sent above
+      });
     } else {
       await sendVisaStatusUpdateEmail(
         application.user.email,
@@ -87,6 +117,20 @@ export async function PUT(
         application.visaType || "",
         status
       );
+      await notify({
+        userId: application.userId,
+        type: "VISA_STATUS_CHANGED",
+        title: "Visa Application Status Updated",
+        message: `Your visa application for ${application.country || ""} ${application.visaType || ""} is now ${status}.`,
+        link: `/dashboard/applications/${application.id}`,
+        data: {
+          applicationId: application.id,
+          status,
+          country: application.country,
+          visaType: application.visaType,
+        },
+        sendEmail: false, // Email already sent above
+      });
     }
 
     await logAuditEvent({

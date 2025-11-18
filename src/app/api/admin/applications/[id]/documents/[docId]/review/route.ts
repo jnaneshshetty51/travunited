@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendVisaDocumentRejectedEmail } from "@/lib/email";
 import { logAuditEvent } from "@/lib/audit";
+import { notify } from "@/lib/notifications";
 export const dynamic = "force-dynamic";
 
 
@@ -84,7 +85,7 @@ export async function PUT(
       },
     });
 
-    // If rejected, send email notification
+    // If rejected, send email notification and in-app notification
     if (normalizedStatus === "REJECTED" && rejectionReason) {
       await sendVisaDocumentRejectedEmail(
         document.application.user.email,
@@ -93,6 +94,19 @@ export async function PUT(
         document.application.visaType || "",
         [{ type: document.documentType || "Document", reason: rejectionReason }]
       );
+      await notify({
+        userId: document.application.userId,
+        type: "VISA_DOCUMENT_REJECTED",
+        title: "Document Rejected",
+        message: `Document "${document.documentType || "Document"}" was rejected. ${rejectionReason}`,
+        link: `/dashboard/applications/${document.applicationId}`,
+        data: {
+          applicationId: document.applicationId,
+          documentType: document.documentType,
+          reason: rejectionReason,
+        },
+        sendEmail: false, // Email already sent above
+      });
     }
 
     return NextResponse.json(updated);

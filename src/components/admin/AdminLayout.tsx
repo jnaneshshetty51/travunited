@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 import { AdminSidebar, AdminSidebarStatic, AdminSidebarToggle } from "./AdminSidebar";
+<<<<<<< Current (Your changes)
+import { NotificationBell } from "@/components/ui/NotificationBell";
+=======
+import { AdminHeader } from "./AdminHeader";
+>>>>>>> Incoming (Background Agent changes)
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -15,10 +20,17 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <div className="flex flex-1 flex-col">
+        <AdminHeader />
         <div className="lg:hidden px-4 py-3 border-b border-neutral-200 flex items-center justify-between bg-white/90 backdrop-blur z-40">
           <div className="flex items-center space-x-3">
             <AdminSidebarToggle onToggle={() => setSidebarOpen(true)} />
             <p className="text-sm font-medium text-neutral-700">Menu</p>
+          </div>
+          <NotificationBell />
+        </div>
+        <div className="hidden lg:block px-6 py-4 border-b border-neutral-200 bg-white/90 backdrop-blur">
+          <div className="flex items-center justify-end">
+            <NotificationBell />
           </div>
         </div>
         <main className="flex-1 px-4 py-6 lg:px-6">
@@ -29,3 +41,4 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
+do 

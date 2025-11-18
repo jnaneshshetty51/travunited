@@ -40,6 +40,8 @@ model User {
   reviews      Review[]
   auditLogs    AuditLog[]
   payments     Payment[]
+  notifications Notification[]
+  notificationSettings UserNotificationSettings?
 }
 
 model Application {
@@ -395,5 +397,39 @@ model BlogPost {
   publishedAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  userId        String
+  roleScope     String?  // "CUSTOMER", "STAFF_ADMIN", "SUPER_ADMIN"
+  type          String   // e.g. VISA_STATUS_CHANGED, TOUR_BOOKING_CREATED
+  title         String
+  message       String
+  data          Json?    // extra data: { applicationId, bookingId, route, ... }
+  link          String?  // URL to open when clicked
+  channelEmail  Boolean  @default(false) // whether email was sent
+  channelInApp  Boolean  @default(true)  // in-app enabled
+  channelPush   Boolean  @default(false)  // for future browser push
+  readAt        DateTime?
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+}
+
+model UserNotificationSettings {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  emailEnabled  Json     @default("{}") // per notification type preferences
+  inAppEnabled  Json     @default("{}")
+  pushEnabled   Json     @default("{}")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 

@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { logAuditEvent } from "@/lib/audit";
 import { AuditAction, AuditEntityType } from "@prisma/client";
+import { notify } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +53,15 @@ export async function PUT(
       );
     }
 
+    // Get application details before update
+    const applicationBefore = await prisma.application.findUnique({
+      where: { id: params.id },
+      select: {
+        country: true,
+        visaType: true,
+      },
+    });
+
     // Update application
     const application = await prisma.application.update({
       where: { id: params.id },
@@ -81,6 +91,24 @@ export async function PUT(
         assignedToName: admin.name || admin.email,
       },
     });
+
+    // Notify assigned admin
+    if (adminId !== session.user.id) {
+      await notify({
+        userId: adminId,
+        type: "ADMIN_APPLICATION_ASSIGNED",
+        title: "New Application Assigned",
+        message: `A new visa application has been assigned to you: ${applicationBefore?.country || ""} ${applicationBefore?.visaType || ""}`,
+        link: `/admin/applications/${params.id}`,
+        data: {
+          applicationId: params.id,
+          country: applicationBefore?.country,
+          visaType: applicationBefore?.visaType,
+        },
+        sendEmail: true,
+        roleScope: "STAFF_ADMIN",
+      });
+    }
 
     return NextResponse.json({
       message: "Application assigned successfully",

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { notify } from "@/lib/notifications";
 export const dynamic = "force-dynamic";
 
 
@@ -30,6 +31,12 @@ export async function POST(
 
     const application = await prisma.application.findUnique({
       where: { id: params.id },
+      select: {
+        id: true,
+        country: true,
+        visaType: true,
+        processedById: true,
+      },
     });
 
     if (!application) {
@@ -53,6 +60,22 @@ export async function POST(
         processedById: session.user.id,
         status: "IN_PROCESS",
       },
+    });
+
+    // Notify admin (self-notification for claim)
+    await notify({
+      userId: session.user.id,
+      type: "ADMIN_APPLICATION_ASSIGNED",
+      title: "Application Claimed",
+      message: `You have claimed a visa application: ${application.country || ""} ${application.visaType || ""}`,
+      link: `/admin/applications/${application.id}`,
+      data: {
+        applicationId: application.id,
+        country: application.country,
+        visaType: application.visaType,
+      },
+      sendEmail: false,
+      roleScope: "STAFF_ADMIN",
     });
 
     return NextResponse.json({ message: "Application claimed successfully" });

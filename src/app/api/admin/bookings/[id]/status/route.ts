@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendTourConfirmedEmail } from "@/lib/email";
 import { logAuditEvent } from "@/lib/audit";
+import { notify } from "@/lib/notifications";
 export const dynamic = "force-dynamic";
 
 
@@ -59,13 +60,52 @@ export async function PUT(
       data: { status },
     });
 
-    // Send email if confirmed
+    // Send email and notification if confirmed
     if (status === "CONFIRMED") {
       await sendTourConfirmedEmail(
         booking.user.email,
         booking.id,
         booking.tourName || ""
       );
+      await notify({
+        userId: booking.userId,
+        type: "TOUR_BOOKING_CONFIRMED",
+        title: "Tour booking confirmed",
+        message: `Your tour booking '${booking.tourName || ""}' has been confirmed.`,
+        link: `/dashboard/bookings/${booking.id}`,
+        data: {
+          bookingId: booking.id,
+          tourName: booking.tourName,
+        },
+        sendEmail: true,
+      });
+    } else if (status === "CANCELLED") {
+      await notify({
+        userId: booking.userId,
+        type: "TOUR_BOOKING_CANCELLED",
+        title: "Tour booking cancelled",
+        message: `Your tour booking '${booking.tourName || ""}' has been cancelled.`,
+        link: `/dashboard/bookings/${booking.id}`,
+        data: {
+          bookingId: booking.id,
+          tourName: booking.tourName,
+        },
+        sendEmail: true,
+      });
+    } else if (previousStatus !== status) {
+      await notify({
+        userId: booking.userId,
+        type: "TOUR_BOOKING_UPDATED",
+        title: "Tour booking updated",
+        message: `Your tour booking '${booking.tourName || ""}' status has been updated to ${status}.`,
+        link: `/dashboard/bookings/${booking.id}`,
+        data: {
+          bookingId: booking.id,
+          tourName: booking.tourName,
+          status,
+        },
+        sendEmail: false,
+      });
     }
 
     await logAuditEvent({

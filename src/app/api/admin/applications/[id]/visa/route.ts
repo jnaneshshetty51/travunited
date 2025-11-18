@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { uploadVisaDocument } from "@/lib/minio";
 import { sendVisaApprovedEmail } from "@/lib/email";
 import { logAuditEvent } from "@/lib/audit";
+import { notify } from "@/lib/notifications";
 export const dynamic = "force-dynamic";
 
 
@@ -76,13 +77,26 @@ export async function POST(
       },
     });
 
-    // Send approval email
+    // Send approval email and notification
     await sendVisaApprovedEmail(
       application.user.email,
       application.id,
       application.country || "",
       application.visaType || ""
     );
+    await notify({
+      userId: application.userId,
+      type: "VISA_READY",
+      title: "Your Visa is Ready!",
+      message: `Your visa document for ${application.country || ""} ${application.visaType || ""} is ready for download.`,
+      link: `/dashboard/applications/${application.id}`,
+      data: {
+        applicationId: application.id,
+        country: application.country,
+        visaType: application.visaType,
+      },
+      sendEmail: false, // Email already sent above
+    });
 
     await logAuditEvent({
       adminId: session.user.id,

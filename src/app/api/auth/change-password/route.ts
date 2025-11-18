@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { notify } from "@/lib/notifications";
 export const dynamic = "force-dynamic";
 
 
@@ -56,6 +57,17 @@ export async function POST(req: Request) {
     await prisma.user.update({
       where: { id: session.user.id },
       data: { passwordHash: newPasswordHash },
+    });
+
+    // Send security notification
+    await notify({
+      userId: session.user.id,
+      type: "PASSWORD_CHANGED",
+      title: "Password changed",
+      message: "Your password has been changed successfully. If you didn't make this change, please contact support immediately.",
+      link: `/dashboard/settings`,
+      data: {},
+      sendEmail: true,
     });
 
     return NextResponse.json({

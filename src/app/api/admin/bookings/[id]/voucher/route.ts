@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { uploadVisaDocument } from "@/lib/minio";
 import { sendTourConfirmedEmail } from "@/lib/email";
 import { logAuditEvent } from "@/lib/audit";
+import { notify } from "@/lib/notifications";
 export const dynamic = "force-dynamic";
 
 
@@ -76,12 +77,25 @@ export async function POST(
       },
     });
 
-    // Send confirmation email
+    // Send confirmation email and notification
     await sendTourConfirmedEmail(
       booking.user.email,
       booking.id,
       booking.tourName || ""
     );
+    
+    await notify({
+      userId: booking.userId,
+      type: "TOUR_VOUCHERS_READY",
+      title: "Your vouchers are ready",
+      message: `Your vouchers and itinerary for '${booking.tourName || ""}' are ready for download.`,
+      link: `/dashboard/bookings/${booking.id}`,
+      data: {
+        bookingId: booking.id,
+        tourName: booking.tourName,
+      },
+      sendEmail: true,
+    });
 
     await logAuditEvent({
       adminId: session.user.id,

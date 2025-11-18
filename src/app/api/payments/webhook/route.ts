@@ -7,6 +7,7 @@ import {
   sendTourPaymentSuccessEmail,
 } from "@/lib/email";
 import { logAuditEvent } from "@/lib/audit";
+import { notify } from "@/lib/notifications";
 export const dynamic = "force-dynamic";
 
 
@@ -62,16 +63,19 @@ export async function POST(req: Request) {
           application: {
             include: {
               user: {
-                select: { email: true, name: true },
+                select: { email: true, name: true, id: true },
               },
             },
           },
           booking: {
             include: {
               user: {
-                select: { email: true, name: true },
+                select: { email: true, name: true, id: true },
               },
             },
+          },
+          user: {
+            select: { id: true },
           },
         },
       });
@@ -110,6 +114,34 @@ export async function POST(req: Request) {
           payment.application.visaType || "",
           payment.amount
         );
+        await notify({
+          userId: payment.application.userId,
+          type: "VISA_PAYMENT_SUCCESS",
+          title: "Payment Successful",
+          message: `Payment of ₹${payment.amount.toLocaleString()} received for your visa application. Your application has been submitted.`,
+          link: `/dashboard/applications/${payment.applicationId}`,
+          data: {
+            applicationId: payment.applicationId,
+            amount: payment.amount,
+            country: payment.application.country,
+            visaType: payment.application.visaType,
+          },
+          sendEmail: false, // Email already sent above
+        });
+        // Notify customer about application submission
+        await notify({
+          userId: payment.application.userId,
+          type: "VISA_APPLICATION_SUBMITTED",
+          title: "Visa Application Submitted",
+          message: `Your visa application for ${payment.application.country || ""} ${payment.application.visaType || ""} has been submitted successfully.`,
+          link: `/dashboard/applications/${payment.applicationId}`,
+          data: {
+            applicationId: payment.applicationId,
+            country: payment.application.country,
+            visaType: payment.application.visaType,
+          },
+          sendEmail: false, // Email already sent above
+        });
       }
 
       if (payment.bookingId && payment.booking) {
@@ -136,6 +168,23 @@ export async function POST(req: Request) {
             isAdvance,
             isAdvance ? pendingBalance : undefined
           );
+          await notify({
+            userId: payment.booking.userId,
+            type: isAdvance ? "TOUR_PAYMENT_SUCCESS" : "TOUR_BOOKING_CONFIRMED",
+            title: isAdvance ? "Advance Payment Received" : "Tour Booking Confirmed",
+            message: isAdvance
+              ? `Advance payment of ₹${payment.amount.toLocaleString()} received for ${booking.tourName || ""}. Pending balance: ₹${pendingBalance.toLocaleString()}`
+              : `Your tour booking "${booking.tourName || ""}" is confirmed.`,
+            link: `/dashboard/bookings/${payment.bookingId}`,
+            data: {
+              bookingId: payment.bookingId,
+              amount: payment.amount,
+              tourName: booking.tourName,
+              isAdvance,
+              pendingBalance: isAdvance ? pendingBalance : undefined,
+            },
+            sendEmail: false, // Email already sent above
+          });
         }
       }
       await logAuditEvent({
@@ -171,7 +220,22 @@ export async function POST(req: Request) {
 
       const failedPayments = await prisma.payment.findMany({
         where: { razorpayOrderId: order_id },
-        select: { id: true, applicationId: true, bookingId: true, amount: true },
+        include: {
+          application: {
+            include: {
+              user: {
+                select: { id: true },
+              },
+            },
+          },
+          booking: {
+            include: {
+              user: {
+                select: { id: true },
+              },
+            },
+          },
+        },
       });
 
       for (const payment of failedPayments) {
@@ -189,6 +253,37 @@ export async function POST(req: Request) {
             razorpayPaymentId: payment_id,
           },
         });
+
+        // Notify user about payment failure
+        if (payment.applicationId && payment.application) {
+          await notify({
+            userId: payment.application.userId,
+            type: "VISA_PAYMENT_FAILED",
+            title: "Payment Failed",
+            message: `Your payment attempt for ₹${payment.amount.toLocaleString()} failed. Please try again.`,
+            link: `/dashboard/applications/${payment.applicationId}`,
+            data: {
+              applicationId: payment.applicationId,
+              amount: payment.amount,
+            },
+            sendEmail: true,
+          });
+        }
+
+        if (payment.bookingId && payment.booking) {
+          await notify({
+            userId: payment.booking.userId,
+            type: "TOUR_PAYMENT_FAILED",
+            title: "Payment Failed",
+            message: `Your payment attempt for ₹${payment.amount.toLocaleString()} failed. Please try again.`,
+            link: `/dashboard/bookings/${payment.bookingId}`,
+            data: {
+              bookingId: payment.bookingId,
+              amount: payment.amount,
+            },
+            sendEmail: true,
+          });
+        }
       }
     }
 

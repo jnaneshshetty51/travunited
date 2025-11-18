@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AuditAction, AuditEntityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logAuditEvent } from "@/lib/audit";
+import { notify, notifyMultiple } from "@/lib/notifications";
 export const dynamic = "force-dynamic";
 
 
@@ -41,6 +42,38 @@ export async function POST(req: Request) {
         email: lead.email,
       },
     });
+
+    // Notify all admins about new corporate lead
+    const admins = await prisma.user.findMany({
+      where: {
+        role: {
+          in: ["STAFF_ADMIN", "SUPER_ADMIN"],
+        },
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (admins.length > 0) {
+      await notifyMultiple(
+        admins.map((a) => a.id),
+        {
+          type: "ADMIN_CORPORATE_LEAD_ASSIGNED",
+          title: "New corporate lead",
+          message: `New corporate lead from ${lead.companyName}. Contact: ${lead.contactName} (${lead.email})`,
+          link: `/admin/corporate-leads`,
+          data: {
+            leadId: lead.id,
+            companyName: lead.companyName,
+            contactName: lead.contactName,
+            email: lead.email,
+          },
+          sendEmail: true,
+        }
+      );
+    }
 
     return NextResponse.json(
       { message: "Lead submitted successfully" },
