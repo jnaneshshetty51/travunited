@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     // Send security notification
     await notify({
       userId: session.user.id,
-      type: "PASSWORD_CHANGED",
+      type: "ACCOUNT_PASSWORD_CHANGED",
       title: "Password changed",
       message: "Your password has been changed successfully. If you didn't make this change, please contact support immediately.",
       link: `/dashboard/settings`,
