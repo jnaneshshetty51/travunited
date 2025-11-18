@@ -5,27 +5,7 @@ import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Menu, X, User, ChevronDown, LogOut, Shield } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
-<<<<<<< Current (Your changes)
 import { NotificationBell } from "@/components/ui/NotificationBell";
-=======
-import { NotificationBell } from "./NotificationBell";
->>>>>>> Incoming (Background Agent changes)
-=======
-import { NotificationBell } from "../notifications/NotificationBell";
->>>>>>> Incoming (Background Agent changes)
-=======
-import { NotificationBell } from "../notifications/NotificationBell";
->>>>>>> Incoming (Background Agent changes)
-=======
-import { NotificationBell } from "../notifications/NotificationBell";
->>>>>>> Incoming (Background Agent changes)
-=======
-import { NotificationBell } from "../notifications/NotificationBell";
->>>>>>> Incoming (Background Agent changes)
 
 export function Navbar() {
   const { data: session } = useSession();
@@ -71,7 +51,6 @@ export function Navbar() {
 
           {/* Auth Buttons */}
           <div className="hidden md:flex items-center space-x-4">
-            {session && <NotificationBell />}
             {session ? (
               <>
                 <NotificationBell />
