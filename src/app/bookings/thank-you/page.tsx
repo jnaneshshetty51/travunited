@@ -18,10 +18,30 @@ function BookingThankYouContent() {
 
   useEffect(() => {
     if (bookingId) {
-      fetch(`/api/bookings/${bookingId}`)
-        .then((res) => res.json())
-        .then((data) => setBooking(data))
-        .catch(console.error);
+      const fetchBooking = async () => {
+        try {
+          const res = await fetch(`/api/bookings/${bookingId}`);
+          if (res.ok) {
+            const data = await res.json();
+            setBooking(data);
+          } else {
+            console.error("Failed to fetch booking");
+          }
+        } catch (error) {
+          console.error("Error fetching booking:", error);
+        }
+      };
+      fetchBooking();
+      
+      // Poll for payment status update (in case webhook is delayed)
+      const interval = setInterval(() => {
+        fetchBooking();
+      }, 3000); // Check every 3 seconds
+      
+      // Stop polling after 30 seconds
+      setTimeout(() => clearInterval(interval), 30000);
+      
+      return () => clearInterval(interval);
     }
   }, [bookingId]);
 
@@ -44,12 +64,28 @@ function BookingThankYouContent() {
             </div>
             
             <h1 className="text-3xl font-bold text-neutral-900 mb-4">
-              Booking Confirmed!
+              {booking?.status === "BOOKED" 
+                ? "Booking Confirmed!" 
+                : booking?.status === "PAYMENT_PENDING"
+                ? "Payment Processing..."
+                : "Booking Received!"}
             </h1>
             
             <p className="text-lg text-neutral-600">
-              Thank you for your booking. Your tour has been confirmed and payment received.
+              {booking?.status === "BOOKED" 
+                ? "Thank you for your booking. Your tour has been confirmed and payment received."
+                : booking?.status === "PAYMENT_PENDING"
+                ? "Your payment is being processed. You'll receive a confirmation email shortly."
+                : "Thank you for your booking. We're processing your request."}
             </p>
+            
+            {booking?.status === "PAYMENT_PENDING" && (
+              <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-sm text-yellow-800">
+                  If payment doesn't complete within a few minutes, please check your dashboard or contact support.
+                </p>
+              </div>
+            )}
           </div>
 
           {booking && (

@@ -3,11 +3,32 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getMediaProxyUrl, normalizeMediaInput } from "@/lib/media";
+
+const mediaField = z
+  .union([
+    z.string().refine((value) => {
+      if (!value || value.trim() === "") {
+        return true; // Empty string is valid (will be normalized to null)
+      }
+      if (value.startsWith("/api/media/")) {
+        return true;
+      }
+      try {
+        new URL(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }, "Cover image must be a valid URL or media path"),
+    z.literal(""),
+  ])
+  .optional();
 
 const blogSchema = z.object({
   title: z.string().min(3),
   slug: z.string().min(3).regex(/^[a-z0-9-]+$/i, "Slug can contain only letters, numbers, and hyphens"),
-  coverImage: z.string().url().optional().or(z.literal("")),
+  coverImage: mediaField,
   excerpt: z.string().optional(),
   category: z.string().optional(),
   readTime: z.string().optional(),
@@ -39,7 +60,12 @@ export async function GET(req: Request) {
       },
     });
 
-    return NextResponse.json(posts);
+    const formatted = posts.map((post) => ({
+      ...post,
+      coverImage: getMediaProxyUrl(post.coverImage),
+    }));
+
+    return NextResponse.json(formatted);
   } catch (error) {
     console.error("Error fetching blog posts:", error);
     return NextResponse.json(
@@ -70,11 +96,25 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = blogSchema.parse(body);
 
+    let normalizedCover: string | null;
+    if (data.coverImage === "" || (typeof data.coverImage === "string" && data.coverImage.trim() === "")) {
+      normalizedCover = null;
+    } else if (data.coverImage) {
+      normalizedCover = normalizeMediaInput(data.coverImage);
+    } else {
+      normalizedCover = null;
+    }
+
+    console.log("Creating blog post:", {
+      coverImage: data.coverImage,
+      normalizedCover,
+    });
+
     const post = await prisma.blogPost.create({
       data: {
         title: data.title,
         slug: data.slug,
-        coverImage: data.coverImage || null,
+        coverImage: normalizedCover,
         excerpt: data.excerpt || null,
         category: data.category || null,
         readTime: data.readTime || null,

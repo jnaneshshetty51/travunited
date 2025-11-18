@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { getMediaProxyUrl } from "@/lib/media";
 
 type CountryOption = { id: string; name: string };
 
@@ -280,6 +281,8 @@ export default function AdminTourEditorPage() {
     form.append("folder", folder);
     form.append("scope", scope);
 
+    console.log(`Uploading ${scope} image:`, { fileName: file.name, size: file.size, type: file.type });
+
     const response = await fetch("/api/admin/uploads", {
       method: "POST",
       body: form,
@@ -287,11 +290,21 @@ export default function AdminTourEditorPage() {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new Error(error.error || "Failed to upload image");
+      const errorMessage = error.error || `Upload failed with status ${response.status}`;
+      console.error("Upload API error:", errorMessage, error);
+      throw new Error(errorMessage);
     }
 
     const payload = await response.json();
-    return payload.url as string;
+    const imageUrl = payload.proxyUrl || payload.url;
+    
+    if (!imageUrl) {
+      console.error("Upload response missing URL:", payload);
+      throw new Error("No image URL returned from upload");
+    }
+
+    console.log(`Upload successful for ${scope}:`, imageUrl);
+    return imageUrl;
   };
 
   const handleCoverImageUpload = async (file: File | null) => {
@@ -309,11 +322,16 @@ export default function AdminTourEditorPage() {
     setCoverUploadError(null);
     try {
       const url = await uploadCmsImage(file, "tours", "cover");
+      if (!url) {
+        throw new Error("No URL returned from upload");
+      }
       updateForm("imageUrl", url);
       setCoverImageMode("upload");
     } catch (error: any) {
       console.error("Cover upload failed", error);
-      setCoverUploadError(error.message || "Failed to upload image");
+      const errorMessage = error.message || "Failed to upload cover image";
+      setCoverUploadError(errorMessage);
+      alert(`Cover image upload failed: ${errorMessage}`);
     } finally {
       setCoverUploading(false);
     }
@@ -334,11 +352,16 @@ export default function AdminTourEditorPage() {
     setHeroUploadError(null);
     try {
       const url = await uploadCmsImage(file, "tours", "hero");
+      if (!url) {
+        throw new Error("No URL returned from upload");
+      }
       updateForm("heroImageUrl", url);
       setHeroImageMode("upload");
     } catch (error: any) {
       console.error("Hero upload failed", error);
-      setHeroUploadError(error.message || "Failed to upload image");
+      const errorMessage = error.message || "Failed to upload hero image";
+      setHeroUploadError(errorMessage);
+      alert(`Hero image upload failed: ${errorMessage}`);
     } finally {
       setHeroUploading(false);
     }
@@ -350,22 +373,40 @@ export default function AdminTourEditorPage() {
     setGalleryUploadError(null);
     try {
       const uploads: string[] = [];
-      for (const file of Array.from(files)) {
+      const fileArray = Array.from(files);
+      
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
         if (!file.type.startsWith("image/")) {
-          throw new Error("Gallery images must be valid image files.");
+          throw new Error(`File "${file.name}" is not a valid image file.`);
         }
         if (file.size > 5 * 1024 * 1024) {
-          throw new Error("Each gallery image must be under 5 MB.");
+          throw new Error(`File "${file.name}" exceeds 5 MB limit.`);
         }
-        const url = await uploadCmsImage(file, "tours", "gallery");
-        uploads.push(url);
+        try {
+          const url = await uploadCmsImage(file, "tours", "gallery");
+          if (!url) {
+            throw new Error(`No URL returned for "${file.name}"`);
+          }
+          uploads.push(url);
+        } catch (uploadError: any) {
+          console.error(`Failed to upload ${file.name}:`, uploadError);
+          throw new Error(`Failed to upload "${file.name}": ${uploadError.message || "Unknown error"}`);
+        }
       }
+      
+      if (uploads.length === 0) {
+        throw new Error("No images were uploaded successfully.");
+      }
+      
       const existing = galleryArray;
       const combined = [...existing, ...uploads].join("\n");
       updateForm("galleryImageUrls", combined);
     } catch (error: any) {
       console.error("Gallery upload failed", error);
-      setGalleryUploadError(error.message || "Failed to upload gallery images");
+      const errorMessage = error.message || "Failed to upload gallery images";
+      setGalleryUploadError(errorMessage);
+      alert(`Gallery upload failed: ${errorMessage}`);
     } finally {
       setGalleryUploading(false);
     }
@@ -838,7 +879,7 @@ export default function AdminTourEditorPage() {
               <div className="mt-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={formData.imageUrl}
+                  src={getMediaProxyUrl(formData.imageUrl)}
                   alt="Cover preview"
                   className="w-full max-h-48 object-cover rounded-lg border border-neutral-200"
                 />
@@ -903,7 +944,7 @@ export default function AdminTourEditorPage() {
               <div className="mt-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={formData.heroImageUrl}
+                  src={getMediaProxyUrl(formData.heroImageUrl)}
                   alt="Hero preview"
                   className="w-full max-h-48 object-cover rounded-lg border border-neutral-200"
                 />
@@ -960,7 +1001,7 @@ export default function AdminTourEditorPage() {
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={url}
+                    src={getMediaProxyUrl(url)}
                     alt={`Gallery ${index + 1}`}
                     className="h-16 w-16 object-cover rounded-md border border-neutral-200 flex-shrink-0"
                   />

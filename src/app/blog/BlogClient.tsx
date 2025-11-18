@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Search, Calendar, ArrowRight, Tag } from "lucide-react";
 import Image from "next/image";
 import { formatDate } from "@/lib/dateFormat";
+import { getMediaProxyUrl } from "@/lib/media";
 
 export type BlogClientPost = {
   id: string;
@@ -101,7 +102,7 @@ export function BlogClient({ posts }: { posts: BlogClientPost[] }) {
                 <div className="aspect-[16/9] relative">
                   <Image
                     src={
-                      post.coverImage ||
+                      getMediaProxyUrl(post.coverImage) ||
                       "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&q=80"
                     }
                     alt={post.title}

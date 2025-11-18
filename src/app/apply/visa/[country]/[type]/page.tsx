@@ -64,7 +64,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
   const [visaLoading, setVisaLoading] = useState(true);
   const [createdTravellerIds, setCreatedTravellerIds] = useState<string[]>([]);
 
-  const [formData, setFormData] = useState<Partial<VisaDraft>>({
+  const [formData, setFormData] = useState<Partial<VisaDraft & { travellers: Array<{ id: string; firstName: string; lastName: string; dateOfBirth: string; gender: string; passportNumber: string; passportIssueDate: string; passportExpiryDate: string; nationality: string; currentCity?: string }> }>>>({
     country: params.country,
     visaType: params.type,
     visaId: undefined,
@@ -98,9 +98,9 @@ export default function VisaApplicationPage({ params }: { params: { country: str
     [visaInfo]
   );
 
-  const getDocumentKey = (requirementId: string, travellerIndex?: number) =>
-    travellerIndex !== undefined
-      ? `${requirementId}:traveller-${travellerIndex}`
+  const getDocumentKey = (requirementId: string, travellerId?: string) =>
+    travellerId
+      ? `${requirementId}:traveller-${travellerId}`
       : `${requirementId}:application`;
 
   const visaName = visaInfo?.name || `${params.country.toUpperCase()} Visa`;
@@ -121,17 +121,20 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         const requirement = doc.requirementId
           ? requirementMap.get(doc.requirementId)
           : undefined;
-        const travellerData =
-          typeof doc.travellerIndex === "number"
-            ? formData.travellers?.[doc.travellerIndex]
-            : undefined;
+        const travellerId = typeof doc.travellerId === "string" ? doc.travellerId : undefined;
+        const travellerData = travellerId
+          ? formData.travellers?.find((t) => t.id === travellerId)
+          : undefined;
+        const travellerIndex = travellerId
+          ? formData.travellers?.findIndex((t) => t.id === travellerId) ?? -1
+          : -1;
         return {
           key,
           requirement,
           travellerLabel: travellerData
             ? `${travellerData.firstName} ${travellerData.lastName}`.trim()
-            : typeof doc.travellerIndex === "number"
-            ? `Traveller ${doc.travellerIndex + 1}`
+            : travellerIndex >= 0
+            ? `Traveller ${travellerIndex + 1}`
             : null,
           category:
             requirement?.category ||
@@ -211,6 +214,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
           ...prev,
           travellers: [
             {
+              id: `traveller-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               firstName: "",
               lastName: "",
               dateOfBirth: "",
@@ -222,6 +226,15 @@ export default function VisaApplicationPage({ params }: { params: { country: str
               currentCity: "",
             },
           ],
+        }));
+      } else {
+        // Ensure all existing travellers have IDs
+        setFormData((prev) => ({
+          ...prev,
+          travellers: prev.travellers?.map((t) => ({
+            ...t,
+            id: (t as any).id || `traveller-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          })) || [],
         }));
       }
     }
@@ -275,8 +288,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
       const missingDocs: string[] = [];
 
       perTravellerRequirements.forEach((req) => {
-        (formData.travellers || []).forEach((_, index) => {
-          const key = getDocumentKey(req.id, index);
+        (formData.travellers || []).forEach((traveller, index) => {
+          const key = getDocumentKey(req.id, traveller.id);
           if (req.isRequired && !formData.documents?.[key]?.file) {
             missingDocs.push(`${req.name} for traveller ${index + 1}`);
           }
@@ -314,7 +327,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
 
   const handleDocumentUpload = (
     requirement: VisaRequirement,
-    travellerIndex: number | undefined,
+    travellerId: string | undefined,
     file: File
   ) => {
     if (file.size > 20 * 1024 * 1024) {
@@ -329,7 +342,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
     }
 
     const reader = new FileReader();
-    const key = getDocumentKey(requirement.id, travellerIndex);
+    const key = getDocumentKey(requirement.id, travellerId);
     reader.onloadend = () => {
       setFormData((prev) => ({
         ...prev,
@@ -339,7 +352,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
             file,
             preview: reader.result as string,
             requirementId: requirement.id,
-            travellerIndex,
+            travellerId,
           },
         },
       }));
@@ -394,7 +407,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
           travelDate: formData.travelDate,
           tripType: formData.tripType,
           primaryContact: formData.primaryContact,
-          travellers: formData.travellers,
+          travellers: formData.travellers?.map(({ id, ...rest }) => rest) || [],
         }),
       });
 
@@ -463,19 +476,40 @@ export default function VisaApplicationPage({ params }: { params: { country: str
       uploadFormData.append("file", doc.file);
       uploadFormData.append("requirementId", doc.requirementId);
 
-      if (typeof doc.travellerIndex === "number") {
-        const travellerId = resolvedMap[doc.travellerIndex];
-        if (!travellerId) {
+      const docTravellerId = (doc as any).travellerId;
+      if (typeof docTravellerId === "string") {
+        // Find the index of this traveller in the form data
+        const travellerIndex = formData.travellers?.findIndex((t) => t.id === docTravellerId) ?? -1;
+        if (travellerIndex >= 0 && travellerIndex < resolvedMap.length) {
+          const travellerId = resolvedMap[travellerIndex];
+          if (travellerId) {
+            uploadFormData.append("travellerId", travellerId);
+          } else {
+            console.warn(
+              "Skipping document upload: traveller mapping missing",
+              travellerIndex
+            );
+            continue;
+          }
+        } else {
           console.warn(
-            "Skipping document upload: traveller mapping missing",
-            doc.travellerIndex
+            "Skipping document upload: traveller not found in form data",
+            docTravellerId
           );
           continue;
         }
-        uploadFormData.append(
-          "travellerId",
-          travellerId
-        );
+      } else if (typeof (doc as any).travellerIndex === "number") {
+        // Legacy support: handle old documents that use travellerIndex
+        const travellerIndex = (doc as any).travellerIndex;
+        const travellerId = resolvedMap[travellerIndex];
+        if (!travellerId) {
+          console.warn(
+            "Skipping document upload: traveller mapping missing",
+            travellerIndex
+          );
+          continue;
+        }
+        uploadFormData.append("travellerId", travellerId);
       }
 
       uploadFormData.append("documentType", doc.requirementId);
@@ -714,15 +748,22 @@ export default function VisaApplicationPage({ params }: { params: { country: str
             </p>
             <div className="space-y-6">
               {(formData.travellers || []).map((traveller, index) => (
-                <div key={index} className="border border-neutral-200 rounded-lg p-6">
+                <div key={traveller.id} className="border border-neutral-200 rounded-lg p-6">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-semibold text-lg">Traveller {index + 1}</h3>
                     {(formData.travellers || []).length > 1 && (
                       <button
                         onClick={() => {
-                          const newTravellers = [...(formData.travellers || [])];
-                          newTravellers.splice(index, 1);
-                          setFormData({ ...formData, travellers: newTravellers });
+                          const newTravellers = (formData.travellers || []).filter((t) => t.id !== traveller.id);
+                          // Clean up documents associated with this traveller
+                          const newDocuments = { ...(formData.documents || {}) };
+                          Object.keys(newDocuments).forEach((key) => {
+                            const doc = newDocuments[key];
+                            if (doc && (doc as any).travellerId === traveller.id) {
+                              delete newDocuments[key];
+                            }
+                          });
+                          setFormData({ ...formData, travellers: newTravellers, documents: newDocuments });
                         }}
                         className="text-red-600 hover:text-red-700 text-sm"
                       >
@@ -740,8 +781,9 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         required
                         value={traveller.firstName}
                         onChange={(e) => {
-                          const newTravellers = [...(formData.travellers || [])];
-                          newTravellers[index].firstName = e.target.value;
+                          const newTravellers = (formData.travellers || []).map((t) =>
+                            t.id === traveller.id ? { ...t, firstName: e.target.value } : t
+                          );
                           setFormData({ ...formData, travellers: newTravellers });
                         }}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
@@ -756,8 +798,9 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         required
                         value={traveller.lastName}
                         onChange={(e) => {
-                          const newTravellers = [...(formData.travellers || [])];
-                          newTravellers[index].lastName = e.target.value;
+                          const newTravellers = (formData.travellers || []).map((t) =>
+                            t.id === traveller.id ? { ...t, lastName: e.target.value } : t
+                          );
                           setFormData({ ...formData, travellers: newTravellers });
                         }}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
@@ -772,8 +815,9 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         required
                         value={traveller.dateOfBirth}
                         onChange={(e) => {
-                          const newTravellers = [...(formData.travellers || [])];
-                          newTravellers[index].dateOfBirth = e.target.value;
+                          const newTravellers = (formData.travellers || []).map((t) =>
+                            t.id === traveller.id ? { ...t, dateOfBirth: e.target.value } : t
+                          );
                           setFormData({ ...formData, travellers: newTravellers });
                         }}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
@@ -787,8 +831,9 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         required
                         value={traveller.gender}
                         onChange={(e) => {
-                          const newTravellers = [...(formData.travellers || [])];
-                          newTravellers[index].gender = e.target.value;
+                          const newTravellers = (formData.travellers || []).map((t) =>
+                            t.id === traveller.id ? { ...t, gender: e.target.value } : t
+                          );
                           setFormData({ ...formData, travellers: newTravellers });
                         }}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
@@ -808,8 +853,9 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         required
                         value={traveller.passportNumber}
                         onChange={(e) => {
-                          const newTravellers = [...(formData.travellers || [])];
-                          newTravellers[index].passportNumber = e.target.value;
+                          const newTravellers = (formData.travellers || []).map((t) =>
+                            t.id === traveller.id ? { ...t, passportNumber: e.target.value } : t
+                          );
                           setFormData({ ...formData, travellers: newTravellers });
                         }}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
@@ -824,8 +870,9 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         required
                         value={traveller.nationality || "Indian"}
                         onChange={(e) => {
-                          const newTravellers = [...(formData.travellers || [])];
-                          newTravellers[index].nationality = e.target.value;
+                          const newTravellers = (formData.travellers || []).map((t) =>
+                            t.id === traveller.id ? { ...t, nationality: e.target.value } : t
+                          );
                           setFormData({ ...formData, travellers: newTravellers });
                         }}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
@@ -841,8 +888,9 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         required
                         value={traveller.passportIssueDate}
                         onChange={(e) => {
-                          const newTravellers = [...(formData.travellers || [])];
-                          newTravellers[index].passportIssueDate = e.target.value;
+                          const newTravellers = (formData.travellers || []).map((t) =>
+                            t.id === traveller.id ? { ...t, passportIssueDate: e.target.value } : t
+                          );
                           setFormData({ ...formData, travellers: newTravellers });
                         }}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
@@ -857,8 +905,9 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         required
                         value={traveller.passportExpiryDate}
                         onChange={(e) => {
-                          const newTravellers = [...(formData.travellers || [])];
-                          newTravellers[index].passportExpiryDate = e.target.value;
+                          const newTravellers = (formData.travellers || []).map((t) =>
+                            t.id === traveller.id ? { ...t, passportExpiryDate: e.target.value } : t
+                          );
                           setFormData({ ...formData, travellers: newTravellers });
                         }}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
@@ -872,8 +921,9 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         type="text"
                         value={traveller.currentCity || ""}
                         onChange={(e) => {
-                          const newTravellers = [...(formData.travellers || [])];
-                          newTravellers[index].currentCity = e.target.value;
+                          const newTravellers = (formData.travellers || []).map((t) =>
+                            t.id === traveller.id ? { ...t, currentCity: e.target.value } : t
+                          );
                           setFormData({ ...formData, travellers: newTravellers });
                         }}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
@@ -890,6 +940,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                     travellers: [
                       ...(formData.travellers || []),
                       {
+                        id: `traveller-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                         firstName: "",
                         lastName: "",
                         dateOfBirth: "",
@@ -941,7 +992,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                   )}
                   {(formData.travellers || []).map((traveller, travellerIndex) => (
                     <div
-                      key={travellerIndex}
+                      key={traveller.id}
                       className="border border-neutral-200 rounded-lg p-4 space-y-3"
                     >
                       <h4 className="font-medium">
@@ -954,7 +1005,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         {perTravellerRequirements.map((requirement) => {
                           const key = getDocumentKey(
                             requirement.id,
-                            travellerIndex
+                            traveller.id
                           );
                           const doc = formData.documents?.[key];
                           return (
@@ -1020,7 +1071,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                                       if (file)
                                         handleDocumentUpload(
                                           requirement,
-                                          travellerIndex,
+                                          traveller.id,
                                           file
                                         );
                                     }}
@@ -1159,7 +1210,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                   {(formData.travellers || []).length} traveller(s)
                 </p>
                 {(formData.travellers || []).map((t, i) => (
-                  <p key={i} className="text-sm">
+                  <p key={t.id} className="text-sm">
                     {i + 1}. {t.firstName} {t.lastName}
                   </p>
                 ))}

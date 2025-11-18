@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { uploadVisaDocument } from "@/lib/minio";
+import { buildMediaProxyUrlFromKey } from "@/lib/media";
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
@@ -22,7 +23,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing file" }, { status: 400 });
     }
 
+    const folder = (formData.get("folder") as string) || "general";
+    const scope = (formData.get("scope") as string) || "media";
+
+    console.log("Upload request:", {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      folder,
+      scope,
+    });
+
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      console.error("Invalid file type:", file.type);
       return NextResponse.json(
         { error: "Only JPG, PNG or WEBP images are allowed" },
         { status: 400 }
@@ -30,19 +43,20 @@ export async function POST(request: Request) {
     }
 
     if (file.size > MAX_UPLOAD_BYTES) {
+      console.error("File too large:", file.size);
       return NextResponse.json(
         { error: "Image too large. Max 5 MB allowed." },
         { status: 400 }
       );
     }
 
-    const folder = (formData.get("folder") as string) || "general";
-    const scope = (formData.get("scope") as string) || "media";
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const safeName =
       sanitizeFileName(file.name || "image") || `image-${Date.now()}.jpg`;
     const key = `cms/${folder}/${scope}/${Date.now()}-${safeName}`;
+
+    console.log("Uploading to MinIO:", { key, bucket: process.env.MINIO_BUCKET });
 
     await uploadVisaDocument(key, buffer, file.type || "application/octet-stream");
 
@@ -54,11 +68,16 @@ export async function POST(request: Request) {
       ? `${trimmedBase}/${bucket}/${key}`
       : `/${bucket}/${key}`;
 
-    return NextResponse.json({ key, url });
+    const proxyUrl = buildMediaProxyUrlFromKey(key);
+
+    console.log("Upload successful:", { key, url, proxyUrl });
+
+    return NextResponse.json({ key, url, proxyUrl });
   } catch (error) {
     console.error("Media upload failed:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to upload image" },
+      { error: `Failed to upload image: ${errorMessage}` },
       { status: 500 }
     );
   }

@@ -249,22 +249,52 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
           bookingId,
           paymentType: formData.paymentType,
         },
-        handler: () => {
-          setLoading(false);
-          router.push(`/bookings/thank-you?bookingId=${bookingId}`);
+        handler: async (response: any) => {
+          try {
+            console.log("Payment response:", response);
+            
+            // Verify payment on server
+            const verifyResponse = await fetch("/api/payments/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                bookingId,
+              }),
+            });
+
+            if (verifyResponse.ok) {
+              setLoading(false);
+              router.push(`/bookings/thank-you?bookingId=${bookingId}`);
+            } else {
+              const errorData = await verifyResponse.json();
+              throw new Error(errorData.error || "Payment verification failed");
+            }
+          } catch (error: any) {
+            console.error("Payment verification error:", error);
+            setLoading(false);
+            alert(`Payment verification failed: ${error.message || "Please contact support"}`);
+          }
         },
         modal: {
           ondismiss: () => {
             setLoading(false);
+            console.log("Payment modal dismissed");
           },
         },
       };
 
       const razorpay = new window.Razorpay(options);
-      razorpay.on("payment.failed", () => {
+      
+      razorpay.on("payment.failed", (response: any) => {
+        console.error("Payment failed:", response);
         setLoading(false);
-        alert("Payment failed. Please try again.");
+        const errorMessage = response.error?.description || response.error?.reason || "Payment failed. Please try again.";
+        alert(errorMessage);
       });
+
       razorpay.open();
     } catch (error) {
       console.error(error);

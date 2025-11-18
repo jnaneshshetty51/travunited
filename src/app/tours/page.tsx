@@ -31,8 +31,8 @@ export default async function ToursPage() {
     isFeatured: tour.isFeatured,
     allowAdvance: tour.allowAdvance,
     image:
-      tour.heroImageUrl ||
-      tour.imageUrl ||
+      getMediaProxyUrl(tour.heroImageUrl) ||
+      getMediaProxyUrl(tour.imageUrl) ||
       "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=900&q=80",
     }));
 

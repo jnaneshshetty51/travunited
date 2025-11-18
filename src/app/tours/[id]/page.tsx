@@ -11,6 +11,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { getMediaProxyUrl } from "@/lib/media";
 
 export default async function TourDetailPage({
   params,
@@ -30,7 +31,7 @@ export default async function TourDetailPage({
   }
 
   const gallery: string[] = tour.galleryImageUrls
-    ? JSON.parse(tour.galleryImageUrls)
+    ? JSON.parse(tour.galleryImageUrls).map((url: string) => getMediaProxyUrl(url) || url)
     : [];
   const inclusions = toList(tour.inclusions);
   const exclusions = toList(tour.exclusions);
@@ -115,7 +116,7 @@ export default async function TourDetailPage({
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {gallery.map((src) => (
                     <div key={src} className="relative aspect-video rounded-xl overflow-hidden">
-                      <Image src={src} alt={tour.name} fill className="object-cover" />
+                      <Image src={getMediaProxyUrl(src)} alt={tour.name} fill className="object-cover" />
                     </div>
                   ))}
                 </div>
@@ -172,9 +173,9 @@ export default async function TourDetailPage({
 
 function Hero({ tour, gallery }: { tour: any; gallery: string[] }) {
   const heroImage =
-    tour.heroImageUrl ||
-    tour.imageUrl ||
-    gallery[0] ||
+    getMediaProxyUrl(tour.heroImageUrl) ||
+    getMediaProxyUrl(tour.imageUrl) ||
+    getMediaProxyUrl(gallery[0]) ||
     "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80";
   return (
     <div className="relative h-[400px] md:h-[500px]">

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import type { Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getMediaProxyUrl, normalizeMediaInput } from "@/lib/media";
 
 const slugify = (text: string) =>
   text
@@ -64,7 +65,18 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(tour);
+    return NextResponse.json({
+      ...tour,
+      imageUrl: getMediaProxyUrl(tour.imageUrl),
+      heroImageUrl: getMediaProxyUrl(tour.heroImageUrl),
+      galleryImageUrls: tour.galleryImageUrls
+        ? JSON.stringify(
+            JSON.parse(tour.galleryImageUrls).map((url: string) =>
+              getMediaProxyUrl(url)
+            )
+          )
+        : null,
+    });
   } catch (error) {
     console.error("Error fetching tour:", error);
     return NextResponse.json(
@@ -141,11 +153,19 @@ export async function PUT(
           inclusions: inclusions || null,
           exclusions: exclusions || null,
           importantNotes: importantNotes || null,
-          imageUrl: imageUrl || null,
-          heroImageUrl: heroImageUrl || imageUrl || null,
+          imageUrl: normalizeMediaInput(imageUrl),
+          heroImageUrl: normalizeMediaInput(heroImageUrl || imageUrl),
           galleryImageUrls: Array.isArray(galleryImageUrls)
-            ? JSON.stringify(galleryImageUrls)
-            : galleryImageUrls || null,
+            ? JSON.stringify(
+                galleryImageUrls.map((url: string) => normalizeMediaInput(url) || url)
+              )
+            : galleryImageUrls
+            ? JSON.stringify(
+                (JSON.parse(galleryImageUrls) as string[]).map((url: string) =>
+                  normalizeMediaInput(url) || url
+                )
+              )
+            : null,
           isActive: isActive ?? true,
           isFeatured: isFeatured ?? false,
           allowAdvance: allowAdvance ?? false,

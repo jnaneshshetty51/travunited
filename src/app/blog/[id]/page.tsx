@@ -4,6 +4,7 @@ import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { formatDate } from "@/lib/dateFormat";
+import { getMediaProxyUrl } from "@/lib/media";
 
 export default async function BlogPostPage({ params }: { params: { id: string } }) {
   const post = await prisma.blogPost.findUnique({
@@ -21,7 +22,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
       <div className="relative h-[400px] md:h-[500px]">
         <Image
           src={
-            post.coverImage ||
+            getMediaProxyUrl(post.coverImage) ||
             "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1600&q=80"
           }
           alt={post.title}

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import type { Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { normalizeMediaInput } from "@/lib/media";
 
 const slugify = (text: string) =>
   text
@@ -153,11 +154,19 @@ export async function POST(req: Request) {
         inclusions: inclusions || null,
         exclusions: exclusions || null,
         importantNotes: importantNotes || null,
-        imageUrl: imageUrl || null,
-        heroImageUrl: heroImageUrl || imageUrl || null,
+        imageUrl: normalizeMediaInput(imageUrl),
+        heroImageUrl: normalizeMediaInput(heroImageUrl || imageUrl),
         galleryImageUrls: Array.isArray(galleryImageUrls)
-          ? JSON.stringify(galleryImageUrls)
-          : galleryImageUrls || null,
+          ? JSON.stringify(
+              galleryImageUrls.map((url: string) => normalizeMediaInput(url) || url)
+            )
+          : galleryImageUrls
+          ? JSON.stringify(
+              (JSON.parse(galleryImageUrls) as string[]).map((url: string) =>
+                normalizeMediaInput(url) || url
+              )
+            )
+          : null,
         isActive: isActive ?? true,
         isFeatured: isFeatured ?? false,
         allowAdvance: allowAdvance ?? false,

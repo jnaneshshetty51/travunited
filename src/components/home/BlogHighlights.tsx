@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Calendar } from "lucide-react";
 import Image from "next/image";
 import { formatDate } from "@/lib/dateFormat";
+import { getMediaProxyUrl } from "@/lib/media";
 
 type HighlightPost = {
   id: string;
@@ -72,10 +73,10 @@ export function BlogHighlights({ posts }: { posts?: HighlightPost[] }) {
                 <div className="bg-white rounded-2xl shadow-medium hover:shadow-large transition-shadow duration-300 overflow-hidden">
                   <div className="aspect-[16/9] relative">
                     <Image
-                      src={
-                        post.image ||
-                        "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&q=80"
-                      }
+                    src={
+                      getMediaProxyUrl(post.image) ||
+                      "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&q=80"
+                    }
                       alt={post.title}
                       fill
                       className="object-cover group-hover:scale-110 transition-transform duration-500"

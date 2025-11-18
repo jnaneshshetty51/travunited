@@ -4,6 +4,7 @@ import type { Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { DocScope } from "@prisma/client";
+import { getMediaProxyUrl, normalizeMediaInput } from "@/lib/media";
 
 const slugify = (text: string) =>
   text
@@ -68,7 +69,10 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(visa);
+    return NextResponse.json({
+      ...visa,
+      heroImageUrl: getMediaProxyUrl(visa.heroImageUrl),
+    });
   } catch (error) {
     console.error("Error fetching visa:", error);
     return NextResponse.json(
@@ -159,7 +163,7 @@ export async function PUT(
           rejectionReasons: rejectionReasons || null,
           whyTravunited: whyTravunited || null,
           statistics: statistics || null,
-          heroImageUrl: heroImageUrl || null,
+          heroImageUrl: normalizeMediaInput(heroImageUrl),
           metaTitle: metaTitle || null,
           metaDescription: metaDescription || null,
         },

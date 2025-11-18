@@ -14,6 +14,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { getMediaProxyUrl } from "@/lib/media";
 
 type DocScope = "PER_TRAVELLER" | "PER_APPLICATION";
 
@@ -378,7 +379,7 @@ const handleFaqChange = (
       }
 
       const payload = await response.json();
-      setFormData((prev) => ({ ...prev, heroImageUrl: payload.url }));
+      setFormData((prev) => ({ ...prev, heroImageUrl: payload.proxyUrl || payload.url }));
       setHeroImageMode("upload");
     } catch (error: any) {
       console.error("Hero image upload failed", error);
@@ -936,11 +937,11 @@ const handleFaqChange = (
                         )}
                       </div>
                     )}
-                    {formData.heroImageUrl && (
+                        {formData.heroImageUrl && (
                       <div className="mt-3">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={formData.heroImageUrl}
+                          src={getMediaProxyUrl(formData.heroImageUrl)}
                           alt="Hero preview"
                           className="w-full max-h-56 object-cover rounded-xl border border-neutral-200"
                         />

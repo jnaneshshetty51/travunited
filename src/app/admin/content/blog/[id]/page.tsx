@@ -7,6 +7,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { Save, ArrowLeft, Loader2 } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
+import { getMediaProxyUrl } from "@/lib/media";
 
 interface BlogPost {
   id: string;
@@ -47,7 +48,10 @@ export default function AdminBlogEditPage() {
       const response = await fetch(`/api/admin/content/blog/${params.id}`);
       if (response.ok) {
         const data = await response.json();
-        setFormData(data);
+        setFormData({
+          ...data,
+          coverImage: getMediaProxyUrl(data.coverImage),
+        });
         if (data.coverImage && !data.coverImage.startsWith("http")) {
           setCoverImageMode("upload");
         } else if (data.coverImage) {
@@ -113,7 +117,16 @@ export default function AdminBlogEditPage() {
       }
 
       const data = await response.json();
-      setFormData((prev) => ({ ...prev, coverImage: data.url }));
+      // Use proxyUrl directly if available, otherwise proxy the raw URL
+      const imageUrl = data.proxyUrl || getMediaProxyUrl(data.url);
+      if (!imageUrl) {
+        throw new Error("No image URL returned from upload");
+      }
+      console.log("Upload successful, image URL:", imageUrl);
+      setFormData((prev) => ({
+        ...prev,
+        coverImage: imageUrl,
+      }));
       setCoverImageMode("upload");
     } catch (error: any) {
       console.error("Cover upload failed", error);
@@ -141,19 +154,29 @@ export default function AdminBlogEditPage() {
         : `/api/admin/content/blog/${params.id}`;
       const method = isNew ? "POST" : "PUT";
 
+      // Prepare form data, converting empty strings to undefined for coverImage
+      const submitData = {
+        ...formData,
+        coverImage: formData.coverImage && formData.coverImage.trim() ? formData.coverImage.trim() : undefined,
+      };
+
+      console.log("Submitting blog post with coverImage:", submitData.coverImage);
+
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submitData),
       });
 
       if (response.ok) {
         router.push("/admin/content/blog");
       } else {
-        alert("Failed to save blog post");
+        const errorData = await response.json().catch(() => ({}));
+        alert(errorData.error || "Failed to save blog post");
       }
     } catch (error) {
-      alert("An error occurred");
+      console.error("Error saving blog post:", error);
+      alert("An error occurred while saving");
     } finally {
       setSaving(false);
     }
@@ -280,7 +303,7 @@ export default function AdminBlogEditPage() {
                   {formData.coverImage && (
                     <div className="mt-3 relative w-full h-48">
                       <Image
-                        src={formData.coverImage}
+                        src={getMediaProxyUrl(formData.coverImage)}
                         alt="Cover preview"
                         fill
                         unoptimized

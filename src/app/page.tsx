@@ -5,6 +5,7 @@ import { WhyTravunited } from "@/components/home/WhyTravunited";
 import { Testimonials } from "@/components/home/Testimonials";
 import { BlogHighlights } from "@/components/home/BlogHighlights";
 import { prisma } from "@/lib/prisma";
+import { getMediaProxyUrl } from "@/lib/media";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -20,7 +21,7 @@ export default async function Home() {
     id: post.slug,
     title: post.title,
     excerpt: post.excerpt,
-    image: post.coverImage,
+    image: getMediaProxyUrl(post.coverImage),
     date: (post.publishedAt ?? post.createdAt).toISOString(),
     category: post.category,
   }));

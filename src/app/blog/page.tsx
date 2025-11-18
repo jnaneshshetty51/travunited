@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { BlogClient } from "./BlogClient";
+import { getMediaProxyUrl } from "@/lib/media";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -14,7 +15,7 @@ export default async function BlogPage() {
     id: post.slug,
     title: post.title,
     excerpt: post.excerpt,
-    coverImage: post.coverImage,
+    coverImage: getMediaProxyUrl(post.coverImage),
     category: post.category,
     readTime: post.readTime,
     publishedAt: (post.publishedAt ?? post.createdAt).toISOString(),

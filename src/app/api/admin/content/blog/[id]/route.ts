@@ -3,11 +3,32 @@ import { getServerSession } from "next-auth";
 import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getMediaProxyUrl, normalizeMediaInput } from "@/lib/media";
+
+const mediaField = z
+  .union([
+    z.string().refine((value) => {
+      if (!value || value.trim() === "") {
+        return true; // Empty string is valid (will be normalized to null)
+      }
+      if (value.startsWith("/api/media/")) {
+        return true;
+      }
+      try {
+        new URL(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }, "Cover image must be a valid URL or media path"),
+    z.literal(""),
+  ])
+  .optional();
 
 const blogSchema = z.object({
   title: z.string().min(3).optional(),
   slug: z.string().min(3).regex(/^[a-z0-9-]+$/i).optional(),
-  coverImage: z.string().url().optional().or(z.literal("")),
+  coverImage: mediaField,
   excerpt: z.string().optional(),
   category: z.string().optional(),
   readTime: z.string().optional(),
@@ -47,7 +68,10 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(post);
+    return NextResponse.json({
+      ...post,
+      coverImage: getMediaProxyUrl(post.coverImage),
+    });
   } catch (error) {
     console.error("Error fetching blog post:", error);
     return NextResponse.json(
@@ -92,12 +116,30 @@ export async function PUT(
       );
     }
 
+    let normalizedCover: string | null | undefined;
+    if (data.coverImage !== undefined) {
+      if (data.coverImage === "" || (typeof data.coverImage === "string" && data.coverImage.trim() === "")) {
+        normalizedCover = null;
+      } else {
+        normalizedCover = normalizeMediaInput(data.coverImage);
+      }
+    } else {
+      normalizedCover = undefined;
+    }
+
+    console.log("Updating blog post:", {
+      coverImage: data.coverImage,
+      normalizedCover,
+      existingCoverImage: existing.coverImage,
+    });
+
     const updated = await prisma.blogPost.update({
       where: { id: params.id },
       data: {
         title: data.title ?? existing.title,
         slug: data.slug ?? existing.slug,
-        coverImage: data.coverImage !== undefined ? data.coverImage || null : existing.coverImage,
+        coverImage:
+          normalizedCover !== undefined ? normalizedCover : existing.coverImage,
         excerpt: data.excerpt !== undefined ? data.excerpt || null : existing.excerpt,
         category: data.category !== undefined ? data.category || null : existing.category,
         readTime: data.readTime !== undefined ? data.readTime || null : existing.readTime,

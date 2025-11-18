@@ -14,7 +14,14 @@ export async function POST(req: Request) {
     const signature = req.headers.get("x-razorpay-signature");
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
+    console.log("Webhook received:", {
+      hasSignature: !!signature,
+      hasSecret: !!webhookSecret,
+      bodyLength: rawBody.length,
+    });
+
     if (!signature || !webhookSecret) {
+      console.error("Webhook configuration missing");
       return NextResponse.json(
         { error: "Webhook configuration missing" },
         { status: 500 }
@@ -27,11 +34,20 @@ export async function POST(req: Request) {
       .digest("hex");
 
     if (expectedSignature !== signature) {
+      console.error("Invalid webhook signature:", {
+        expected: expectedSignature.substring(0, 20) + "...",
+        received: signature.substring(0, 20) + "...",
+      });
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
     const body = JSON.parse(rawBody);
     const { event, payload } = body;
+
+    console.log("Webhook event:", event, {
+      order_id: payload?.payment?.entity?.order_id,
+      payment_id: payload?.payment?.entity?.payment_id,
+    });
 
     if (event === "payment.captured") {
       const { payment_id, order_id } = payload.payment.entity;
@@ -59,6 +75,7 @@ export async function POST(req: Request) {
       });
 
       if (!payment) {
+        console.error("Payment not found for order_id:", order_id);
         return NextResponse.json({ error: "Payment not found" }, { status: 404 });
       }
 
@@ -130,11 +147,15 @@ export async function POST(req: Request) {
     }
 
     if (event === "payment.failed") {
-      const { order_id } = payload.payment.entity;
-      await prisma.payment.updateMany({
+      const { order_id, payment_id } = payload.payment.entity;
+      console.log("Payment failed webhook:", { order_id, payment_id });
+
+      const updated = await prisma.payment.updateMany({
         where: { razorpayOrderId: order_id },
         data: { status: "FAILED" },
       });
+
+      console.log(`Updated ${updated.count} payment(s) to FAILED status`);
 
       const failedPayments = await prisma.payment.findMany({
         where: { razorpayOrderId: order_id },
@@ -153,6 +174,7 @@ export async function POST(req: Request) {
             bookingId: payment.bookingId,
             amount: payment.amount,
             razorpayOrderId: order_id,
+            razorpayPaymentId: payment_id,
           },
         });
       }

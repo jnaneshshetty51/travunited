@@ -33,6 +33,7 @@ export interface VisaDraft {
       preview?: string;
       requirementId?: string;
       travellerIndex?: number;
+      travellerId?: string;
     }
   >;
   travellerIds?: string[];
