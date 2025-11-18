@@ -82,7 +82,7 @@ function BookingThankYouContent() {
             {booking?.status === "PAYMENT_PENDING" && (
               <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                 <p className="text-sm text-yellow-800">
-                  If payment doesn't complete within a few minutes, please check your dashboard or contact support.
+                  If payment doesn&apos;t complete within a few minutes, please check your dashboard or contact support.
                 </p>
               </div>
             )}

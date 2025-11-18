@@ -194,6 +194,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
     return () => {
       isMounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.country, params.type, router]);
 
   // Load draft from localStorage on mount
@@ -250,6 +251,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         },
       }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, params, travellerCount]);
 
   // Auto-save to localStorage on form changes
