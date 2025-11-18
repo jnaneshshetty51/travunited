@@ -99,6 +99,18 @@ export async function POST(req: Request) {
       );
     }
 
+    // Idempotency check: if payment is already completed, return success
+    if (payment.status === "COMPLETED") {
+      console.log(`Payment ${payment.id} already verified`);
+      return NextResponse.json({
+        success: true,
+        paymentId: payment.id,
+        bookingId: payment.bookingId,
+        applicationId: payment.applicationId,
+        message: "Payment already verified",
+      });
+    }
+
     // Update payment status
     await prisma.payment.update({
       where: { id: payment.id },

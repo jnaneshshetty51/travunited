@@ -48,6 +48,12 @@ A modern, premium travel website for visa services and tour packages, built with
    MINIO_ENDPOINT=http://localhost:9000
    MINIO_ACCESS_KEY=minioadmin
    MINIO_SECRET_KEY=miniolocalpassword
+   
+   # Razorpay Configuration (Live)
+   RAZORPAY_KEY_ID=rzp_live_RgWRYwBIvTDWg0
+   RAZORPAY_KEY_SECRET=2DXH80QhLv9gTcZhQ1pXgioo
+   NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_live_RgWRYwBIvTDWg0
+   RAZORPAY_WEBHOOK_SECRET=TRAVunited@@@1234
    MINIO_BUCKET=visa-documents
 
    NEXTAUTH_SECRET=your-secret-key

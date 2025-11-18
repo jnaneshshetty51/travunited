@@ -17,11 +17,30 @@ function ThankYouContent() {
 
   useEffect(() => {
     if (applicationId) {
-      // Fetch application details
-      fetch(`/api/applications/${applicationId}`)
-        .then((res) => res.json())
-        .then((data) => setApplication(data))
-        .catch(console.error);
+      const fetchApplication = async () => {
+        try {
+          const res = await fetch(`/api/applications/${applicationId}`);
+          if (res.ok) {
+            const data = await res.json();
+            setApplication(data);
+          } else {
+            console.error("Failed to fetch application");
+          }
+        } catch (error) {
+          console.error("Error fetching application:", error);
+        }
+      };
+      fetchApplication();
+      
+      // Poll for payment status update (in case webhook is delayed)
+      const interval = setInterval(() => {
+        fetchApplication();
+      }, 3000); // Check every 3 seconds
+      
+      // Stop polling after 30 seconds
+      setTimeout(() => clearInterval(interval), 30000);
+      
+      return () => clearInterval(interval);
     }
   }, [applicationId]);
 

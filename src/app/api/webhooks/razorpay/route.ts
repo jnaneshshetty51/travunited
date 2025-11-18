@@ -12,22 +12,34 @@ export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
     const signature = req.headers.get("x-razorpay-signature");
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    
+    // Use the provided webhook secret
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || "TRAVunited@@@1234";
 
-    console.log("Webhook received:", {
+    console.log("Razorpay webhook received:", {
       hasSignature: !!signature,
       hasSecret: !!webhookSecret,
       bodyLength: rawBody.length,
+      timestamp: new Date().toISOString(),
     });
 
-    if (!signature || !webhookSecret) {
-      console.error("Webhook configuration missing");
+    if (!signature) {
+      console.error("Missing webhook signature");
+      return NextResponse.json(
+        { error: "Missing signature" },
+        { status: 401 }
+      );
+    }
+
+    if (!webhookSecret) {
+      console.error("Webhook secret not configured");
       return NextResponse.json(
         { error: "Webhook configuration missing" },
         { status: 500 }
       );
     }
 
+    // Verify signature
     const expectedSignature = crypto
       .createHmac("sha256", webhookSecret)
       .update(rawBody)
@@ -49,6 +61,7 @@ export async function POST(req: Request) {
       payment_id: payload?.payment?.entity?.payment_id,
     });
 
+    // Handle payment.captured event
     if (event === "payment.captured") {
       const { payment_id, order_id } = payload.payment.entity;
 
@@ -93,6 +106,7 @@ export async function POST(req: Request) {
         },
       });
 
+      // Update application status if applicable
       if (payment.applicationId && payment.application) {
         await prisma.application.update({
           where: { id: payment.applicationId },
@@ -110,6 +124,7 @@ export async function POST(req: Request) {
         );
       }
 
+      // Update booking status if applicable
       if (payment.bookingId && payment.booking) {
         const booking = await prisma.booking.findUnique({
           where: { id: payment.bookingId },
@@ -136,12 +151,14 @@ export async function POST(req: Request) {
           );
         }
       }
+
+      // Log audit event
       await logAuditEvent({
         adminId: null,
         entityType: AuditEntityType.PAYMENT,
         entityId: payment.id,
         action: AuditAction.STATUS_CHANGE,
-        description: `Payment captured via Razorpay for ${payment.applicationId ? "application" : "booking"} ${payment.applicationId || payment.bookingId}`,
+        description: `Payment captured via Razorpay webhook for ${payment.applicationId ? "application" : "booking"} ${payment.applicationId || payment.bookingId}`,
         metadata: {
           applicationId: payment.applicationId,
           bookingId: payment.bookingId,
@@ -150,8 +167,11 @@ export async function POST(req: Request) {
           razorpayPaymentId: payment_id,
         },
       });
+
+      console.log(`Successfully processed payment.captured for payment ${payment.id}`);
     }
 
+    // Handle payment.failed event
     if (event === "payment.failed") {
       const { order_id, payment_id } = payload.payment.entity;
       console.log("Payment failed webhook:", { order_id, payment_id });
@@ -190,13 +210,40 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ received: true });
+    // Handle order.paid event (alternative event name)
+    if (event === "order.paid") {
+      const { id: order_id } = payload.order.entity;
+      console.log("Order paid webhook:", { order_id });
+
+      const payment = await prisma.payment.findFirst({
+        where: {
+          razorpayOrderId: order_id,
+        },
+      });
+
+      if (payment && payment.status !== "COMPLETED") {
+        // Fetch payment details from Razorpay if needed
+        // For now, we'll rely on payment.captured event
+        console.log(`Order ${order_id} paid, but waiting for payment.captured event`);
+      }
+    }
+
+    return NextResponse.json({ received: true, event });
   } catch (error) {
-    console.error("Error processing webhook:", error);
+    console.error("Error processing Razorpay webhook:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
     );
   }
+}
+
+// Also handle GET requests for webhook verification/testing
+export async function GET() {
+  return NextResponse.json({ 
+    message: "Razorpay webhook endpoint is active",
+    webhookUrl: "https://travunited.com/api/webhooks/razorpay",
+    timestamp: new Date().toISOString(),
+  });
 }
 
