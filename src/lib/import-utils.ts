@@ -20,21 +20,18 @@ export function parseCSV(file: File): Promise<any[]> {
 }
 
 export function parseXLSX(file: File): Promise<any[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-        resolve(jsonData as any[]);
-      } catch (error) {
-        reject(error);
-      }
-    };
-    reader.onerror = reject;
-    reader.readAsArrayBuffer(file);
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Use File.arrayBuffer() which works in both browser and Node.js environments
+      const arrayBuffer = await file.arrayBuffer();
+      const data = new Uint8Array(arrayBuffer);
+      const workbook = XLSX.read(data, { type: "array" });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+      resolve(jsonData as any[]);
+    } catch (error) {
+      reject(error);
+    }
   });
 }
 
