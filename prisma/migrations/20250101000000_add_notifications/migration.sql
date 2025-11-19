@@ -26,6 +26,6 @@ CREATE INDEX "Notification_userId_readAt_idx" ON "Notification"("userId", "readA
 -- CreateIndex
 CREATE INDEX "Notification_type_idx" ON "Notification"("type");
 
--- AddForeignKey
-ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+-- FK to User intentionally removed for now - will be re-added when User model is finalized
+-- ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

@@ -40,8 +40,9 @@ model User {
   reviews      Review[]
   auditLogs    AuditLog[]
   payments     Payment[]
-  notifications Notification[]
-  notificationSettings UserNotificationSettings?
+  // Relations to Notification models intentionally removed for now - will be re-added when User model is finalized
+  // notifications Notification[]
+  // notificationSettings UserNotificationSettings?
 }
 
 model Application {
@@ -401,7 +402,7 @@ model BlogPost {
 
 model Notification {
   id            String   @id @default(cuid())
-  userId        String
+  userId        String   // Store user ID as string, no FK for now
   roleScope     String?  // "CUSTOMER", "STAFF_ADMIN", "SUPER_ADMIN"
   type          String   // e.g. VISA_STATUS_CHANGED, TOUR_BOOKING_CREATED
   title         String
@@ -414,7 +415,8 @@ model Notification {
   readAt        DateTime?
   createdAt     DateTime @default(now())
 
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // FK to User intentionally removed for now - will be re-added when User model is finalized
+  // user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, readAt])
@@ -423,13 +425,14 @@ model Notification {
 
 model UserNotificationSettings {
   id            String   @id @default(cuid())
-  userId        String   @unique
+  userId        String   @unique // Store user ID as string, no FK for now
   emailEnabled  Json     @default("{}") // per notification type preferences
   inAppEnabled  Json     @default("{}")
   pushEnabled   Json     @default("{}")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // FK to User intentionally removed for now - will be re-added when User model is finalized
+  // user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
