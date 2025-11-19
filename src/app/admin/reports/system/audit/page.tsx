@@ -77,7 +77,7 @@ export default function AuditLogPage() {
       }
       fetchReport();
     }
-  }, [session?.user?.role, status, fetchReport]);
+  }, [session?.user?.role, status, router, fetchReport]);
 
   const handleExport = (format: "xlsx" | "csv" | "pdf") => {
     const url = buildExportUrl("/api/admin/reports/system/audit", filters, format);

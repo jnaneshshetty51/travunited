@@ -113,7 +113,7 @@ export default function VisaApplicationsReportPage() {
       }
       fetchReport();
     }
-  }, [session?.user?.role, status, fetchReport]);
+  }, [session?.user?.role, status, router, fetchReport]);
 
   const handleExport = (format: "xlsx" | "csv" | "pdf") => {
     const url = buildExportUrl("/api/admin/reports/visas/summary", filters, format);
