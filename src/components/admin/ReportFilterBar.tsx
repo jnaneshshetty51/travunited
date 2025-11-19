@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Calendar, Filter, X } from "lucide-react";
 
 interface ReportFilterBarProps {
@@ -84,18 +84,22 @@ export function ReportFilterBar({
     }
   }, [datePreset]);
 
+  // Memoize the filter object to prevent unnecessary re-renders
+  const filterObject = useMemo(() => ({
+    dateFrom,
+    dateTo,
+    datePreset,
+    countryIds: selectedCountries.length > 0 ? selectedCountries : undefined,
+    status: status || undefined,
+    paymentStatus: paymentStatus || undefined,
+    type: type || undefined,
+  }), [dateFrom, dateTo, datePreset, selectedCountries, status, paymentStatus, type]);
+
   useEffect(() => {
     // Notify parent of filter changes
-    onFilterChange({
-      dateFrom,
-      dateTo,
-      datePreset,
-      countryIds: selectedCountries.length > 0 ? selectedCountries : undefined,
-      status: status || undefined,
-      paymentStatus: paymentStatus || undefined,
-      type: type || undefined,
-    });
-  }, [dateFrom, dateTo, datePreset, selectedCountries, status, paymentStatus, type, onFilterChange]);
+    onFilterChange(filterObject);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterObject]);
 
   const handlePresetChange = (preset: string) => {
     setDatePreset(preset);

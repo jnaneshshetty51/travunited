@@ -37,12 +37,16 @@ export default function AuditLogPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Memoize filter values to prevent infinite re-renders
+  const dateFrom = filters.dateFrom;
+  const dateTo = filters.dateTo;
+
   const fetchReport = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filters.dateFrom) params.append("dateFrom", filters.dateFrom);
-      if (filters.dateTo) params.append("dateTo", filters.dateTo);
+      if (dateFrom) params.append("dateFrom", dateFrom);
+      if (dateTo) params.append("dateTo", dateTo);
       params.append("page", page.toString());
       params.append("limit", "50");
 
@@ -58,20 +62,22 @@ export default function AuditLogPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, page]);
+  }, [dateFrom, dateTo, page]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
-    } else if (status === "authenticated") {
+      return;
+    }
+    if (status === "authenticated") {
       const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
       if (!isSuperAdmin) {
         router.push("/admin");
-      } else {
-        fetchReport();
+        return;
       }
+      fetchReport();
     }
-  }, [session, status, router, fetchReport]);
+  }, [session?.user?.role, status, fetchReport]);
 
   const handleExport = (format: "xlsx" | "csv" | "pdf") => {
     const url = buildExportUrl("/api/admin/reports/system/audit", filters, format);

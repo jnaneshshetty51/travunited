@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Download, FileDown, TrendingUp, Calendar, FileText } from "lucide-react";
@@ -47,14 +47,19 @@ export default function TourPerformancePage() {
     }
   }, []);
 
+  // Memoize filter values to prevent infinite re-renders
+  const dateFrom = filters.dateFrom;
+  const dateTo = filters.dateTo;
+  const countryIds = useMemo(() => filters.countryIds || [], [filters.countryIds]);
+
   const fetchReport = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filters.dateFrom) params.append("dateFrom", filters.dateFrom);
-      if (filters.dateTo) params.append("dateTo", filters.dateTo);
-      if (filters.countryIds && filters.countryIds.length > 0) {
-        filters.countryIds.forEach((id) => params.append("countryIds", id));
+      if (dateFrom) params.append("dateFrom", dateFrom);
+      if (dateTo) params.append("dateTo", dateTo);
+      if (countryIds.length > 0) {
+        countryIds.forEach((id) => params.append("countryIds", id));
       }
 
       const response = await fetch(`/api/admin/reports/tours/performance?${params.toString()}`);
@@ -67,7 +72,7 @@ export default function TourPerformancePage() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [dateFrom, dateTo, countryIds]);
 
   useEffect(() => {
     fetchCountries();
@@ -76,15 +81,17 @@ export default function TourPerformancePage() {
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
-    } else if (status === "authenticated") {
+      return;
+    }
+    if (status === "authenticated") {
       const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
       if (!isSuperAdmin) {
         router.push("/admin");
-      } else {
-        fetchReport();
+        return;
       }
+      fetchReport();
     }
-  }, [session, status, router, fetchReport]);
+  }, [session?.user?.role, status, fetchReport]);
 
   const handleExport = (format: "xlsx" | "csv" | "pdf") => {
     const url = buildExportUrl("/api/admin/reports/tours/performance", filters, format);

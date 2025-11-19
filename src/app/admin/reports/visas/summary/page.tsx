@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Download, FileDown, FileText, TrendingUp, CheckCircle, XCircle, Clock, FileText as FileTextIcon } from "lucide-react";
@@ -51,6 +51,12 @@ export default function VisaApplicationsReportPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Memoize filter values to prevent infinite re-renders
+  const dateFrom = filters.dateFrom;
+  const dateTo = filters.dateTo;
+  const filterStatus = filters.status;
+  const countryIds = useMemo(() => filters.countryIds || [], [filters.countryIds]);
+
   const fetchCountries = useCallback(async () => {
     try {
       const response = await fetch("/api/admin/content/countries");
@@ -67,11 +73,11 @@ export default function VisaApplicationsReportPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filters.dateFrom) params.append("dateFrom", filters.dateFrom);
-      if (filters.dateTo) params.append("dateTo", filters.dateTo);
-      if (filters.status) params.append("status", filters.status);
-      if (filters.countryIds && filters.countryIds.length > 0) {
-        filters.countryIds.forEach((id) => params.append("countryIds", id));
+      if (dateFrom) params.append("dateFrom", dateFrom);
+      if (dateTo) params.append("dateTo", dateTo);
+      if (filterStatus) params.append("status", filterStatus);
+      if (countryIds.length > 0) {
+        countryIds.forEach((id) => params.append("countryIds", id));
       }
       params.append("page", page.toString());
       params.append("limit", "50");
@@ -88,7 +94,7 @@ export default function VisaApplicationsReportPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, page]);
+  }, [dateFrom, dateTo, filterStatus, countryIds, page]);
 
   useEffect(() => {
     fetchCountries();
@@ -97,15 +103,17 @@ export default function VisaApplicationsReportPage() {
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
-    } else if (status === "authenticated") {
+      return;
+    }
+    if (status === "authenticated") {
       const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
       if (!isSuperAdmin) {
         router.push("/admin");
-      } else {
-        fetchReport();
+        return;
       }
+      fetchReport();
     }
-  }, [session, status, router, fetchReport]);
+  }, [session?.user?.role, status, fetchReport]);
 
   const handleExport = (format: "xlsx" | "csv" | "pdf") => {
     const url = buildExportUrl("/api/admin/reports/visas/summary", filters, format);

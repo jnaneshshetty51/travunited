@@ -25,11 +25,6 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </div>
           <NotificationBell />
         </div>
-        <div className="hidden lg:block px-6 py-4 border-b border-neutral-200 bg-white/90 backdrop-blur">
-          <div className="flex items-center justify-end">
-            <NotificationBell />
-          </div>
-        </div>
         <main className="flex-1 px-4 py-6 lg:px-6">
           <div className="w-full">{children}</div>
         </main>

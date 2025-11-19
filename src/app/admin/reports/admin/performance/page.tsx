@@ -35,12 +35,16 @@ export default function AdminPerformancePage() {
     datePreset: "last30",
   });
 
+  // Memoize filter values to prevent infinite re-renders
+  const dateFrom = filters.dateFrom;
+  const dateTo = filters.dateTo;
+
   const fetchReport = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filters.dateFrom) params.append("dateFrom", filters.dateFrom);
-      if (filters.dateTo) params.append("dateTo", filters.dateTo);
+      if (dateFrom) params.append("dateFrom", dateFrom);
+      if (dateTo) params.append("dateTo", dateTo);
 
       const response = await fetch(`/api/admin/reports/admin/performance?${params.toString()}`);
       if (response.ok) {
@@ -53,20 +57,22 @@ export default function AdminPerformancePage() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [dateFrom, dateTo]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
-    } else if (status === "authenticated") {
+      return;
+    }
+    if (status === "authenticated") {
       const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
       if (!isSuperAdmin) {
         router.push("/admin");
-      } else {
-        fetchReport();
+        return;
       }
+      fetchReport();
     }
-  }, [session, status, router, fetchReport]);
+  }, [session?.user?.role, status, fetchReport]);
 
   const handleExport = (format: "xlsx" | "csv" | "pdf") => {
     const url = buildExportUrl("/api/admin/reports/admin/performance", filters, format);

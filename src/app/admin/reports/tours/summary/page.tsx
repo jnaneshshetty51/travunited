@@ -51,13 +51,18 @@ export default function TourBookingsReportPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  // Memoize filter values to prevent infinite re-renders
+  const dateFrom = filters.dateFrom;
+  const dateTo = filters.dateTo;
+  const filterStatus = filters.status;
+
   const fetchReport = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (filters.dateFrom) params.append("dateFrom", filters.dateFrom);
-      if (filters.dateTo) params.append("dateTo", filters.dateTo);
-      if (filters.status) params.append("status", filters.status);
+      if (dateFrom) params.append("dateFrom", dateFrom);
+      if (dateTo) params.append("dateTo", dateTo);
+      if (filterStatus) params.append("status", filterStatus);
       params.append("page", page.toString());
       params.append("limit", "50");
 
@@ -73,20 +78,22 @@ export default function TourBookingsReportPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters, page]);
+  }, [dateFrom, dateTo, filterStatus, page]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
-    } else if (status === "authenticated") {
+      return;
+    }
+    if (status === "authenticated") {
       const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
       if (!isSuperAdmin) {
         router.push("/admin");
-      } else {
-        fetchReport();
+        return;
       }
+      fetchReport();
     }
-  }, [session, status, router, fetchReport]);
+  }, [session?.user?.role, status, fetchReport]);
 
   const handleExport = (format: "xlsx" | "csv" | "pdf") => {
     const url = buildExportUrl("/api/admin/reports/tours/summary", filters, format);
