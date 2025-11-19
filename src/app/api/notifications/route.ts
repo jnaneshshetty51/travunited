@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { markAllNotificationsAsRead, getNotifications } from "@/lib/notifications";
+import { markAllNotificationsAsRead, getNotifications, deleteNotifications } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -22,12 +22,14 @@ export async function GET(req: NextRequest) {
     const unreadOnly = searchParams.get("unreadOnly") === "true";
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
+    const search = searchParams.get("search") || undefined;
 
     const result = await getNotifications(session.user.id, {
       filter: filter || "all",
       unreadOnly,
       page,
       limit,
+      search,
     });
 
     return NextResponse.json({
@@ -62,6 +64,15 @@ export async function POST(req: NextRequest) {
     if (action === "read-all") {
       const count = await markAllNotificationsAsRead(session.user.id);
       return NextResponse.json({ message: "All notifications marked as read", count });
+    }
+
+    if (action === "delete-selected") {
+      const { notificationIds } = body;
+      if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
+        return NextResponse.json({ error: "Invalid notification IDs" }, { status: 400 });
+      }
+      const count = await deleteNotifications(notificationIds, session.user.id);
+      return NextResponse.json({ message: `${count} notification(s) deleted`, count });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });

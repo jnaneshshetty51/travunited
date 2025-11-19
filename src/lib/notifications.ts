@@ -43,6 +43,8 @@ export type NotificationType =
   | "ADMIN_ROLE_CHANGED"
   | "ADMIN_ACCOUNT_LOCKED";
 
+export type NotificationPriority = "low" | "normal" | "high" | "urgent";
+
 export interface NotificationParams {
   userId: string;
   type: NotificationType;
@@ -52,6 +54,8 @@ export interface NotificationParams {
   data?: Record<string, any>;
   sendEmail?: boolean;
   roleScope?: UserRole | "CUSTOMER" | "STAFF_ADMIN" | "SUPER_ADMIN";
+  priority?: NotificationPriority;
+  actionLabel?: string; // e.g., "View Application", "Download Voucher"
 }
 
 /**
@@ -204,35 +208,93 @@ function generateEmailTemplate({
     }
   }
 
+  // Determine icon and color based on notification type
+  let icon = "🔔";
+  let color = "#0066cc";
+  if (type.includes("VISA")) {
+    icon = "🛂";
+    color = "#2563eb";
+  } else if (type.includes("TOUR")) {
+    icon = "✈️";
+    color = "#16a34a";
+  } else if (type.includes("PAYMENT")) {
+    icon = "💳";
+    color = "#9333ea";
+  } else if (type.includes("ADMIN")) {
+    icon = "⚙️";
+    color = "#ea580c";
+  } else if (type.includes("ACCOUNT")) {
+    icon = "🔒";
+    color = "#dc2626";
+  }
+
   return `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-        <h1 style="color: #0066cc; margin: 0;">${title}</h1>
-      </div>
-      
-      <div style="padding: 20px 0;">
-        <p>${greeting}</p>
-        <p>${message}</p>
-        ${additionalInfo}
-      </div>
-
-      ${link ? `
-        <div style="margin: 30px 0;">
-          <a href="${link}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
-            View Details
-          </a>
-        </div>
-      ` : ""}
-
-      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 14px;">
-        <p>Best regards,<br>The Travunited Team</p>
-        <p style="margin-top: 20px;">
-          <a href="${process.env.NEXTAUTH_URL || "http://localhost:3000"}/notifications" style="color: #0066cc;">
-            Manage notification preferences
-          </a>
-        </p>
-      </div>
-    </div>
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 20px;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, ${color} 0%, ${color}dd 100%); padding: 30px 40px; text-align: center;">
+                  <div style="font-size: 48px; margin-bottom: 10px;">${icon}</div>
+                  <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">${title}</h1>
+                </td>
+              </tr>
+              
+              <!-- Content -->
+              <tr>
+                <td style="padding: 40px;">
+                  <p style="color: #374151; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">${greeting}</p>
+                  <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin: 0 0 20px 0;">${message}</p>
+                  ${additionalInfo ? `<div style="background-color: #f9fafb; border-left: 4px solid ${color}; padding: 16px; margin: 20px 0; border-radius: 4px;">${additionalInfo}</div>` : ""}
+                  
+                  ${link ? `
+                    <div style="margin: 30px 0; text-align: center;">
+                      <a href="${link}" style="background-color: ${color}; color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+                        View Details
+                      </a>
+                    </div>
+                  ` : ""}
+                </td>
+              </tr>
+              
+              <!-- Footer -->
+              <tr>
+                <td style="background-color: #f9fafb; padding: 30px 40px; border-top: 1px solid #e5e7eb;">
+                  <p style="color: #6b7280; font-size: 14px; margin: 0 0 10px 0;">
+                    Best regards,<br>
+                    <strong style="color: #374151;">The Travunited Team</strong>
+                  </p>
+                  <p style="margin: 20px 0 0 0;">
+                    <a href="${process.env.NEXTAUTH_URL || "http://localhost:3000"}/notifications" style="color: ${color}; text-decoration: none; font-size: 14px;">
+                      Manage notification preferences →
+                    </a>
+                  </p>
+                </td>
+              </tr>
+            </table>
+            
+            <!-- Footer Text -->
+            <table width="600" cellpadding="0" cellspacing="0" style="margin-top: 20px;">
+              <tr>
+                <td style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+                  <p style="margin: 0;">This is an automated notification from Travunited.</p>
+                  <p style="margin: 5px 0 0 0;">© ${new Date().getFullYear()} Travunited. All rights reserved.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
   `;
 }
 
@@ -320,6 +382,7 @@ export async function getNotifications(
     unreadOnly?: boolean;
     page?: number;
     limit?: number;
+    search?: string;
   } = {}
 ): Promise<{
   notifications: any[];
@@ -337,6 +400,7 @@ export async function getNotifications(
     unreadOnly = false,
     page = 1,
     limit = 20,
+    search,
   } = options;
 
   const skip = (page - 1) * limit;
@@ -348,6 +412,14 @@ export async function getNotifications(
   // Filter by read status
   if (unreadOnly) {
     where.readAt = null;
+  }
+
+  // Search functionality
+  if (search && search.trim()) {
+    where.OR = [
+      { title: { contains: search, mode: "insensitive" } },
+      { message: { contains: search, mode: "insensitive" } },
+    ];
   }
 
   // Filter by type category
@@ -395,7 +467,16 @@ export async function getNotifications(
     };
 
     if (typeFilters[filter]) {
-      where.type = { in: typeFilters[filter] };
+      if (where.OR) {
+        // Combine search with type filter
+        where.AND = [
+          { OR: where.OR },
+          { type: { in: typeFilters[filter] } },
+        ];
+        delete where.OR;
+      } else {
+        where.type = { in: typeFilters[filter] };
+      }
     }
   }
 
@@ -426,5 +507,95 @@ export async function getNotifications(
       totalPages: Math.ceil(total / limit),
     },
   };
+}
+
+/**
+ * Delete a notification
+ */
+export async function deleteNotification(
+  notificationId: string,
+  userId: string
+): Promise<boolean> {
+  const notification = await prisma.notification.findUnique({
+    where: { id: notificationId },
+  });
+
+  if (!notification || notification.userId !== userId) {
+    return false;
+  }
+
+  await prisma.notification.delete({
+    where: { id: notificationId },
+  });
+
+  return true;
+}
+
+/**
+ * Delete multiple notifications
+ */
+export async function deleteNotifications(
+  notificationIds: string[],
+  userId: string
+): Promise<number> {
+  const result = await prisma.notification.deleteMany({
+    where: {
+      id: { in: notificationIds },
+      userId,
+    },
+  });
+
+  return result.count;
+}
+
+/**
+ * Get notification statistics for a user
+ */
+export async function getNotificationStats(userId: string): Promise<{
+  total: number;
+  unread: number;
+  byCategory: Record<string, number>;
+  recentCount: number; // Last 7 days
+}> {
+  const [total, unread, recent, allNotifications] = await Promise.all([
+    prisma.notification.count({ where: { userId } }),
+    prisma.notification.count({ where: { userId, readAt: null } }),
+    prisma.notification.count({
+      where: {
+        userId,
+        createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+      },
+    }),
+    prisma.notification.findMany({
+      where: { userId },
+      select: { type: true },
+    }),
+  ]);
+
+  // Count by category
+  const byCategory: Record<string, number> = {};
+  allNotifications.forEach((n) => {
+    const category = getNotificationCategory(n.type);
+    byCategory[category] = (byCategory[category] || 0) + 1;
+  });
+
+  return {
+    total,
+    unread,
+    byCategory,
+    recentCount: recent,
+  };
+}
+
+/**
+ * Helper to get notification category from type
+ */
+function getNotificationCategory(type: string): string {
+  if (type.includes("VISA")) return "visa";
+  if (type.includes("TOUR")) return "tour";
+  if (type.includes("PAYMENT")) return "payment";
+  if (type.includes("ADMIN")) return "system";
+  if (type.includes("ACCOUNT")) return "account";
+  return "other";
 }
 
