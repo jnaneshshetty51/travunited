@@ -20,28 +20,36 @@ export const VisaImportRowSchema = z.object({
   visa_name: z.string().min(1),
   visa_slug: z.string().min(1).toLowerCase(),
   entry_type: z.string().optional(),
-  stay_duration_days: z.string().optional().transform((val) => {
-    if (!val || val.trim() === "") return null;
+  stay_duration_days: z.string().min(1).transform((val) => {
     const num = parseInt(val);
-    return isNaN(num) ? null : num;
+    if (isNaN(num) || num < 1) {
+      throw new Error("stay_duration_days must be a positive integer");
+    }
+    return num;
   }),
-  validity_days: z.string().optional().transform((val) => {
-    if (!val || val.trim() === "") return null;
+  validity_days: z.string().min(1).transform((val) => {
     const num = parseInt(val);
-    return isNaN(num) ? null : num;
+    if (isNaN(num) || num < 1) {
+      throw new Error("validity_days must be a positive integer");
+    }
+    return num;
   }),
   processing_time_days: z.string().optional(),
-  govt_fee: z.string().transform((val) => {
-    if (!val || val.trim() === "") return 0;
+  govt_fee: z.string().min(1).transform((val) => {
     const num = parseFloat(val);
-    return isNaN(num) ? 0 : Math.round(num);
+    if (isNaN(num) || num < 0) {
+      throw new Error("govt_fee must be a valid non-negative number");
+    }
+    return Math.round(num);
   }),
-  service_fee: z.string().transform((val) => {
-    if (!val || val.trim() === "") return 0;
+  service_fee: z.string().min(1).transform((val) => {
     const num = parseFloat(val);
-    return isNaN(num) ? 0 : Math.round(num);
+    if (isNaN(num) || num < 0) {
+      throw new Error("service_fee must be a valid non-negative number");
+    }
+    return Math.round(num);
   }),
-  currency: z.string().default("INR"),
+  currency: z.string().min(1).default("INR"),
   is_active: z.enum(["TRUE", "FALSE", "true", "false", "1", "0"]).transform((val) => 
     val === "TRUE" || val === "true" || val === "1"
   ),

@@ -63,17 +63,10 @@ export async function POST(req: NextRequest) {
 
     for (const { row, data } of validation.validRows) {
       try {
-        // Validate required fields
-        if (!data.country_code || !data.country_name || !data.visa_name || !data.visa_slug || !data.currency) {
-          failed.push({ row, message: "Missing required fields: country_code, country_name, visa_name, visa_slug, currency" });
-          continue;
-        }
+        // Validation is handled by Zod schema in validateVisas()
+        // If we reach here, all required fields are present and valid
 
-        // Data is already validated and transformed by the schema
-        // stay_duration_days and validity_days are already integers or null
-        // govt_fee and service_fee are already numbers
-
-        // Find or create country by country_code
+        // Find or create country by country_code (as per requirements)
         const country = await prisma.country.upsert({
           where: { code: data.country_code },
           update: { name: data.country_name },
@@ -93,17 +86,17 @@ export async function POST(req: NextRequest) {
           name: data.visa_name,
           slug: data.visa_slug,
           category: data.entry_type || "Tourist",
-          // New fields from CSV template
-          stayDurationDays: data.stay_duration_days ?? null,
-          validityDays: data.validity_days ?? null,
-          govtFee: data.govt_fee,
-          serviceFee: data.service_fee,
+          // New fields from CSV template (required)
+          stayDurationDays: Number(data.stay_duration_days),
+          validityDays: Number(data.validity_days),
+          govtFee: Number(data.govt_fee),
+          serviceFee: Number(data.service_fee),
           currency: data.currency || "INR",
           // Legacy fields (for backward compatibility)
           priceInInr: totalPrice,
           processingTime: data.processing_time_days || "3-5 days",
-          stayDuration: data.stay_duration_days ? `${data.stay_duration_days} days` : "30 days",
-          validity: data.validity_days ? `${data.validity_days} days` : "60 days",
+          stayDuration: `${data.stay_duration_days} days`,
+          validity: `${data.validity_days} days`,
           entryType: data.entry_type || "single",
           overview: data.long_description || data.short_description || "",
           eligibility: "",
@@ -111,21 +104,21 @@ export async function POST(req: NextRequest) {
           isFeatured: data.show_on_homepage || false,
         };
 
-        // Upsert visa by slug
+        // Upsert visa by slug (as per requirements)
         const existingVisa = await prisma.visa.findUnique({
           where: { slug: data.visa_slug },
+          select: { id: true },
+        });
+
+        await prisma.visa.upsert({
+          where: { slug: data.visa_slug },
+          update: visaData,
+          create: visaData,
         });
 
         if (existingVisa) {
-          await prisma.visa.update({
-            where: { slug: data.visa_slug },
-            data: visaData,
-          });
           updated++;
         } else {
-          await prisma.visa.create({
-            data: visaData,
-          });
           created++;
         }
       } catch (error: any) {
