@@ -29,13 +29,13 @@ async function ensureUniqueSlug(baseSlug: string) {
   return slug;
 }
 
-function ensureSuperAdmin(session: Session | null) {
+function ensureContentAdmin(session: Session | null) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (session.user.role !== "SUPER_ADMIN") {
+  if (session.user.role !== "STAFF_ADMIN" && session.user.role !== "SUPER_ADMIN") {
     return NextResponse.json(
-      { error: "Forbidden - Super Admin access required" },
+      { error: "Forbidden - Admin access required" },
       { status: 403 }
     );
   }
@@ -45,7 +45,7 @@ function ensureSuperAdmin(session: Session | null) {
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    const authError = ensureSuperAdmin(session);
+    const authError = ensureContentAdmin(session);
     if (authError) return authError;
 
     const url = new URL(req.url);
@@ -222,7 +222,7 @@ function buildTourData(body: any, resolvedSlug: string) {
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    const authError = ensureSuperAdmin(session);
+    const authError = ensureContentAdmin(session);
     if (authError) return authError;
 
     const body = await req.json();

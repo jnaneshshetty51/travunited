@@ -103,8 +103,8 @@ export default function AdminBlogEditPage() {
     if (status === "unauthenticated") {
       router.push("/login");
     } else if (status === "authenticated") {
-      const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
-      if (!isSuperAdmin) {
+      const isAdmin = session?.user?.role === "STAFF_ADMIN" || session?.user?.role === "SUPER_ADMIN";
+      if (!isAdmin) {
         router.push("/admin");
       } else if (!isNew) {
         fetchPost();

@@ -7,13 +7,13 @@ export const dynamic = "force-dynamic";
 
 
 
-function ensureSuperAdmin(session: Session | null) {
+function ensureContentAdmin(session: Session | null) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (session.user.role !== "SUPER_ADMIN") {
+  if (session.user.role !== "STAFF_ADMIN" && session.user.role !== "SUPER_ADMIN") {
     return NextResponse.json(
-      { error: "Forbidden - Super Admin access required" },
+      { error: "Forbidden - Admin access required" },
       { status: 403 }
     );
   }
@@ -26,7 +26,7 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const authError = ensureSuperAdmin(session);
+    const authError = ensureContentAdmin(session);
     if (authError) return authError;
 
     const country = await prisma.country.findUnique({
@@ -59,7 +59,7 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const authError = ensureSuperAdmin(session);
+    const authError = ensureContentAdmin(session);
     if (authError) return authError;
 
     const body = await req.json();
@@ -106,7 +106,7 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    const authError = ensureSuperAdmin(session);
+    const authError = ensureContentAdmin(session);
     if (authError) return authError;
 
     const country = await prisma.country.findUnique({

@@ -124,6 +124,8 @@ function SidebarNavigation({
   toggleMenu: (menu: "content" | "settings" | "reports") => void;
   onNavigate?: () => void;
 }) {
+  const isAdmin = session?.user?.role === "STAFF_ADMIN" || session?.user?.role === "SUPER_ADMIN";
+  
   const visibleMenuItems = BASE_MENU_ITEMS.filter((item) =>
     item.roles?.some(
       (role) =>
@@ -137,6 +139,9 @@ function SidebarNavigation({
     : SETTINGS_MENU_ITEMS.filter((item) => item.roles?.includes("STAFF_ADMIN"));
 
   const visibleReportsItems = isSuperAdmin ? REPORTS_MENU_ITEMS : [];
+  
+  // Content menu items - show to both STAFF_ADMIN and SUPER_ADMIN
+  const visibleContentItems = isAdmin ? CONTENT_MENU_ITEMS : [];
 
   const isActive = (path: string) =>
     pathname === path || pathname.startsWith(path + "/");
@@ -164,7 +169,7 @@ function SidebarNavigation({
           );
         })}
 
-        {isSuperAdmin && (
+        {isAdmin && (
           <>
             <div className="mt-4">
               <button
@@ -195,7 +200,7 @@ function SidebarNavigation({
                     className="overflow-hidden"
                   >
                     <div className="pl-11 pt-1 space-y-1">
-                      {CONTENT_MENU_ITEMS.map((item) => {
+                      {visibleContentItems.map((item) => {
                         const Icon = item.icon;
                         const active = isActive(item.href);
                         return (

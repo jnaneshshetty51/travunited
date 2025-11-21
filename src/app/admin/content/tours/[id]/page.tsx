@@ -409,7 +409,7 @@ export default function AdminTourEditorPage() {
       router.push("/login");
       return;
     }
-    if (session.user.role !== "SUPER_ADMIN") {
+    if (session.user.role !== "STAFF_ADMIN" && session.user.role !== "SUPER_ADMIN") {
       router.push("/admin");
       return;
     }

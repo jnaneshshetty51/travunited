@@ -15,16 +15,19 @@ export default withAuth(
       }
     }
 
-    // Super admin only routes (Content Management, Admin Settings)
+    // Super admin only routes (Admin Settings, Admin Management)
     if (
-      path.startsWith("/admin/content") ||
-      path.startsWith("/admin/settings") ||
-      path.startsWith("/admin/users")
+      path.startsWith("/admin/settings/admins") ||
+      path.startsWith("/admin/users") ||
+      path.startsWith("/admin/reports") // Reports still require SUPER_ADMIN
     ) {
       if (!isSuperAdmin) {
         return NextResponse.redirect(new URL("/admin", req.url));
       }
     }
+    
+    // Content management routes - allow both STAFF_ADMIN and SUPER_ADMIN
+    // (No redirect needed, both admin roles can access)
 
     // Redirect based on role after login
     if (path === "/login" && token) {

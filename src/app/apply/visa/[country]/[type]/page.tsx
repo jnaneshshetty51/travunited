@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -97,7 +97,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
     travellerIds: [],
   });
 
-  const travellerCount = formData.travellers?.length ?? 0;
+  // Memoize travellerCount to prevent unnecessary recalculations
+  const travellerCount = useMemo(() => formData.travellers?.length ?? 0, [formData.travellers?.length]);
 
   const perTravellerRequirements = useMemo(
     () =>
@@ -214,7 +215,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.country, params.type, router]);
 
-  // Load draft from localStorage on mount
+  // Load draft from localStorage on mount - only run once on mount or when params change
   useEffect(() => {
     const draft = getDraftFromLocalStorage();
     if (draft && (draft.country === params.country && draft.visaType === params.type)) {
@@ -225,11 +226,17 @@ export default function VisaApplicationPage({ params }: { params: { country: str
       }));
       
       const { travellers: _, ...draftWithoutTravellers } = draft;
-      setFormData((prev) => ({ 
-        ...prev, 
-        ...draftWithoutTravellers,
-        travellers: travellersWithIds.length > 0 ? travellersWithIds : prev.travellers,
-      }));
+      setFormData((prev) => {
+        // Only update if we don't already have travellers (to prevent overwriting user input)
+        if (prev.travellers && prev.travellers.length > 0) {
+          return prev;
+        }
+        return { 
+          ...prev, 
+          ...draftWithoutTravellers,
+          travellers: travellersWithIds.length > 0 ? travellersWithIds : prev.travellers,
+        };
+      });
       if (draft.applicationId) {
         setDraftId(draft.applicationId);
       }
@@ -237,9 +244,20 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         setCreatedTravellerIds(draft.travellerIds);
       }
     } else {
-      // Initialize with at least one traveller
-      if (travellerCount === 0) {
-        setFormData((prev) => ({
+      // Initialize with at least one traveller only if we don't have any
+      setFormData((prev) => {
+        if (prev.travellers && prev.travellers.length > 0) {
+          // Ensure all existing travellers have IDs
+          return {
+            ...prev,
+            travellers: prev.travellers.map((t) => ({
+              ...t,
+              id: t.id || `traveller-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            })),
+          };
+        }
+        // No travellers, initialize with one
+        return {
           ...prev,
           travellers: [
             {
@@ -255,17 +273,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
               currentCity: "",
             },
           ],
-        }));
-      } else {
-        // Ensure all existing travellers have IDs
-        setFormData((prev) => ({
-          ...prev,
-          travellers: prev.travellers?.map((t) => ({
-            ...t,
-            id: t.id || `traveller-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          })) || [],
-        }));
-      }
+        };
+      });
     }
     
     // Auto-fill for logged-in users
@@ -279,13 +288,65 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         },
       }));
     }
+    // Only run on mount or when params/session change, NOT when travellerCount changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, params, travellerCount]);
+  }, [session?.user?.id, params.country, params.type]);
 
-  // Auto-save to localStorage on form changes
+  // Helper function to update a traveller field
+  const updateTravellerField = useCallback((travellerId: string, field: keyof FormDataTraveller, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      travellers: (prev.travellers || []).map((t) =>
+        t.id === travellerId ? { ...t, [field]: value } : t
+      ),
+    }));
+  }, []);
+
+  // Helper function to remove a traveller
+  const removeTraveller = useCallback((travellerId: string) => {
+    setFormData((prev) => {
+      const newTravellers = (prev.travellers || []).filter((t) => t.id !== travellerId);
+      // Clean up documents associated with this traveller
+      const newDocuments = { ...(prev.documents || {}) };
+      Object.keys(newDocuments).forEach((key) => {
+        const doc = newDocuments[key];
+        if (doc && (doc as any).travellerId === travellerId) {
+          delete newDocuments[key];
+        }
+      });
+      return { ...prev, travellers: newTravellers, documents: newDocuments };
+    });
+  }, []);
+
+  // Helper function to add a traveller
+  const addTraveller = useCallback(() => {
+    setFormData((prev) => ({
+      ...prev,
+      travellers: [
+        ...(prev.travellers || []),
+        {
+          id: `traveller-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          firstName: "",
+          lastName: "",
+          dateOfBirth: "",
+          gender: "",
+          passportNumber: "",
+          passportIssueDate: "",
+          passportExpiryDate: "",
+          nationality: "Indian",
+          currentCity: "",
+        },
+      ],
+    }));
+  }, []);
+
+  // Auto-save to localStorage on form changes - debounced to prevent excessive saves
   useEffect(() => {
     if (currentStep > 1) {
-      saveDraftToLocalStorage(formData);
+      const timeoutId = setTimeout(() => {
+        saveDraftToLocalStorage(formData);
+      }, 300); // Debounce by 300ms
+      return () => clearTimeout(timeoutId);
     }
   }, [formData, currentStep]);
 
@@ -812,18 +873,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                     <h3 className="font-semibold text-lg">Traveller {index + 1}</h3>
                     {(formData.travellers || []).length > 1 && (
                       <button
-                        onClick={() => {
-                          const newTravellers = (formData.travellers || []).filter((t) => t.id !== traveller.id);
-                          // Clean up documents associated with this traveller
-                          const newDocuments = { ...(formData.documents || {}) };
-                          Object.keys(newDocuments).forEach((key) => {
-                            const doc = newDocuments[key];
-                            if (doc && (doc as any).travellerId === traveller.id) {
-                              delete newDocuments[key];
-                            }
-                          });
-                          setFormData({ ...formData, travellers: newTravellers, documents: newDocuments });
-                        }}
+                        type="button"
+                        onClick={() => removeTraveller(traveller.id)}
                         className="text-red-600 hover:text-red-700 text-sm"
                       >
                         Remove
@@ -839,12 +890,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         type="text"
                         required
                         value={traveller.firstName}
-                        onChange={(e) => {
-                          const newTravellers = (formData.travellers || []).map((t) =>
-                            t.id === traveller.id ? { ...t, firstName: e.target.value } : t
-                          );
-                          setFormData({ ...formData, travellers: newTravellers });
-                        }}
+                        onChange={(e) => updateTravellerField(traveller.id, "firstName", e.target.value)}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
                       />
                     </div>
@@ -856,12 +902,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         type="text"
                         required
                         value={traveller.lastName}
-                        onChange={(e) => {
-                          const newTravellers = (formData.travellers || []).map((t) =>
-                            t.id === traveller.id ? { ...t, lastName: e.target.value } : t
-                          );
-                          setFormData({ ...formData, travellers: newTravellers });
-                        }}
+                        onChange={(e) => updateTravellerField(traveller.id, "lastName", e.target.value)}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
                       />
                     </div>
@@ -873,12 +914,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         type="date"
                         required
                         value={traveller.dateOfBirth}
-                        onChange={(e) => {
-                          const newTravellers = (formData.travellers || []).map((t) =>
-                            t.id === traveller.id ? { ...t, dateOfBirth: e.target.value } : t
-                          );
-                          setFormData({ ...formData, travellers: newTravellers });
-                        }}
+                        onChange={(e) => updateTravellerField(traveller.id, "dateOfBirth", e.target.value)}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
                       />
                     </div>
@@ -889,12 +925,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                       <select
                         required
                         value={traveller.gender}
-                        onChange={(e) => {
-                          const newTravellers = (formData.travellers || []).map((t) =>
-                            t.id === traveller.id ? { ...t, gender: e.target.value } : t
-                          );
-                          setFormData({ ...formData, travellers: newTravellers });
-                        }}
+                        onChange={(e) => updateTravellerField(traveller.id, "gender", e.target.value)}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
                       >
                         <option value="">Select</option>
@@ -911,12 +942,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         type="text"
                         required
                         value={traveller.passportNumber}
-                        onChange={(e) => {
-                          const newTravellers = (formData.travellers || []).map((t) =>
-                            t.id === traveller.id ? { ...t, passportNumber: e.target.value } : t
-                          );
-                          setFormData({ ...formData, travellers: newTravellers });
-                        }}
+                        onChange={(e) => updateTravellerField(traveller.id, "passportNumber", e.target.value)}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
                       />
                     </div>
@@ -928,12 +954,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         type="text"
                         required
                         value={traveller.nationality || "Indian"}
-                        onChange={(e) => {
-                          const newTravellers = (formData.travellers || []).map((t) =>
-                            t.id === traveller.id ? { ...t, nationality: e.target.value } : t
-                          );
-                          setFormData({ ...formData, travellers: newTravellers });
-                        }}
+                        onChange={(e) => updateTravellerField(traveller.id, "nationality", e.target.value)}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
                         placeholder="Indian"
                       />
@@ -946,12 +967,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         type="date"
                         required
                         value={traveller.passportIssueDate}
-                        onChange={(e) => {
-                          const newTravellers = (formData.travellers || []).map((t) =>
-                            t.id === traveller.id ? { ...t, passportIssueDate: e.target.value } : t
-                          );
-                          setFormData({ ...formData, travellers: newTravellers });
-                        }}
+                        onChange={(e) => updateTravellerField(traveller.id, "passportIssueDate", e.target.value)}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
                       />
                     </div>
@@ -963,12 +979,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         type="date"
                         required
                         value={traveller.passportExpiryDate}
-                        onChange={(e) => {
-                          const newTravellers = (formData.travellers || []).map((t) =>
-                            t.id === traveller.id ? { ...t, passportExpiryDate: e.target.value } : t
-                          );
-                          setFormData({ ...formData, travellers: newTravellers });
-                        }}
+                        onChange={(e) => updateTravellerField(traveller.id, "passportExpiryDate", e.target.value)}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
                       />
                     </div>
@@ -979,12 +990,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                       <input
                         type="text"
                         value={traveller.currentCity || ""}
-                        onChange={(e) => {
-                          const newTravellers = (formData.travellers || []).map((t) =>
-                            t.id === traveller.id ? { ...t, currentCity: e.target.value } : t
-                          );
-                          setFormData({ ...formData, travellers: newTravellers });
-                        }}
+                        onChange={(e) => updateTravellerField(traveller.id, "currentCity", e.target.value)}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
                         placeholder="Mumbai"
                       />
@@ -993,26 +999,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                 </div>
               ))}
               <button
-                onClick={() => {
-                  setFormData({
-                    ...formData,
-                    travellers: [
-                      ...(formData.travellers || []),
-                      {
-                        id: `traveller-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                        firstName: "",
-                        lastName: "",
-                        dateOfBirth: "",
-                        gender: "",
-                        passportNumber: "",
-                        passportIssueDate: "",
-                        passportExpiryDate: "",
-                        nationality: "Indian",
-                        currentCity: "",
-                      },
-                    ],
-                  });
-                }}
+                type="button"
+                onClick={addTraveller}
                 className="w-full border-2 border-dashed border-neutral-300 rounded-lg py-4 text-neutral-600 hover:border-primary-600 hover:text-primary-600 transition-colors"
               >
                 + Add Another Traveller

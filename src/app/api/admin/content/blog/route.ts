@@ -57,9 +57,9 @@ export async function GET(req: Request) {
       );
     }
 
-    if (session.user.role !== "SUPER_ADMIN") {
+    if (session.user.role !== "STAFF_ADMIN" && session.user.role !== "SUPER_ADMIN") {
       return NextResponse.json(
-        { error: "Forbidden - Super Admin access required" },
+        { error: "Forbidden - Admin access required" },
         { status: 403 }
       );
     }
@@ -105,9 +105,9 @@ export async function POST(req: Request) {
       );
     }
 
-    if (session.user.role !== "SUPER_ADMIN") {
+    if (session.user.role !== "STAFF_ADMIN" && session.user.role !== "SUPER_ADMIN") {
       return NextResponse.json(
-        { error: "Forbidden - Super Admin access required" },
+        { error: "Forbidden - Admin access required" },
         { status: 403 }
       );
     }
