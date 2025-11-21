@@ -79,6 +79,7 @@ export async function GET(req: Request) {
       return {
         ...post,
         published: post.isPublished, // Map isPublished to published for frontend consistency
+        isFeatured: post.isFeatured,
         coverImage: getMediaProxyUrl(post.coverImage),
         status: derivedStatus,
       };
@@ -168,6 +169,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ...post,
       published: post.isPublished, // Map isPublished to published for frontend consistency
+      isFeatured: post.isFeatured,
       status: derivedStatus,
     });
   } catch (error) {

@@ -16,20 +16,14 @@ type HighlightPost = {
   category?: string | null;
 };
 
-const fallbackPosts: HighlightPost[] = [
-  {
-    id: "visa-guide-2024",
-    title: "Complete Guide to Schengen Visa for Indians in 2024",
-    excerpt:
-      "Everything you need to know about applying for a Schengen visa, including documents, processing time, and tips for approval.",
-    image: "https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=600&q=80",
-    date: "2024-03-15",
-    category: "Visa Guide",
-  },
-];
 
 export function BlogHighlights({ posts }: { posts?: HighlightPost[] }) {
-  const displayPosts = (posts && posts.length ? posts : fallbackPosts).slice(0, 3);
+  // Only show if we have posts from database, no fallback
+  if (!posts || posts.length === 0) {
+    return null;
+  }
+  
+  const displayPosts = posts.slice(0, 3);
 
   return (
     <section className="py-16 md:py-24 bg-white">

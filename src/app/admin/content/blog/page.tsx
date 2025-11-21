@@ -18,6 +18,7 @@ import {
   Square,
   X,
   Calendar,
+  Star,
 } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { formatDate } from "@/lib/dateFormat";
@@ -30,6 +31,7 @@ interface BlogPost {
   excerpt?: string | null;
   category?: string | null;
   published: boolean;
+  isFeatured?: boolean;
   createdAt: string;
   publishedAt?: string | null;
   updatedAt?: string;
@@ -193,6 +195,26 @@ export default function AdminBlogPage() {
       newSelected.add(id);
     }
     setSelectedIds(newSelected);
+  };
+
+  const handleToggleFeatured = async (post: BlogPost) => {
+    try {
+      const response = await fetch(`/api/admin/content/blog/${post.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFeatured: !post.isFeatured }),
+      });
+
+      if (response.ok) {
+        await fetchPosts();
+      } else {
+        const error = await response.json().catch(() => ({}));
+        alert(error.error || "Failed to update featured status");
+      }
+    } catch (error) {
+      console.error("Error toggling featured:", error);
+      alert("An error occurred while updating");
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -457,6 +479,7 @@ export default function AdminBlogPage() {
                       Title <SortIcon field="title" />
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-700">Status</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-700">Featured</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-neutral-700">Category</th>
                     <th
                       className="px-4 py-3 text-left text-sm font-semibold text-neutral-700 cursor-pointer hover:bg-neutral-100"
@@ -509,6 +532,20 @@ export default function AdminBlogPage() {
                         >
                           {post.published ? "Published" : "Draft"}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleToggleFeatured(post)}
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium transition-colors ${
+                            post.isFeatured
+                              ? "text-amber-600 bg-amber-50 hover:bg-amber-100"
+                              : "text-neutral-500 bg-neutral-100 hover:bg-neutral-200"
+                          }`}
+                          title={post.isFeatured ? "Remove from homepage" : "Show on homepage"}
+                        >
+                          <Star size={12} className={post.isFeatured ? "fill-amber-500 text-amber-500" : ""} />
+                          {post.isFeatured ? "Featured" : "Not Featured"}
+                        </button>
                       </td>
                       <td className="px-4 py-3">
                         {post.category ? (

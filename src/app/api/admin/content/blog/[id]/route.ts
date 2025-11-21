@@ -44,6 +44,7 @@ const blogSchema = z.object({
     z.literal("").transform(() => undefined),
   ]).optional(),
   published: z.boolean().optional(),
+  isFeatured: z.boolean().optional(),
   // SEO & Metadata
   metaTitle: z.string().optional().nullable(),
   metaDescription: z.string().optional().nullable(),
@@ -89,6 +90,7 @@ export async function GET(
       ...post,
       published: post.isPublished, // Map isPublished to published for frontend consistency
       coverImage: getMediaProxyUrl(post.coverImage),
+      isFeatured: post.isFeatured,
       // Derive status from isPublished and publishedAt
       status: post.isPublished 
         ? (post.publishedAt && post.publishedAt > new Date() ? "SCHEDULED" : "PUBLISHED")
@@ -258,6 +260,9 @@ export async function PUT(
     if (data.author !== undefined) {
       updateData.author = data.author || null;
     }
+    if (data.isFeatured !== undefined) {
+      updateData.isFeatured = data.isFeatured;
+    }
 
     const updated = await prisma.blogPost.update({
       where: { id: params.id },
@@ -272,6 +277,7 @@ export async function PUT(
     return NextResponse.json({
       ...updated,
       published: updated.isPublished, // Map isPublished to published for frontend consistency
+      isFeatured: updated.isFeatured,
       status: derivedStatus,
     });
   } catch (error) {
@@ -283,6 +289,59 @@ export async function PUT(
       );
     }
 
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    if (session.user.role !== "STAFF_ADMIN" && session.user.role !== "SUPER_ADMIN") {
+      return NextResponse.json(
+        { error: "Forbidden - Admin access required" },
+        { status: 403 }
+      );
+    }
+
+    const body = await req.json();
+    
+    const updated = await prisma.blogPost.update({
+      where: { id: params.id },
+      data: {
+        ...(body.isPublished === undefined ? {} : { isPublished: body.isPublished }),
+        ...(body.isFeatured === undefined ? {} : { isFeatured: body.isFeatured }),
+        ...(body.publishedAt === undefined ? {} : { publishedAt: body.publishedAt ? new Date(body.publishedAt) : null }),
+      },
+    });
+
+    // Derive status from isPublished and publishedAt
+    const derivedStatus = updated.isPublished 
+      ? (updated.publishedAt && updated.publishedAt > new Date() ? "SCHEDULED" : "PUBLISHED")
+      : "DRAFT";
+
+    return NextResponse.json({
+      ...updated,
+      published: updated.isPublished,
+      isFeatured: updated.isFeatured,
+      status: derivedStatus,
+      coverImage: getMediaProxyUrl(updated.coverImage),
+    });
+  } catch (error) {
+    console.error("Error updating blog post status:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

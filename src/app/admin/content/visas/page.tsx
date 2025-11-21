@@ -160,6 +160,20 @@ export default function AdminVisasPage() {
     }
   };
 
+  const handleToggleFeatured = async (visa: VisaRecord) => {
+    try {
+      await fetch(`/api/admin/content/visas/${visa.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFeatured: !visa.isFeatured }),
+      });
+      fetchVisas(filters);
+    } catch (error) {
+      console.error("Failed to toggle featured status", error);
+      alert("Failed to update featured status");
+    }
+  };
+
   const handleRefresh = () => {
     setRefreshing(true);
     fetchVisas(filters);
@@ -428,27 +442,35 @@ export default function AdminVisasPage() {
                       <h2 className="text-lg font-bold text-neutral-900">
                         {visa.name}
                       </h2>
-                      {visa.isFeatured && (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
-                          <Star size={12} className="fill-amber-500 text-amber-500" />
-                          Featured
-                        </span>
-                      )}
                     </div>
                     <p className="text-sm text-neutral-500">
                       {visa.country.name} &middot; {visa.category}
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleToggleStatus(visa)}
-                    className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                      visa.isActive
-                        ? "bg-green-50 text-green-700"
-                        : "bg-neutral-100 text-neutral-600"
-                    }`}
-                  >
-                    {visa.isActive ? "Active" : "Inactive"}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleToggleFeatured(visa)}
+                      className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full transition-colors ${
+                        visa.isFeatured
+                          ? "text-amber-600 bg-amber-50 hover:bg-amber-100"
+                          : "text-neutral-500 bg-neutral-100 hover:bg-neutral-200"
+                      }`}
+                      title={visa.isFeatured ? "Remove from homepage" : "Show on homepage"}
+                    >
+                      <Star size={12} className={visa.isFeatured ? "fill-amber-500 text-amber-500" : ""} />
+                      Featured
+                    </button>
+                    <button
+                      onClick={() => handleToggleStatus(visa)}
+                      className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                        visa.isActive
+                          ? "bg-green-50 text-green-700"
+                          : "bg-neutral-100 text-neutral-600"
+                      }`}
+                    >
+                      {visa.isActive ? "Active" : "Inactive"}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-neutral-600">

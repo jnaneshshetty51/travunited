@@ -2,28 +2,29 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Calendar, MapPin, ArrowRight } from "lucide-react";
+import { ArrowRight, MapPin, Clock } from "lucide-react";
 import Image from "next/image";
 
-type FeaturedTour = {
+type FeaturedVisa = {
   id: string;
   slug: string;
   name: string;
   subtitle?: string | null;
-  destination: string;
-  duration: string;
-  durationNights?: number | null;
+  country: string;
+  countryCode: string;
   price: number;
+  processingTime: string;
+  entryType: string;
   image?: string | null;
 };
 
-export function FeaturedTours({ tours }: { tours: FeaturedTour[] }) {
-  if (tours.length === 0) {
+export function FeaturedVisas({ visas }: { visas: FeaturedVisa[] }) {
+  if (visas.length === 0) {
     return null;
   }
 
   return (
-    <section className="py-16 md:py-24 bg-neutral-50">
+    <section className="py-16 md:py-24 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -33,17 +34,17 @@ export function FeaturedTours({ tours }: { tours: FeaturedTour[] }) {
           className="text-center mb-12"
         >
           <h2 className="text-3xl md:text-4xl font-bold text-neutral-900 mb-4">
-            Featured Tour Packages
+            Featured Visa Packages
           </h2>
           <p className="text-lg text-neutral-600 max-w-2xl mx-auto">
-            Curated holiday experiences designed for unforgettable memories
+            Fast, secure, and hassle-free visa application with expert support
           </p>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {tours.map((tour, index) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {visas.map((visa, index) => (
             <motion.div
-              key={tour.id}
+              key={visa.id}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -51,45 +52,47 @@ export function FeaturedTours({ tours }: { tours: FeaturedTour[] }) {
               whileHover={{ y: -4 }}
               className="group"
             >
-              <Link href={`/tours/${tour.slug || tour.id}`}>
+              <Link href={`/visas/${visa.countryCode}/${visa.slug}`}>
                 <div className="bg-white rounded-2xl shadow-medium hover:shadow-large transition-shadow duration-300 overflow-hidden h-full flex flex-col">
                   <div className="aspect-[4/3] relative">
                     <Image
                       src={
-                        tour.image ||
+                        visa.image ||
                         "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=600&q=80"
                       }
-                      alt={tour.name}
+                      alt={visa.name}
                       fill
                       className="object-cover group-hover:scale-110 transition-transform duration-500"
                     />
                   </div>
                   <div className="p-6 flex-1 flex flex-col">
-                    <h3 className="text-xl font-bold text-neutral-900 mb-2 line-clamp-2">
-                      {tour.name}
+                    <div className="flex items-center text-neutral-600 text-sm mb-2">
+                      <MapPin size={16} className="mr-1" />
+                      <span>{visa.country}</span>
+                    </div>
+                    <h3 className="text-xl font-bold text-neutral-900 mb-1 line-clamp-2">
+                      {visa.name}
                     </h3>
-                    {tour.subtitle && (
-                      <p className="text-neutral-600 text-sm mb-2 line-clamp-1">
-                        {tour.subtitle}
+                    {visa.subtitle && (
+                      <p className="text-neutral-600 text-sm mb-3 line-clamp-1">
+                        {visa.subtitle}
                       </p>
                     )}
-                    <div className="flex items-center text-neutral-600 text-sm mb-3">
-                      <MapPin size={16} className="mr-1" />
-                      <span className="line-clamp-1">{tour.destination}</span>
-                    </div>
                     <div className="flex items-center text-neutral-600 text-sm mb-4">
-                      <Calendar size={16} className="mr-1" />
-                      <span>{tour.duration}</span>
+                      <Clock size={16} className="mr-1" />
+                      <span>{visa.processingTime}</span>
+                      <span className="mx-2">•</span>
+                      <span>{visa.entryType}</span>
                     </div>
                     <div className="mt-auto flex items-center justify-between pt-4 border-t border-neutral-200">
                       <div>
                         <div className="text-2xl font-bold text-primary-600">
-                          ₹{tour.price.toLocaleString()}
+                          ₹{visa.price.toLocaleString()}
                         </div>
-                        <div className="text-xs text-neutral-500">per person</div>
+                        <div className="text-xs text-neutral-500">starting from</div>
                       </div>
                       <div className="flex items-center text-primary-600 font-medium group-hover:translate-x-1 transition-transform">
-                        <span className="text-sm">View</span>
+                        <span className="text-sm">Apply Now</span>
                         <ArrowRight size={16} className="ml-1" />
                       </div>
                     </div>
@@ -108,10 +111,10 @@ export function FeaturedTours({ tours }: { tours: FeaturedTour[] }) {
           className="text-center mt-12"
         >
           <Link
-            href="/tours"
+            href="/visas"
             className="inline-flex items-center space-x-2 bg-primary-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors"
           >
-            <span>View All Tours</span>
+            <span>View All Visas</span>
             <ArrowRight size={20} />
           </Link>
         </motion.div>
