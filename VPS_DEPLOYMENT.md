@@ -21,6 +21,16 @@ git merge --abort 2>/dev/null || true
 git fetch origin
 git reset --hard origin/main
 
+# **IMPORTANT: Apply database migrations before building**
+# Load environment variables
+set -a; source .env; set +a
+
+# Apply pending migrations
+npx prisma migrate deploy
+
+# Regenerate Prisma Client (critical after schema changes)
+npx prisma generate
+
 # Deploy
 npm install
 npm run build
@@ -153,4 +163,39 @@ rm -rf .next node_modules
 npm install
 npm run build
 ```
+
+### Database Schema Mismatch Errors
+
+If you see errors like:
+- `Unknown argument 'shortDescription'`
+- `Unknown argument 'originalPrice'`
+- Or any "Unknown argument" errors from Prisma
+
+This means the database schema is out of sync with the Prisma schema. Fix it:
+
+```bash
+cd /var/www/travunited/travunitedlatest
+
+# Load environment variables
+set -a; source .env; set +a
+
+# Apply all pending migrations
+npx prisma migrate deploy
+
+# Regenerate Prisma Client (CRITICAL - must run after migrations)
+npx prisma generate
+
+# Rebuild and restart
+npm run build
+pm2 restart travunited --update-env
+```
+
+**Why this happens:**
+- The Prisma schema (`prisma/schema.prisma`) was updated locally
+- Migrations were created but not applied on VPS
+- OR migrations were applied but `npx prisma generate` wasn't run
+- The Prisma Client on the server is using an old schema
+
+**Prevention:**
+Always run `npx prisma migrate deploy` and `npx prisma generate` after pulling code that includes schema changes.
 

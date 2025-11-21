@@ -96,6 +96,129 @@ export async function GET(req: Request) {
   }
 }
 
+// Helper function to build tour data object
+function buildTourData(body: any, resolvedSlug: string) {
+  // Helper to safely stringify JSON fields
+  const stringifyJson = (value: any): string | null => {
+    if (!value) return null;
+    if (typeof value === "string") {
+      try {
+        JSON.parse(value);
+        return value;
+      } catch {
+        return JSON.stringify(value);
+      }
+    }
+    return JSON.stringify(value);
+  };
+
+  // Process gallery images
+  const processGalleryImages = (galleryImageUrls: any, images: any): string | null => {
+    if (Array.isArray(galleryImageUrls)) {
+      return JSON.stringify(galleryImageUrls.map((url: string) => normalizeMediaInput(url) || url));
+    }
+    if (galleryImageUrls && typeof galleryImageUrls === "string") {
+      try {
+        const parsed = JSON.parse(galleryImageUrls);
+        if (Array.isArray(parsed)) {
+          return JSON.stringify(parsed.map((url: string) => normalizeMediaInput(url) || url));
+        }
+      } catch {
+        // If not JSON, treat as newline-separated
+        const urls = galleryImageUrls.split("\n").map((url: string) => url.trim()).filter(Boolean);
+        return JSON.stringify(urls.map((url: string) => normalizeMediaInput(url) || url));
+      }
+    }
+    if (images) {
+      return stringifyJson(images);
+    }
+    return null;
+  };
+
+  return {
+    countryId: body.countryId || null,
+    name: body.name,
+    slug: resolvedSlug,
+    subtitle: body.subtitle || null,
+    shortDescription: body.shortDescription || null,
+    description: body.description || null,
+    tourType: body.tourType || null,
+    tourSubType: body.tourSubType || null,
+    bestFor: stringifyJson(body.bestFor),
+    
+    // Destination & Categorization
+    destination: body.destination,
+    primaryDestination: body.primaryDestination || null,
+    destinationCountry: body.destinationCountry || null,
+    destinationState: body.destinationState || null,
+    citiesCovered: stringifyJson(body.citiesCovered),
+    region: body.region || null,
+    regionTags: stringifyJson(body.regionTags),
+    categoryId: body.categoryId || null,
+    themes: stringifyJson(body.themes),
+    
+    // Duration & Group Size
+    duration: body.duration,
+    durationDays: body.durationDays || null,
+    durationNights: body.durationNights || null,
+    groupSizeMin: body.groupSizeMin || null,
+    groupSizeMax: body.groupSizeMax || null,
+    minimumTravelers: body.minimumTravelers || null,
+    maximumTravelers: body.maximumTravelers || null,
+    difficultyLevel: body.difficultyLevel || null,
+    
+    // Pricing
+    price: Number(body.price),
+    basePriceInInr: body.basePriceInInr ? Number(body.basePriceInInr) : Number(body.price),
+    originalPrice: body.originalPrice ? Number(body.originalPrice) : null,
+    currency: body.currency || "INR",
+    packageType: body.packageType || null,
+    seasonalPricing: stringifyJson(body.seasonalPricing),
+    
+    // Dates & Availability
+    availableDates: stringifyJson(body.availableDates),
+    bookingDeadline: body.bookingDeadline ? new Date(body.bookingDeadline) : null,
+    status: body.status || (body.isActive ? "active" : "inactive"),
+    isActive: body.isActive ?? true,
+    isFeatured: body.isFeatured ?? false,
+    
+    // Advance Payment
+    allowAdvance: body.allowAdvance ?? false,
+    advancePercentage: body.allowAdvance && body.advancePercentage ? Number(body.advancePercentage) : null,
+    
+    // Content
+    overview: body.overview || null,
+    highlights: stringifyJson(body.highlights),
+    inclusions: stringifyJson(body.inclusions),
+    exclusions: stringifyJson(body.exclusions),
+    itinerary: stringifyJson(body.itinerary),
+    importantNotes: body.importantNotes || null,
+    hotelCategories: stringifyJson(body.hotelCategories),
+    customizationOptions: stringifyJson(body.customizationOptions),
+    bookingPolicies: body.bookingPolicies || null,
+    cancellationTerms: body.cancellationTerms || null,
+    
+    // Images & Media
+    imageUrl: normalizeMediaInput(body.imageUrl),
+    heroImageUrl: normalizeMediaInput(body.heroImageUrl || body.imageUrl),
+    featuredImage: normalizeMediaInput(body.featuredImage),
+    galleryImageUrls: processGalleryImages(body.galleryImageUrls, body.images),
+    images: stringifyJson(body.images || body.galleryImageUrls),
+    ogImage: normalizeMediaInput(body.ogImage),
+    twitterImage: normalizeMediaInput(body.twitterImage),
+    
+    // SEO & Social
+    metaTitle: body.metaTitle || null,
+    metaDescription: body.metaDescription || null,
+    metaKeywords: body.metaKeywords || null,
+    canonicalUrl: body.canonicalUrl || null,
+    ogTitle: body.ogTitle || null,
+    ogDescription: body.ogDescription || null,
+    twitterTitle: body.twitterTitle || null,
+    twitterDescription: body.twitterDescription || null,
+  };
+}
+
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -103,31 +226,7 @@ export async function POST(req: Request) {
     if (authError) return authError;
 
     const body = await req.json();
-    const {
-      countryId,
-      name,
-      slug,
-      subtitle,
-      destination,
-      duration,
-      overview,
-      description,
-      price,
-      basePriceInInr,
-      inclusions,
-      exclusions,
-      importantNotes,
-      imageUrl,
-      heroImageUrl,
-      galleryImageUrls,
-      isActive,
-      isFeatured,
-      allowAdvance,
-      advancePercentage,
-      metaTitle,
-      metaDescription,
-      days = [],
-    } = body;
+    const { name, slug, destination, duration, price, days = [] } = body;
 
     if (!name || !destination || !duration || !price) {
       return NextResponse.json(
@@ -142,43 +241,7 @@ export async function POST(req: Request) {
 
     const tour = await prisma.tour.create({
       data: {
-        countryId: countryId || null,
-        name,
-        slug: resolvedSlug,
-        subtitle: subtitle || null,
-        destination,
-        duration,
-        overview: overview || null,
-        description: description || null,
-        price: Number(price),
-        basePriceInInr: basePriceInInr
-          ? Number(basePriceInInr)
-          : Number(price),
-        inclusions: inclusions || null,
-        exclusions: exclusions || null,
-        importantNotes: importantNotes || null,
-        imageUrl: normalizeMediaInput(imageUrl),
-        heroImageUrl: normalizeMediaInput(heroImageUrl || imageUrl),
-        galleryImageUrls: Array.isArray(galleryImageUrls)
-          ? JSON.stringify(
-              galleryImageUrls.map((url: string) => normalizeMediaInput(url) || url)
-            )
-          : galleryImageUrls
-          ? JSON.stringify(
-              (JSON.parse(galleryImageUrls) as string[]).map((url: string) =>
-                normalizeMediaInput(url) || url
-              )
-            )
-          : null,
-        isActive: isActive ?? true,
-        isFeatured: isFeatured ?? false,
-        allowAdvance: allowAdvance ?? false,
-        advancePercentage:
-          allowAdvance && advancePercentage
-            ? Number(advancePercentage)
-            : null,
-        metaTitle: metaTitle || null,
-        metaDescription: metaDescription || null,
+        ...buildTourData(body, resolvedSlug),
         days: days.length
           ? {
               create: days.map(

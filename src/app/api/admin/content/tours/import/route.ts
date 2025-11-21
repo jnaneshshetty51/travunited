@@ -239,7 +239,18 @@ export async function POST(req: NextRequest) {
         }
       } catch (error: any) {
         console.error(`Error importing tour at row ${row}:`, error);
-        failed.push({ row, message: error.message || "Failed to import" });
+        
+        // Provide more helpful error messages for common issues
+        let errorMessage = error.message || "Failed to import";
+        if (error.message?.includes("Unknown argument")) {
+          errorMessage = `Schema mismatch: ${error.message}. Please ensure migrations are applied and Prisma Client is regenerated on the server.`;
+        } else if (error.code === "P2002") {
+          errorMessage = `Duplicate slug or unique constraint violation`;
+        } else if (error.code === "P2003") {
+          errorMessage = `Foreign key constraint failed: ${error.meta?.field_name || "related record not found"}`;
+        }
+        
+        failed.push({ row, message: errorMessage });
       }
     }
 

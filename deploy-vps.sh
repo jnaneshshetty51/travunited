@@ -33,11 +33,26 @@ git status
 echo "📦 Installing dependencies..."
 npm install
 
-# Step 5: Build the application
+# Step 5: Apply database migrations (if .env exists)
+if [ -f .env ]; then
+    echo "🗄️  Applying database migrations..."
+    set -a; source .env; set +a
+    npx prisma migrate deploy || {
+        echo "⚠️  Warning: Migration failed, but continuing..."
+    }
+    echo "🔄 Regenerating Prisma Client..."
+    npx prisma generate || {
+        echo "⚠️  Warning: Prisma generate failed, but continuing..."
+    }
+else
+    echo "⚠️  Warning: .env file not found, skipping migrations"
+fi
+
+# Step 6: Build the application
 echo "🔨 Building application..."
 npm run build
 
-# Step 6: Restart PM2 process
+# Step 7: Restart PM2 process
 echo "🔄 Restarting PM2 process..."
 pm2 restart travunited --update-env
 

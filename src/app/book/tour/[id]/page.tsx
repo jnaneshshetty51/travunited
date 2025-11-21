@@ -17,42 +17,16 @@ const steps = [
   { id: 5, name: "Payment", icon: CreditCard },
 ];
 
-// Mock tour data - in production, fetch from API
-const tourData: Record<string, any> = {
-  "dubai-premium": {
-    name: "Dubai 5N6D Premium Escape",
-    price: 45999,
-    advancePercentage: 30,
-  },
-  "europe-grand": {
-    name: "European Grand Tour",
-    price: 189999,
-    advancePercentage: 30,
-  },
-  "thailand-tropical": {
-    name: "Thailand Tropical Paradise",
-    price: 34999,
-    advancePercentage: 30,
-  },
-  "singapore-city": {
-    name: "Singapore City Explorer",
-    price: 42999,
-    advancePercentage: 30,
-  },
-};
-
 export default function TourBookingPage({ params }: { params: { id: string } }) {
   const { data: session } = useSession();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
-  
-  const tour = tourData[params.id] || {
-    name: "Tour Package",
-    price: 50000,
-    advancePercentage: 30,
-  };
+  const [tour, setTour] = useState<any>(null);
+  const [tourLoading, setTourLoading] = useState(true);
+  const [selectedCustomizations, setSelectedCustomizations] = useState<Record<string, boolean>>({});
+  const [selectedHotelCategory, setSelectedHotelCategory] = useState<string>("");
 
   const [formData, setFormData] = useState({
     travelDate: "",
@@ -72,13 +46,85 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
     paymentType: "full" as "full" | "advance",
   });
 
+  // Fetch tour data
+  useEffect(() => {
+    const fetchTour = async () => {
+      try {
+        const response = await fetch(`/api/tours/${params.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setTour(data);
+          // Set default hotel category if available
+          if (data.hotelCategories && data.hotelCategories.length > 0) {
+            setSelectedHotelCategory(data.hotelCategories[0]);
+          }
+        } else {
+          router.push("/tours");
+        }
+      } catch (error) {
+        console.error("Failed to load tour:", error);
+        router.push("/tours");
+      } finally {
+        setTourLoading(false);
+      }
+    };
+    fetchTour();
+  }, [params.id, router]);
+
+  // Calculate pricing with seasonal pricing and customizations
+  const calculatePrice = () => {
+    if (!tour) return { baseAmount: 0, finalAmount: 0, advanceAmount: 0, remainingAmount: 0 };
+
+    const travellerCount = formData.numberOfAdults + formData.numberOfChildren;
+    const normalizedTravellerCount = Math.max(travellerCount, 1);
+
+    // Get base price (check seasonal pricing first)
+    let basePrice = tour.basePriceInInr ?? tour.price ?? 0;
+    if (formData.travelDate && tour.seasonalPricing) {
+      const travelDate = new Date(formData.travelDate);
+      for (const [seasonName, seasonData] of Object.entries(tour.seasonalPricing as Record<string, any>)) {
+        if (seasonData.from && seasonData.to) {
+          const fromDate = new Date(seasonData.from);
+          const toDate = new Date(seasonData.to);
+          if (travelDate >= fromDate && travelDate <= toDate && seasonData.price) {
+            basePrice = seasonData.price;
+            break;
+          }
+        }
+      }
+    }
+
+    // Calculate base amount
+    let baseAmount = basePrice * normalizedTravellerCount;
+
+    // Add customization options
+    let customizationTotal = 0;
+    if (tour.customizationOptions) {
+      for (const [key, value] of Object.entries(tour.customizationOptions as Record<string, any>)) {
+        if (selectedCustomizations[key] && value.price) {
+          if (value.type === "per_person") {
+            customizationTotal += value.price * normalizedTravellerCount;
+          } else {
+            customizationTotal += value.price;
+          }
+        }
+      }
+    }
+
+    const finalAmount = baseAmount + customizationTotal;
+    const advancePercentage = tour.advancePercentage ?? 0;
+    const advanceAmount = formData.paymentType === "advance" && tour.allowAdvance
+      ? Math.round(finalAmount * (advancePercentage / 100))
+      : finalAmount;
+    const remainingAmount = Math.max(finalAmount - advanceAmount, 0);
+
+    return { baseAmount, finalAmount, advanceAmount, remainingAmount };
+  };
+
+  const { baseAmount, finalAmount, advanceAmount, remainingAmount } = calculatePrice();
+
   const travellerCount = formData.numberOfAdults + formData.numberOfChildren;
   const travellersLength = formData.travellers.length;
-  const normalizedTravellerCount = Math.max(travellerCount, 1);
-  const baseAmount = tour.price * normalizedTravellerCount;
-  const advancePercentage = tour.advancePercentage ?? 0;
-  const advanceAmount = Math.round(baseAmount * (advancePercentage / 100));
-  const remainingAmount = Math.max(baseAmount - advanceAmount, 0);
   // Auto-fill for logged-in users
   useEffect(() => {
     if (session?.user) {
@@ -119,11 +165,61 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
     }
   }, [travellerCount, travellersLength]);
 
+  // Validate availability and constraints
+  const validateStep1 = (): string | null => {
+    if (!tour) return "Tour not loaded";
+    
+    if (!formData.travelDate) {
+      return "Please select a travel date";
+    }
+
+    const travelDate = new Date(formData.travelDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Check if date is in the past
+    if (travelDate < today) {
+      return "Travel date cannot be in the past";
+    }
+
+    // Check booking deadline
+    if (tour.bookingDeadline) {
+      const deadline = new Date(tour.bookingDeadline);
+      if (travelDate <= deadline) {
+        return `Booking deadline is ${deadline.toLocaleDateString()}. Please select a date after the deadline.`;
+      }
+    }
+
+    // Check available dates for fixed departure
+    if (tour.packageType === "fixed_departure" && tour.availableDates && tour.availableDates.length > 0) {
+      const dateStr = travelDate.toISOString().split("T")[0];
+      const isAvailable = tour.availableDates.some((date: string) => {
+        const availableDate = new Date(date);
+        return availableDate.toISOString().split("T")[0] === dateStr;
+      });
+      if (!isAvailable) {
+        return "Selected date is not available. Please choose from available dates.";
+      }
+    }
+
+    // Validate traveler count
+    const totalTravelers = formData.numberOfAdults + formData.numberOfChildren;
+    if (tour.minimumTravelers && totalTravelers < tour.minimumTravelers) {
+      return `Minimum ${tour.minimumTravelers} traveler(s) required for this tour`;
+    }
+    if (tour.maximumTravelers && totalTravelers > tour.maximumTravelers) {
+      return `Maximum ${tour.maximumTravelers} traveler(s) allowed for this tour`;
+    }
+
+    return null;
+  };
+
   const nextStep = () => {
     // Validation
     if (currentStep === 1) {
-      if (!formData.travelDate) {
-        alert("Please select a travel date");
+      const error = validateStep1();
+      if (error) {
+        alert(error);
         return;
       }
     }
@@ -172,18 +268,20 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
       const response = await fetch("/api/bookings/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tourId: params.id,
-          tourName: tour.name,
-          tourPrice: tour.price,
-          advancePercentage: tour.advancePercentage,
-          travelDate: formData.travelDate,
-          numberOfAdults: formData.numberOfAdults,
-          numberOfChildren: formData.numberOfChildren,
-          primaryContact: formData.primaryContact,
-          travellers: formData.travellers,
-          paymentType: formData.paymentType,
-        }),
+      body: JSON.stringify({
+        tourId: tour.id,
+        tourName: tour.name,
+        tourPrice: finalAmount,
+        advancePercentage: tour.advancePercentage,
+        travelDate: formData.travelDate,
+        numberOfAdults: formData.numberOfAdults,
+        numberOfChildren: formData.numberOfChildren,
+        primaryContact: formData.primaryContact,
+        travellers: formData.travellers,
+        paymentType: formData.paymentType,
+        customizations: selectedCustomizations,
+        hotelCategory: selectedHotelCategory,
+      }),
       });
 
       if (response.ok) {
@@ -206,11 +304,9 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
 
     setLoading(true);
     try {
-      const totalTravellers = formData.numberOfAdults + formData.numberOfChildren;
-      const baseAmount = tour.price * totalTravellers;
       const amount = formData.paymentType === "full"
-        ? baseAmount
-        : Math.round(baseAmount * (tour.advancePercentage / 100));
+        ? finalAmount
+        : advanceAmount;
 
       const response = await fetch("/api/payments/create-order", {
         method: "POST",
@@ -306,27 +402,92 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
+        if (!tour) {
+          return (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto" />
+              <p className="mt-4 text-neutral-600">Loading tour details...</p>
+            </div>
+          );
+        }
+
         return (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-neutral-900 mb-4">Select Tour & Travel Date</h2>
             <div className="bg-neutral-50 rounded-lg p-6 mb-6">
               <h3 className="font-semibold text-lg mb-2">{tour.name}</h3>
-              <p className="text-neutral-600 mb-4">Starting from ₹{tour.price.toLocaleString()} per person</p>
+              <p className="text-neutral-600 mb-4">
+                Starting from ₹{(tour.basePriceInInr ?? tour.price ?? 0).toLocaleString()} per person
+                {tour.originalPrice && tour.originalPrice > (tour.basePriceInInr ?? tour.price ?? 0) && (
+                  <span className="ml-2 text-neutral-500 line-through">
+                    ₹{tour.originalPrice.toLocaleString()}
+                  </span>
+                )}
+              </p>
             </div>
             <div className="space-y-4">
+              {/* Date Selection */}
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-2">
                   Select Travel Date *
                 </label>
-                <input
-                  type="date"
-                  required
-                  value={formData.travelDate}
-                  onChange={(e) => setFormData({ ...formData, travelDate: e.target.value })}
-                  min={new Date().toISOString().split("T")[0]}
-                  className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                />
+                {tour.packageType === "fixed_departure" && tour.availableDates && tour.availableDates.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {tour.availableDates.map((dateStr: string) => {
+                        const date = new Date(dateStr);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const isPast = date < today;
+                        const isSelected = formData.travelDate === dateStr;
+                        const isPastDeadline = tour.bookingDeadline && date <= new Date(tour.bookingDeadline);
+                        const isDisabled = isPast || isPastDeadline;
+
+                        return (
+                          <button
+                            key={dateStr}
+                            type="button"
+                            disabled={isDisabled}
+                            onClick={() => !isDisabled && setFormData({ ...formData, travelDate: dateStr })}
+                            className={`p-3 border rounded-lg text-sm text-left transition-colors ${
+                              isSelected
+                                ? "bg-primary-600 text-white border-primary-600"
+                                : isDisabled
+                                ? "bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed"
+                                : "bg-white text-neutral-700 border-neutral-300 hover:border-primary-500"
+                            }`}
+                          >
+                            <div className="font-medium">
+                              {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                            </div>
+                            <div className="text-xs opacity-75">
+                              {date.toLocaleDateString("en-US", { year: "numeric" })}
+                            </div>
+                            {isPast && <div className="text-xs mt-1">Past</div>}
+                            {isPastDeadline && <div className="text-xs mt-1">Closed</div>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {tour.bookingDeadline && (
+                      <p className="text-xs text-neutral-500 mt-2">
+                        Booking closes {new Date(tour.bookingDeadline).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <input
+                    type="date"
+                    required
+                    value={formData.travelDate}
+                    onChange={(e) => setFormData({ ...formData, travelDate: e.target.value })}
+                    min={new Date().toISOString().split("T")[0]}
+                    className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                )}
               </div>
+
+              {/* Travelers */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-2">
@@ -340,6 +501,11 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                     onChange={(e) => setFormData({ ...formData, numberOfAdults: parseInt(e.target.value) || 1 })}
                     className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
+                  {tour.minimumTravelers && (
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Minimum: {tour.minimumTravelers} traveler(s)
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-2">
@@ -352,13 +518,108 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                     onChange={(e) => setFormData({ ...formData, numberOfChildren: parseInt(e.target.value) || 0 })}
                     className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
+                  {tour.maximumTravelers && (
+                    <p className="text-xs text-neutral-500 mt-1">
+                      Maximum: {tour.maximumTravelers} traveler(s)
+                    </p>
+                  )}
                 </div>
               </div>
+
+              {/* Hotel Categories */}
+              {tour.hotelCategories && tour.hotelCategories.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Hotel Category
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {tour.hotelCategories.map((category: string) => (
+                      <button
+                        key={category}
+                        type="button"
+                        onClick={() => setSelectedHotelCategory(category)}
+                        className={`px-4 py-2 border rounded-lg text-sm transition-colors ${
+                          selectedHotelCategory === category
+                            ? "bg-primary-600 text-white border-primary-600"
+                            : "bg-white text-neutral-700 border-neutral-300 hover:border-primary-500"
+                        }`}
+                      >
+                        {category}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Customization Options */}
+              {tour.customizationOptions && Object.keys(tour.customizationOptions).length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Customization Options
+                  </label>
+                  <div className="space-y-2">
+                    {Object.entries(tour.customizationOptions as Record<string, any>).map(([key, value]: [string, any]) => (
+                      <label
+                        key={key}
+                        className="flex items-start gap-3 p-3 border border-neutral-200 rounded-lg hover:bg-neutral-50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedCustomizations[key] || false}
+                          onChange={(e) =>
+                            setSelectedCustomizations({
+                              ...selectedCustomizations,
+                              [key]: e.target.checked,
+                            })
+                          }
+                          className="mt-1 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <div className="flex-1">
+                          <div className="font-medium text-neutral-900">{key}</div>
+                          {typeof value === "object" && value.description && (
+                            <div className="text-sm text-neutral-600">{value.description}</div>
+                          )}
+                          {typeof value === "object" && value.price && (
+                            <div className="text-sm text-primary-600 mt-1">
+                              +₹{value.price.toLocaleString()}
+                              {value.type === "per_person" && " per person"}
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Price Summary */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-700">
-                  Total travellers: {travellerCount}{" "}
-                  (₹{(tour.price * normalizedTravellerCount).toLocaleString()} total)
-                </p>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-neutral-700">Total travellers:</span>
+                    <span className="font-medium">{travellerCount}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-neutral-700">Base price:</span>
+                    <span className="font-medium">₹{baseAmount.toLocaleString()}</span>
+                  </div>
+                  {Object.keys(selectedCustomizations).some(key => selectedCustomizations[key]) && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-neutral-700">Customizations:</span>
+                      <span className="font-medium">
+                        +₹{(finalAmount - baseAmount).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="border-t border-blue-300 pt-2 mt-2">
+                    <div className="flex justify-between">
+                      <span className="font-semibold text-neutral-900">Total Amount:</span>
+                      <span className="font-bold text-lg text-primary-600">
+                        ₹{finalAmount.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

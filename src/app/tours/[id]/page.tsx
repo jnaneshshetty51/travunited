@@ -3,15 +3,68 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { Metadata } from "next";
 import {
   Calendar,
   MapPin,
   Clock,
   CheckCircle,
   ArrowRight,
+  Users,
+  Star,
+  TrendingUp,
+  Hotel,
+  Settings,
+  XCircle,
+  Tag,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { getMediaProxyUrl } from "@/lib/media";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { id: string };
+}): Promise<Metadata> {
+  const tour = await prisma.tour.findFirst({
+    where: { slug: params.id },
+  });
+
+  if (!tour) {
+    return {};
+  }
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://travunited.com";
+  const canonical = tour.canonicalUrl || `${siteUrl}/tours/${tour.slug}`;
+  const ogImage = tour.ogImage
+    ? getMediaProxyUrl(tour.ogImage)
+    : tour.featuredImage
+    ? getMediaProxyUrl(tour.featuredImage)
+    : tour.heroImageUrl
+    ? getMediaProxyUrl(tour.heroImageUrl)
+    : undefined;
+
+  return {
+    title: tour.metaTitle || tour.name,
+    description: tour.metaDescription || tour.shortDescription || tour.description?.substring(0, 160),
+    keywords: tour.metaKeywords?.split(",").map((k) => k.trim()),
+    alternates: {
+      canonical,
+    },
+    openGraph: {
+      title: tour.ogTitle || tour.metaTitle || tour.name,
+      description: tour.ogDescription || tour.metaDescription || tour.shortDescription || tour.description?.substring(0, 160),
+      images: ogImage ? [{ url: ogImage }] : [],
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: tour.twitterTitle || tour.metaTitle || tour.name,
+      description: tour.twitterDescription || tour.metaDescription || tour.shortDescription || tour.description?.substring(0, 160),
+      images: tour.twitterImage ? [getMediaProxyUrl(tour.twitterImage)] : ogImage ? [ogImage] : [],
+    },
+  };
+}
 
 export default async function TourDetailPage({
   params,
@@ -19,7 +72,11 @@ export default async function TourDetailPage({
   params: { id: string };
 }) {
   const tour = await prisma.tour.findFirst({
-    where: { slug: params.id },
+    where: { 
+      slug: params.id,
+      isActive: true,
+      status: "active",
+    },
     include: {
       country: true,
       days: { orderBy: { dayIndex: "asc" } },
@@ -30,41 +87,169 @@ export default async function TourDetailPage({
     notFound();
   }
 
-  const gallery: string[] = tour.galleryImageUrls
-    ? JSON.parse(tour.galleryImageUrls).map((url: string) => getMediaProxyUrl(url) || url)
+  // Parse JSON fields
+  const gallery: string[] = tour.images
+    ? (() => {
+        try {
+          const parsed = JSON.parse(tour.images);
+          return Array.isArray(parsed) ? parsed.map((url: string) => getMediaProxyUrl(url) || url) : [];
+        } catch {
+          return [];
+        }
+      })()
+    : tour.galleryImageUrls
+    ? (() => {
+        try {
+          const parsed = JSON.parse(tour.galleryImageUrls);
+          return Array.isArray(parsed) ? parsed.map((url: string) => getMediaProxyUrl(url) || url) : [];
+        } catch {
+          return [];
+        }
+      })()
     : [];
-  const inclusions = toList(tour.inclusions);
-  const exclusions = toList(tour.exclusions);
+
+  const inclusions = parseJsonArray(tour.inclusions);
+  const exclusions = parseJsonArray(tour.exclusions);
+  const highlights = parseJsonArray(tour.highlights);
+  const themes = parseJsonArray(tour.themes);
+  const bestFor = parseJsonArray(tour.bestFor);
+  const regionTags = parseJsonArray(tour.regionTags);
+  const citiesCovered = parseJsonArray(tour.citiesCovered);
+  const availableDates = parseJsonArray(tour.availableDates);
+  const hotelCategories = parseJsonArray(tour.hotelCategories);
+  const customizationOptions = parseJsonObject(tour.customizationOptions);
+  const seasonalPricing = parseJsonObject(tour.seasonalPricing);
+
+  // Format duration
+  const durationParts: string[] = [];
+  if (tour.durationDays) durationParts.push(`${tour.durationDays} day${tour.durationDays !== 1 ? "s" : ""}`);
+  if (tour.durationNights) durationParts.push(`${tour.durationNights} night${tour.durationNights !== 1 ? "s" : ""}`);
+  const durationDisplay = durationParts.length > 0 ? durationParts.join(" / ") : tour.duration || "5 days";
+
+  // Format destination
+  const destinationParts: string[] = [];
+  if (tour.primaryDestination) destinationParts.push(tour.primaryDestination);
+  if (tour.destinationState) destinationParts.push(tour.destinationState);
+  if (tour.destinationCountry) destinationParts.push(tour.destinationCountry);
+  const destinationDisplay = destinationParts.length > 0 ? destinationParts.join(", ") : tour.destination || "";
+
+  // Price display
+  const currencySymbol = tour.currency === "INR" ? "₹" : tour.currency || "₹";
+  const displayPrice = tour.basePriceInInr ?? tour.price ?? 0;
+  const originalPrice = tour.originalPrice;
 
   return (
     <div className="min-h-screen bg-white">
-      <Hero tour={tour} gallery={gallery} />
+      <Hero 
+        tour={tour} 
+        gallery={gallery}
+        destinationDisplay={destinationDisplay}
+        durationDisplay={durationDisplay}
+        price={displayPrice}
+        originalPrice={originalPrice}
+        currency={currencySymbol}
+        tourType={tour.tourType}
+        tourSubType={tour.tourSubType}
+        region={tour.region}
+        regionTags={regionTags}
+        bestFor={bestFor}
+        highlights={highlights}
+        groupSizeMin={tour.groupSizeMin}
+        groupSizeMax={tour.groupSizeMax}
+        difficultyLevel={tour.difficultyLevel}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-10">
+            {/* Overview Section */}
             <Section title="Overview">
-              <p className="text-neutral-700 whitespace-pre-line leading-relaxed">
-                {tour.overview || tour.description}
-              </p>
+              {tour.shortDescription && (
+                <p className="text-lg text-neutral-700 leading-relaxed mb-4">
+                  {tour.shortDescription}
+                </p>
+              )}
+              {tour.description && (
+                <div className="text-neutral-700 whitespace-pre-line leading-relaxed">
+                  {tour.description}
+                </div>
+              )}
+              {!tour.description && tour.overview && (
+                <p className="text-neutral-700 whitespace-pre-line leading-relaxed">
+                  {tour.overview}
+                </p>
+              )}
             </Section>
 
+            {/* Highlights */}
+            {highlights.length > 0 && (
+              <Section title="Highlights">
+                <ul className="space-y-3">
+                  {highlights.map((highlight, index) => (
+                    <li key={index} className="flex items-start gap-3">
+                      <Star size={20} className="text-primary-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-neutral-700">{highlight}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Section>
+            )}
+
+            {/* Themes & Best For */}
+            {(themes.length > 0 || bestFor.length > 0) && (
+              <Section title="Tour Details">
+                <div className="space-y-4">
+                  {themes.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-neutral-600 mb-2">Themes</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {themes.map((theme, index) => (
+                          <span
+                            key={index}
+                            className="px-3 py-1 bg-primary-50 text-primary-700 rounded-full text-sm"
+                          >
+                            {theme}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {bestFor.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-neutral-600 mb-2">Best For</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {bestFor.map((item, index) => (
+                          <span
+                            key={index}
+                            className="px-3 py-1 bg-neutral-100 text-neutral-700 rounded-full text-sm"
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Section>
+            )}
+
+            {/* Itinerary */}
             {tour.days.length > 0 && (
-              <Section title="Itinerary">
+              <Section title="Detailed Itinerary">
                 <div className="space-y-4">
                   {tour.days.map((day) => (
                     <div
                       key={day.id}
                       className="border border-neutral-200 rounded-2xl p-5 flex gap-4"
                     >
-                      <div className="h-12 w-12 rounded-full bg-primary-100 text-primary-600 font-semibold flex items-center justify-center">
+                      <div className="h-12 w-12 rounded-full bg-primary-100 text-primary-600 font-semibold flex items-center justify-center flex-shrink-0">
                         {day.dayIndex}
                       </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-neutral-900">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-neutral-900 mb-2">
                           {day.title}
                         </h3>
-                        <p className="text-neutral-700 whitespace-pre-line mt-2">
+                        <p className="text-neutral-700 whitespace-pre-line">
                           {day.content}
                         </p>
                       </div>
@@ -74,14 +259,32 @@ export default async function TourDetailPage({
               </Section>
             )}
 
-            {(inclusions.length || exclusions.length) && (
+            {/* Cities Covered Timeline */}
+            {citiesCovered.length > 0 && (
+              <Section title="Cities Covered">
+                <div className="flex flex-wrap gap-3">
+                  {citiesCovered.map((city, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2 px-4 py-2 bg-neutral-50 rounded-lg"
+                    >
+                      <MapPin size={16} className="text-primary-600" />
+                      <span className="text-neutral-700">{city}</span>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {/* Inclusions & Exclusions */}
+            {(inclusions.length > 0 || exclusions.length > 0) && (
               <div className="grid md:grid-cols-2 gap-6">
                 {inclusions.length > 0 && (
-                  <Section title="Inclusions">
+                  <Section title="What's Included">
                     <ul className="space-y-2 text-sm text-neutral-700">
                       {inclusions.map((item, index) => (
                         <li key={index} className="flex items-start gap-2">
-                          <CheckCircle size={16} className="text-primary-600 mt-0.5" />
+                          <CheckCircle size={16} className="text-primary-600 mt-0.5 flex-shrink-0" />
                           <span>{item}</span>
                         </li>
                       ))}
@@ -89,11 +292,11 @@ export default async function TourDetailPage({
                   </Section>
                 )}
                 {exclusions.length > 0 && (
-                  <Section title="Exclusions">
+                  <Section title="What's Not Included">
                     <ul className="space-y-2 text-sm text-neutral-700">
                       {exclusions.map((item, index) => (
                         <li key={index} className="flex items-start gap-2">
-                          <Clock size={16} className="text-neutral-500 mt-0.5" />
+                          <XCircle size={16} className="text-neutral-500 mt-0.5 flex-shrink-0" />
                           <span>{item}</span>
                         </li>
                       ))}
@@ -103,20 +306,147 @@ export default async function TourDetailPage({
               </div>
             )}
 
-            {tour.importantNotes && (
-              <Section title="Important Notes">
-                <p className="text-neutral-700 whitespace-pre-line">
-                  {tour.importantNotes}
-                </p>
+            {/* Booking Policies & Cancellation */}
+            {(tour.bookingPolicies || tour.cancellationTerms) && (
+              <div className="grid md:grid-cols-2 gap-6">
+                {tour.bookingPolicies && (
+                  <Section title="Booking Policy">
+                    <div className="text-neutral-700 whitespace-pre-line text-sm">
+                      {tour.bookingPolicies}
+                    </div>
+                  </Section>
+                )}
+                {tour.cancellationTerms && (
+                  <Section title="Cancellation & Refunds">
+                    <div className="text-neutral-700 whitespace-pre-line text-sm">
+                      {tour.cancellationTerms}
+                    </div>
+                  </Section>
+                )}
+              </div>
+            )}
+
+            {/* Dates & Availability */}
+            {tour.packageType && (
+              <Section title="Dates & Availability">
+                {tour.packageType === "fixed_departure" && availableDates.length > 0 ? (
+                  <div className="space-y-3">
+                    {availableDates.map((dateStr, index) => {
+                      const date = new Date(dateStr);
+                      const isPast = date < new Date();
+                      return (
+                        <div
+                          key={index}
+                          className={`p-4 border rounded-lg ${
+                            isPast ? "bg-neutral-50 border-neutral-200 opacity-60" : "bg-white border-neutral-200"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-medium text-neutral-900">
+                                {date.toLocaleDateString("en-US", {
+                                  weekday: "long",
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                })}
+                              </div>
+                              {tour.bookingDeadline && (
+                                <div className="text-sm text-neutral-600 mt-1">
+                                  Booking closes {new Date(tour.bookingDeadline).toLocaleDateString()}
+                                </div>
+                              )}
+                            </div>
+                            {isPast && (
+                              <span className="px-3 py-1 bg-neutral-200 text-neutral-600 rounded-full text-xs">
+                                Past
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : tour.packageType === "on_demand" ? (
+                  <div className="p-4 bg-primary-50 border border-primary-200 rounded-lg">
+                    <p className="text-neutral-700">
+                      This tour is available on-demand. Please select your preferred travel dates during booking.
+                    </p>
+                  </div>
+                ) : null}
               </Section>
             )}
 
+            {/* Hotels */}
+            {hotelCategories.length > 0 && (
+              <Section title="Stay & Hotels">
+                <div className="flex flex-wrap gap-3">
+                  {hotelCategories.map((category, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-2 px-4 py-2 bg-neutral-50 rounded-lg"
+                    >
+                      <Hotel size={16} className="text-primary-600" />
+                      <span className="text-neutral-700">{category}</span>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {/* Customization Options */}
+            {customizationOptions && Object.keys(customizationOptions).length > 0 && (
+              <Section title="Customize Your Trip">
+                <div className="space-y-3">
+                  {Object.entries(customizationOptions).map(([key, value]: [string, any]) => (
+                    <div key={key} className="p-4 border border-neutral-200 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <Settings size={18} className="text-primary-600 mt-0.5" />
+                        <div className="flex-1">
+                          <div className="font-medium text-neutral-900">{key}</div>
+                          {typeof value === "string" && (
+                            <div className="text-sm text-neutral-600 mt-1">{value}</div>
+                          )}
+                          {typeof value === "object" && value.price && (
+                            <div className="text-sm text-primary-600 mt-1">
+                              +{currencySymbol}{value.price.toLocaleString()}
+                              {value.type === "per_person" && " per person"}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {/* Important Notes */}
+            {tour.importantNotes && (
+              <Section title="Important Notes">
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-neutral-700 whitespace-pre-line">
+                    {tour.importantNotes}
+                  </p>
+                </div>
+              </Section>
+            )}
+
+            {/* Gallery */}
             {gallery.length > 0 && (
-              <Section title="Gallery">
+              <Section title="Photo Gallery">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {gallery.map((src) => (
-                    <div key={src} className="relative aspect-video rounded-xl overflow-hidden">
-                      <Image src={getMediaProxyUrl(src)} alt={tour.name} fill className="object-cover" />
+                  {gallery.slice(0, 6).map((src, index) => (
+                    <div
+                      key={index}
+                      className="relative aspect-video rounded-xl overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                    >
+                      <Image
+                        src={getMediaProxyUrl(src) || src}
+                        alt={`${tour.name} - Image ${index + 1}`}
+                        fill
+                        className="object-cover"
+                      />
                     </div>
                   ))}
                 </div>
@@ -124,46 +454,26 @@ export default async function TourDetailPage({
             )}
           </div>
 
+          {/* Booking Sidebar */}
           <aside className="lg:col-span-1">
-            <div className="sticky top-24 bg-white rounded-2xl shadow-large p-6 border border-neutral-200 space-y-4">
-              <div>
-                <div className="text-4xl font-bold text-primary-600 mb-1">
-                  ₹{(tour.basePriceInInr ?? tour.price).toLocaleString()}
-                </div>
-                <div className="text-sm text-neutral-500">Per traveller</div>
-              </div>
-
-              <div className="text-sm text-neutral-600 space-y-2">
-                <div className="flex items-center gap-2">
-                  <MapPin size={16} className="text-primary-600" />
-                  <span>{tour.destination}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Calendar size={16} className="text-primary-600" />
-                  <span>{tour.duration}</span>
-                </div>
-                {tour.country?.name && (
-                  <div className="flex items-center gap-2">
-                    <Clock size={16} className="text-primary-600" />
-                    <span>{tour.country.name}</span>
-                  </div>
-                )}
-              </div>
-
-              <Link
-                href={`/book/tour/${tour.slug}`}
-                className="w-full bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors flex items-center justify-center gap-2"
-              >
-                <span>Book this Tour</span>
-                <ArrowRight size={18} />
-              </Link>
-
-              {tour.allowAdvance && tour.advancePercentage && (
-                <p className="text-xs text-neutral-500">
-                  Pay {tour.advancePercentage}% now and the remaining before departure.
-                </p>
-              )}
-            </div>
+            <BookingSidebar
+              tour={tour}
+              price={displayPrice}
+              originalPrice={originalPrice}
+              currency={currencySymbol}
+              durationDisplay={durationDisplay}
+              destinationDisplay={destinationDisplay}
+              minimumTravelers={tour.minimumTravelers}
+              maximumTravelers={tour.maximumTravelers}
+              groupSizeMin={tour.groupSizeMin}
+              groupSizeMax={tour.groupSizeMax}
+              packageType={tour.packageType}
+              availableDates={availableDates}
+              bookingDeadline={tour.bookingDeadline}
+              status={tour.status}
+              allowAdvance={tour.allowAdvance}
+              advancePercentage={tour.advancePercentage}
+            />
           </aside>
         </div>
       </div>
@@ -171,16 +481,52 @@ export default async function TourDetailPage({
   );
 }
 
-function Hero({ tour, gallery }: { tour: any; gallery: string[] }) {
+function Hero({
+  tour,
+  gallery,
+  destinationDisplay,
+  durationDisplay,
+  price,
+  originalPrice,
+  currency,
+  tourType,
+  tourSubType,
+  region,
+  regionTags,
+  bestFor,
+  highlights,
+  groupSizeMin,
+  groupSizeMax,
+  difficultyLevel,
+}: {
+  tour: any;
+  gallery: string[];
+  destinationDisplay: string;
+  durationDisplay: string;
+  price: number;
+  originalPrice: number | null;
+  currency: string;
+  tourType: string | null;
+  tourSubType: string | null;
+  region: string | null;
+  regionTags: string[];
+  bestFor: string[];
+  highlights: string[];
+  groupSizeMin: number | null;
+  groupSizeMax: number | null;
+  difficultyLevel: string | null;
+}) {
   const heroImage =
+    getMediaProxyUrl(tour.featuredImage) ||
     getMediaProxyUrl(tour.heroImageUrl) ||
     getMediaProxyUrl(tour.imageUrl) ||
     getMediaProxyUrl(gallery[0]) ||
     "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80";
+
   return (
-    <div className="relative h-[400px] md:h-[500px]">
-      <Image src={heroImage} alt={tour.name} fill className="object-cover" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+    <div className="relative h-[500px] md:h-[600px]">
+      <Image src={heroImage} alt={tour.name} fill className="object-cover" priority />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
       <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
         <div className="max-w-7xl mx-auto">
           <Link
@@ -189,19 +535,225 @@ function Hero({ tour, gallery }: { tour: any; gallery: string[] }) {
           >
             ← Back to Tours
           </Link>
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">{tour.name}</h1>
-          <div className="flex flex-wrap items-center gap-4 text-white/90 text-sm">
-            <span className="flex items-center gap-2">
-              <MapPin size={18} />
-              {tour.destination}
-            </span>
-            <span className="flex items-center gap-2">
-              <Calendar size={18} />
-              {tour.duration}
-            </span>
+          
+          {/* Title & Location */}
+          <h1 className="text-3xl md:text-5xl font-bold mb-3">{tour.name}</h1>
+          {destinationDisplay && (
+            <div className="flex items-center gap-2 text-white/90 mb-4">
+              <MapPin size={20} />
+              <span>{destinationDisplay}</span>
+            </div>
+          )}
+
+          {/* Tags & Badges */}
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            {tourType && (
+              <span className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-sm border border-white/30">
+                {tourType}
+              </span>
+            )}
+            {tourSubType && (
+              <span className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-sm border border-white/30">
+                {tourSubType}
+              </span>
+            )}
+            {region && (
+              <span className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-sm border border-white/30">
+                {region}
+              </span>
+            )}
+            {regionTags.slice(0, 2).map((tag, index) => (
+              <span
+                key={index}
+                className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-sm border border-white/30"
+              >
+                {tag}
+              </span>
+            ))}
           </div>
+
+          {/* Info Strip */}
+          <div className="flex flex-wrap items-center gap-6 text-sm text-white/90 mb-4">
+            <div className="flex items-center gap-2">
+              <Calendar size={18} />
+              <span>{durationDisplay}</span>
+            </div>
+            {(groupSizeMin || groupSizeMax) && (
+              <div className="flex items-center gap-2">
+                <Users size={18} />
+                <span>
+                  Group: {groupSizeMin || 1}–{groupSizeMax || 20} people
+                </span>
+              </div>
+            )}
+            {difficultyLevel && (
+              <div className="flex items-center gap-2">
+                <TrendingUp size={18} />
+                <span>Difficulty: {difficultyLevel}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Price Block */}
+          <div className="flex items-baseline gap-3">
+            {originalPrice && originalPrice > price && (
+              <span className="text-xl text-white/70 line-through">
+                {currency}{originalPrice.toLocaleString()}
+              </span>
+            )}
+            <span className="text-4xl md:text-5xl font-bold">
+              {currency}{price.toLocaleString()}
+            </span>
+            <span className="text-white/80">per person</span>
+          </div>
+
+          {/* Best For */}
+          {bestFor.length > 0 && (
+            <div className="mt-4 flex items-center gap-2">
+              <span className="text-white/80 text-sm">Best for:</span>
+              <div className="flex flex-wrap gap-2">
+                {bestFor.slice(0, 3).map((item, index) => (
+                  <span
+                    key={index}
+                    className="px-2 py-1 bg-white/20 backdrop-blur-sm rounded text-xs"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function BookingSidebar({
+  tour,
+  price,
+  originalPrice,
+  currency,
+  durationDisplay,
+  destinationDisplay,
+  minimumTravelers,
+  maximumTravelers,
+  groupSizeMin,
+  groupSizeMax,
+  packageType,
+  availableDates,
+  bookingDeadline,
+  status,
+  allowAdvance,
+  advancePercentage,
+}: {
+  tour: any;
+  price: number;
+  originalPrice: number | null;
+  currency: string;
+  durationDisplay: string;
+  destinationDisplay: string;
+  minimumTravelers: number | null;
+  maximumTravelers: number | null;
+  groupSizeMin: number | null;
+  groupSizeMax: number | null;
+  packageType: string | null;
+  availableDates: string[];
+  bookingDeadline: Date | null;
+  status: string | null;
+  allowAdvance: boolean;
+  advancePercentage: number | null;
+}) {
+  const canBook = status === "active";
+
+  return (
+    <div className="sticky top-24 bg-white rounded-2xl shadow-large p-6 border border-neutral-200 space-y-4">
+      {/* Price */}
+      <div>
+        {originalPrice && originalPrice > price && (
+          <div className="text-sm text-neutral-500 line-through mb-1">
+            {currency}{originalPrice.toLocaleString()}
+          </div>
+        )}
+        <div className="text-4xl font-bold text-primary-600 mb-1">
+          {currency}{price.toLocaleString()}
+        </div>
+        <div className="text-sm text-neutral-500">Starting from per person</div>
+      </div>
+
+      {/* Info */}
+      <div className="text-sm text-neutral-600 space-y-2 border-t border-neutral-200 pt-4">
+        <div className="flex items-center gap-2">
+          <MapPin size={16} className="text-primary-600" />
+          <span>{destinationDisplay || tour.destination}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Calendar size={16} className="text-primary-600" />
+          <span>{durationDisplay}</span>
+        </div>
+        {(minimumTravelers || maximumTravelers) && (
+          <div className="flex items-center gap-2">
+            <Users size={16} className="text-primary-600" />
+            <span>
+              {minimumTravelers || 1}–{maximumTravelers || 50} travelers
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Booking Button */}
+      {canBook ? (
+        <Link
+          href={`/book/tour/${tour.slug}`}
+          className="w-full bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors flex items-center justify-center gap-2"
+        >
+          <span>Book this Tour</span>
+          <ArrowRight size={18} />
+        </Link>
+      ) : (
+        <button
+          disabled
+          className="w-full bg-neutral-300 text-neutral-500 px-6 py-3 rounded-lg font-medium cursor-not-allowed"
+        >
+          Not Available
+        </button>
+      )}
+
+      {/* Advance Payment Info */}
+      {allowAdvance && advancePercentage && (
+        <p className="text-xs text-neutral-500 text-center">
+          Pay {advancePercentage}% now and the remaining before departure.
+        </p>
+      )}
+
+      {/* Package Type Info */}
+      {packageType && (
+        <div className="text-xs text-neutral-600 border-t border-neutral-200 pt-4">
+          {packageType === "fixed_departure" && availableDates.length > 0 && (
+            <div>
+              <div className="font-medium mb-2">Available Dates:</div>
+              <div className="space-y-1">
+                {availableDates.slice(0, 3).map((dateStr, index) => {
+                  const date = new Date(dateStr);
+                  return (
+                    <div key={index} className="text-xs">
+                      {date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </div>
+                  );
+                })}
+                {availableDates.length > 3 && (
+                  <div className="text-xs text-primary-600">+{availableDates.length - 3} more dates</div>
+                )}
+              </div>
+            </div>
+          )}
+          {packageType === "on_demand" && (
+            <div className="text-xs text-neutral-600">
+              Available on-demand. Select your preferred dates during booking.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -221,11 +773,26 @@ function Section({
   );
 }
 
-function toList(value: string | null) {
+function parseJsonArray(value: string | null): string[] {
   if (!value) return [];
-  return value
-    .split("\n")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    // Fallback: treat as newline-separated string
+    return value
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
 }
 
+function parseJsonObject(value: string | null): Record<string, any> {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === "object" && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}

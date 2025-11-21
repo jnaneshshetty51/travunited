@@ -28,57 +28,179 @@ type DayState = {
 };
 
 type FormState = {
+  // Basic Info
   countryId: string;
   name: string;
   slug: string;
   subtitle: string;
-  destination: string;
-  duration: string;
-  overview: string;
+  shortDescription: string;
   description: string;
-  inclusions: string;
-  exclusions: string;
-  importantNotes: string;
+  tourType: string;
+  tourSubType: string;
+  bestFor: string; // JSON array string
+  
+  // Destination & Categorization
+  destination: string;
+  primaryDestination: string;
+  destinationCountry: string;
+  destinationState: string;
+  citiesCovered: string; // JSON array string
+  region: string;
+  regionTags: string; // JSON array string
+  categoryId: string;
+  themes: string; // JSON array string
+  
+  // Duration & Group Size
+  duration: string;
+  durationDays: number | null;
+  durationNights: number | null;
+  groupSizeMin: number | null;
+  groupSizeMax: number | null;
+  minimumTravelers: number | null;
+  maximumTravelers: number | null;
+  difficultyLevel: string;
+  
+  // Pricing
   price: number;
   basePriceInInr: number;
-  allowAdvance: boolean;
-  advancePercentage: number | null;
+  originalPrice: number | null;
+  currency: string;
+  packageType: string;
+  seasonalPricing: string; // JSON string
+  
+  // Dates & Availability
+  availableDates: string; // JSON array string
+  bookingDeadline: string; // ISO date string
+  status: string;
   isActive: boolean;
   isFeatured: boolean;
+  
+  // Advance Payment
+  allowAdvance: boolean;
+  advancePercentage: number | null;
+  
+  // Content
+  overview: string;
+  highlights: string; // JSON array string
+  inclusions: string; // JSON array string
+  exclusions: string; // JSON array string
+  itinerary: string; // JSON string (for structured itinerary)
+  importantNotes: string;
+  hotelCategories: string; // JSON array string
+  customizationOptions: string; // JSON string
+  bookingPolicies: string;
+  cancellationTerms: string;
+  
+  // Images & Media
   imageUrl: string;
   heroImageUrl: string;
-  galleryImageUrls: string;
+  featuredImage: string;
+  galleryImageUrls: string; // JSON array string or newline-separated
+  images: string; // JSON array string
+  ogImage: string;
+  twitterImage: string;
+  
+  // SEO & Social
   metaTitle: string;
   metaDescription: string;
+  metaKeywords: string;
+  canonicalUrl: string;
+  ogTitle: string;
+  ogDescription: string;
+  twitterTitle: string;
+  twitterDescription: string;
 };
 
 const defaultForm: FormState = {
+  // Basic Info
   countryId: "",
   name: "",
   slug: "",
   subtitle: "",
-  destination: "",
-  duration: "",
-  overview: "",
+  shortDescription: "",
   description: "",
-  inclusions: "",
-  exclusions: "",
-  importantNotes: "",
+  tourType: "",
+  tourSubType: "",
+  bestFor: "[]",
+  
+  // Destination & Categorization
+  destination: "",
+  primaryDestination: "",
+  destinationCountry: "",
+  destinationState: "",
+  citiesCovered: "[]",
+  region: "",
+  regionTags: "[]",
+  categoryId: "",
+  themes: "[]",
+  
+  // Duration & Group Size
+  duration: "",
+  durationDays: null,
+  durationNights: null,
+  groupSizeMin: null,
+  groupSizeMax: null,
+  minimumTravelers: null,
+  maximumTravelers: null,
+  difficultyLevel: "",
+  
+  // Pricing
   price: 0,
   basePriceInInr: 0,
-  allowAdvance: false,
-  advancePercentage: null,
+  originalPrice: null,
+  currency: "INR",
+  packageType: "",
+  seasonalPricing: "{}",
+  
+  // Dates & Availability
+  availableDates: "[]",
+  bookingDeadline: "",
+  status: "active",
   isActive: true,
   isFeatured: false,
+  
+  // Advance Payment
+  allowAdvance: false,
+  advancePercentage: null,
+  
+  // Content
+  overview: "",
+  highlights: "[]",
+  inclusions: "[]",
+  exclusions: "[]",
+  itinerary: "[]",
+  importantNotes: "",
+  hotelCategories: "[]",
+  customizationOptions: "{}",
+  bookingPolicies: "",
+  cancellationTerms: "",
+  
+  // Images & Media
   imageUrl: "",
   heroImageUrl: "",
+  featuredImage: "",
   galleryImageUrls: "",
+  images: "[]",
+  ogImage: "",
+  twitterImage: "",
+  
+  // SEO & Social
   metaTitle: "",
   metaDescription: "",
+  metaKeywords: "",
+  canonicalUrl: "",
+  ogTitle: "",
+  ogDescription: "",
+  twitterTitle: "",
+  twitterDescription: "",
 };
 
 const tabs = [
   { id: "basic", label: "Basic Info" },
+  { id: "destination", label: "Destination" },
+  { id: "duration", label: "Duration & Group" },
+  { id: "pricing", label: "Pricing" },
+  { id: "availability", label: "Dates & Availability" },
   { id: "content", label: "Content" },
   { id: "itinerary", label: "Itinerary" },
   { id: "media", label: "Media & SEO" },
@@ -110,11 +232,14 @@ export default function AdminTourEditorPage() {
   const [saving, setSaving] = useState(false);
   const [coverImageMode, setCoverImageMode] = useState<"url" | "upload">("url");
   const [heroImageMode, setHeroImageMode] = useState<"url" | "upload">("url");
+  const [featuredImageMode, setFeaturedImageMode] = useState<"url" | "upload">("url");
   const [coverUploading, setCoverUploading] = useState(false);
   const [heroUploading, setHeroUploading] = useState(false);
+  const [featuredUploading, setFeaturedUploading] = useState(false);
   const [galleryUploading, setGalleryUploading] = useState(false);
   const [coverUploadError, setCoverUploadError] = useState<string | null>(null);
   const [heroUploadError, setHeroUploadError] = useState<string | null>(null);
+  const [featuredUploadError, setFeaturedUploadError] = useState<string | null>(null);
   const [galleryUploadError, setGalleryUploadError] = useState<string | null>(null);
   const [draggingGalleryIndex, setDraggingGalleryIndex] = useState<number | null>(null);
 
@@ -135,31 +260,120 @@ export default function AdminTourEditorPage() {
   }, []);
 
   const hydrateTour = useCallback((data: any) => {
+    // Helper to parse JSON fields safely
+    const parseJsonField = (value: any, defaultValue: string = "[]") => {
+      if (!value) return defaultValue;
+      if (typeof value === "string") {
+        try {
+          JSON.parse(value);
+          return value;
+        } catch {
+          return defaultValue;
+        }
+      }
+      return JSON.stringify(value);
+    };
+
     setFormData({
+      // Basic Info
       countryId: data.countryId ?? "",
       name: data.name ?? "",
       slug: data.slug ?? "",
       subtitle: data.subtitle ?? "",
-      destination: data.destination ?? "",
-      duration: data.duration ?? "",
-      overview: data.overview ?? "",
+      shortDescription: data.shortDescription ?? "",
       description: data.description ?? "",
-      inclusions: data.inclusions ?? "",
-      exclusions: data.exclusions ?? "",
-      importantNotes: data.importantNotes ?? "",
+      tourType: data.tourType ?? "",
+      tourSubType: data.tourSubType ?? "",
+      bestFor: parseJsonField(data.bestFor),
+      
+      // Destination & Categorization
+      destination: data.destination ?? "",
+      primaryDestination: data.primaryDestination ?? "",
+      destinationCountry: data.destinationCountry ?? "",
+      destinationState: data.destinationState ?? "",
+      citiesCovered: parseJsonField(data.citiesCovered),
+      region: data.region ?? "",
+      regionTags: parseJsonField(data.regionTags),
+      categoryId: data.categoryId ?? "",
+      themes: parseJsonField(data.themes),
+      
+      // Duration & Group Size
+      duration: data.duration ?? "",
+      durationDays: data.durationDays ?? null,
+      durationNights: data.durationNights ?? null,
+      groupSizeMin: data.groupSizeMin ?? null,
+      groupSizeMax: data.groupSizeMax ?? null,
+      minimumTravelers: data.minimumTravelers ?? null,
+      maximumTravelers: data.maximumTravelers ?? null,
+      difficultyLevel: data.difficultyLevel ?? "",
+      
+      // Pricing
       price: data.price ?? 0,
       basePriceInInr: data.basePriceInInr ?? data.price ?? 0,
-      allowAdvance: data.allowAdvance ?? false,
-      advancePercentage: data.advancePercentage ?? null,
+      originalPrice: data.originalPrice ?? null,
+      currency: data.currency ?? "INR",
+      packageType: data.packageType ?? "",
+      seasonalPricing: parseJsonField(data.seasonalPricing, "{}"),
+      
+      // Dates & Availability
+      availableDates: parseJsonField(data.availableDates),
+      bookingDeadline: data.bookingDeadline ? new Date(data.bookingDeadline).toISOString().split("T")[0] : "",
+      status: data.status ?? (data.isActive ? "active" : "inactive"),
       isActive: data.isActive ?? true,
       isFeatured: data.isFeatured ?? false,
+      
+      // Advance Payment
+      allowAdvance: data.allowAdvance ?? false,
+      advancePercentage: data.advancePercentage ?? null,
+      
+      // Content
+      overview: data.overview ?? "",
+      highlights: parseJsonField(data.highlights),
+      inclusions: parseJsonField(data.inclusions),
+      exclusions: parseJsonField(data.exclusions),
+      itinerary: parseJsonField(data.itinerary),
+      importantNotes: data.importantNotes ?? "",
+      hotelCategories: parseJsonField(data.hotelCategories),
+      customizationOptions: parseJsonField(data.customizationOptions, "{}"),
+      bookingPolicies: data.bookingPolicies ?? "",
+      cancellationTerms: data.cancellationTerms ?? "",
+      
+      // Images & Media
       imageUrl: data.imageUrl ?? "",
       heroImageUrl: data.heroImageUrl ?? "",
+      featuredImage: data.featuredImage ?? "",
       galleryImageUrls: data.galleryImageUrls
-        ? JSON.parse(data.galleryImageUrls).join("\n")
+        ? (() => {
+            try {
+              const parsed = JSON.parse(data.galleryImageUrls);
+              return Array.isArray(parsed) ? parsed.join("\n") : data.galleryImageUrls;
+            } catch {
+              return data.galleryImageUrls;
+            }
+          })()
+        : data.images
+        ? (() => {
+            try {
+              const parsed = JSON.parse(data.images);
+              return Array.isArray(parsed) ? parsed.join("\n") : "";
+            } catch {
+              return "";
+            }
+          })()
         : "",
+      images: parseJsonField(data.images),
+      ogImage: data.ogImage ?? "",
+      twitterImage: data.twitterImage ?? "",
+      
+      // SEO & Social
       metaTitle: data.metaTitle ?? "",
       metaDescription: data.metaDescription ?? "",
+      metaKeywords: data.metaKeywords ?? "",
+      canonicalUrl: data.canonicalUrl ?? "",
+      ogTitle: data.ogTitle ?? "",
+      ogDescription: data.ogDescription ?? "",
+      twitterTitle: data.twitterTitle ?? "",
+      twitterDescription: data.twitterDescription ?? "",
     });
     setDays(
       (data.days || []).map((day: any, index: number) => ({
@@ -240,9 +454,103 @@ export default function AdminTourEditorPage() {
     event.preventDefault();
     setSaving(true);
     try {
-      const payload = {
-        ...formData,
-        galleryImageUrls: galleryArray,
+      // Helper to parse JSON strings safely
+      const parseJsonString = (value: string, defaultValue: any = null) => {
+        if (!value || value.trim() === "") return defaultValue;
+        try {
+          return JSON.parse(value);
+        } catch {
+          return defaultValue;
+        }
+      };
+
+      // Convert gallery URLs to JSON array
+      const galleryUrls = galleryArray.length > 0 ? galleryArray : parseJsonString(formData.images, []);
+
+      const payload: any = {
+        // Basic Info
+        countryId: formData.countryId || null,
+        name: formData.name,
+        slug: formData.slug,
+        subtitle: formData.subtitle || null,
+        shortDescription: formData.shortDescription || null,
+        description: formData.description || null,
+        tourType: formData.tourType || null,
+        tourSubType: formData.tourSubType || null,
+        bestFor: parseJsonString(formData.bestFor, []),
+        
+        // Destination & Categorization
+        destination: formData.destination,
+        primaryDestination: formData.primaryDestination || null,
+        destinationCountry: formData.destinationCountry || null,
+        destinationState: formData.destinationState || null,
+        citiesCovered: parseJsonString(formData.citiesCovered, []),
+        region: formData.region || null,
+        regionTags: parseJsonString(formData.regionTags, []),
+        categoryId: formData.categoryId || null,
+        themes: parseJsonString(formData.themes, []),
+        
+        // Duration & Group Size
+        duration: formData.duration,
+        durationDays: formData.durationDays,
+        durationNights: formData.durationNights,
+        groupSizeMin: formData.groupSizeMin,
+        groupSizeMax: formData.groupSizeMax,
+        minimumTravelers: formData.minimumTravelers,
+        maximumTravelers: formData.maximumTravelers,
+        difficultyLevel: formData.difficultyLevel || null,
+        
+        // Pricing
+        price: formData.price,
+        basePriceInInr: formData.basePriceInInr || formData.price,
+        originalPrice: formData.originalPrice,
+        currency: formData.currency || "INR",
+        packageType: formData.packageType || null,
+        seasonalPricing: parseJsonString(formData.seasonalPricing, {}),
+        
+        // Dates & Availability
+        availableDates: parseJsonString(formData.availableDates, []),
+        bookingDeadline: formData.bookingDeadline ? new Date(formData.bookingDeadline).toISOString() : null,
+        status: formData.status || (formData.isActive ? "active" : "inactive"),
+        isActive: formData.isActive,
+        isFeatured: formData.isFeatured,
+        
+        // Advance Payment
+        allowAdvance: formData.allowAdvance,
+        advancePercentage: formData.advancePercentage,
+        
+        // Content
+        overview: formData.overview || null,
+        highlights: parseJsonString(formData.highlights, []),
+        inclusions: parseJsonString(formData.inclusions, []),
+        exclusions: parseJsonString(formData.exclusions, []),
+        itinerary: parseJsonString(formData.itinerary, []),
+        importantNotes: formData.importantNotes || null,
+        hotelCategories: parseJsonString(formData.hotelCategories, []),
+        customizationOptions: parseJsonString(formData.customizationOptions, {}),
+        bookingPolicies: formData.bookingPolicies || null,
+        cancellationTerms: formData.cancellationTerms || null,
+        
+        // Images & Media
+        imageUrl: formData.imageUrl || null,
+        heroImageUrl: formData.heroImageUrl || null,
+        featuredImage: formData.featuredImage || null,
+        galleryImageUrls: galleryUrls,
+        images: galleryUrls,
+        ogImage: formData.ogImage || null,
+        twitterImage: formData.twitterImage || null,
+        
+        // SEO & Social
+        metaTitle: formData.metaTitle || null,
+        metaDescription: formData.metaDescription || null,
+        metaKeywords: formData.metaKeywords || null,
+        canonicalUrl: formData.canonicalUrl || null,
+        ogTitle: formData.ogTitle || null,
+        ogDescription: formData.ogDescription || null,
+        twitterTitle: formData.twitterTitle || null,
+        twitterDescription: formData.twitterDescription || null,
+        
+        // Itinerary Days
         days: days.map((day, index) => ({
           dayIndex: day.dayIndex || index + 1,
           title: day.title,
@@ -483,6 +791,10 @@ export default function AdminTourEditorPage() {
 
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             {activeTab === "basic" && <BasicTab />}
+            {activeTab === "destination" && <DestinationTab />}
+            {activeTab === "duration" && <DurationTab />}
+            {activeTab === "pricing" && <PricingTab />}
+            {activeTab === "availability" && <AvailabilityTab />}
             {activeTab === "content" && <ContentTab />}
             {activeTab === "itinerary" && <ItineraryTab />}
             {activeTab === "media" && <MediaTab />}
@@ -524,24 +836,6 @@ export default function AdminTourEditorPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">
-              Country <span className="text-red-500">*</span>
-            </span>
-            <select
-              required
-              value={formData.countryId}
-              onChange={(e) => updateForm("countryId", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">Select country</option>
-              {countries.map((country) => (
-                <option key={country.id} value={country.id}>
-                  {country.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col">
-            <span className="text-sm font-medium text-neutral-700">
               Tour Name <span className="text-red-500">*</span>
             </span>
             <input
@@ -574,6 +868,134 @@ export default function AdminTourEditorPage() {
               </button>
             </div>
           </label>
+        </div>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Short Description</span>
+          <textarea
+            rows={3}
+            value={formData.shortDescription}
+            onChange={(e) => updateForm("shortDescription", e.target.value)}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            placeholder="Brief overview (shown in listings)"
+          />
+        </label>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Full Description</span>
+          <textarea
+            rows={6}
+            value={formData.description}
+            onChange={(e) => updateForm("description", e.target.value)}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            placeholder="Detailed tour description"
+          />
+        </label>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Tour Type</span>
+            <select
+              value={formData.tourType}
+              onChange={(e) => updateForm("tourType", e.target.value)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Select type</option>
+              <option value="group">Group Tour</option>
+              <option value="private">Private Tour</option>
+              <option value="fixed_departure">Fixed Departure</option>
+              <option value="on_demand">On Demand</option>
+            </select>
+          </label>
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Tour Sub Type</span>
+            <select
+              value={formData.tourSubType}
+              onChange={(e) => updateForm("tourSubType", e.target.value)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Select sub type</option>
+              <option value="honeymoon">Honeymoon</option>
+              <option value="family">Family</option>
+              <option value="adventure">Adventure</option>
+              <option value="leisure">Leisure</option>
+              <option value="religious">Religious</option>
+              <option value="wildlife">Wildlife</option>
+            </select>
+          </label>
+        </div>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Best For (comma-separated)</span>
+          <input
+            type="text"
+            value={(() => {
+              try {
+                const parsed = JSON.parse(formData.bestFor);
+                return Array.isArray(parsed) ? parsed.join(", ") : formData.bestFor;
+              } catch {
+                return formData.bestFor.replace(/[\[\]"]/g, "").replace(/,/g, ", ");
+              }
+            })()}
+            onChange={(e) => {
+              const values = e.target.value.split(",").map(v => v.trim()).filter(Boolean);
+              updateForm("bestFor", JSON.stringify(values));
+            }}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            placeholder="Couples, Families, Solo Travelers"
+          />
+        </label>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <label className="inline-flex items-center gap-2 border border-neutral-200 rounded-lg px-3 py-2">
+            <input
+              type="checkbox"
+              checked={formData.isFeatured}
+              onChange={(e) => updateForm("isFeatured", e.target.checked)}
+              className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+            />
+            <span className="text-sm font-medium text-neutral-700">
+              Featured package
+            </span>
+          </label>
+          <label className="inline-flex items-center gap-2 border border-neutral-200 rounded-lg px-3 py-2">
+            <input
+              type="checkbox"
+              checked={formData.isActive}
+              onChange={(e) => updateForm("isActive", e.target.checked)}
+              className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+            />
+            <span className="text-sm font-medium text-neutral-700">
+              Visible to travellers
+            </span>
+          </label>
+        </div>
+      </div>
+    );
+  }
+
+  function DestinationTab() {
+    return (
+      <div className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-4">
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">
+              Country <span className="text-red-500">*</span>
+            </span>
+            <select
+              required
+              value={formData.countryId}
+              onChange={(e) => updateForm("countryId", e.target.value)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">Select country</option>
+              {countries.map((country) => (
+                <option key={country.id} value={country.id}>
+                  {country.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">
               Destination <span className="text-red-500">*</span>
@@ -590,8 +1012,121 @@ export default function AdminTourEditorPage() {
 
         <div className="grid md:grid-cols-2 gap-4">
           <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Primary Destination</span>
+            <input
+              type="text"
+              value={formData.primaryDestination}
+              onChange={(e) => updateForm("primaryDestination", e.target.value)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              placeholder="Main city or location"
+            />
+          </label>
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Destination Country</span>
+            <input
+              type="text"
+              value={formData.destinationCountry}
+              onChange={(e) => updateForm("destinationCountry", e.target.value)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            />
+          </label>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Destination State</span>
+            <input
+              type="text"
+              value={formData.destinationState}
+              onChange={(e) => updateForm("destinationState", e.target.value)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            />
+          </label>
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Region</span>
+            <input
+              type="text"
+              value={formData.region}
+              onChange={(e) => updateForm("region", e.target.value)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              placeholder="e.g., South East Asia, Europe"
+            />
+          </label>
+        </div>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Cities Covered (comma-separated)</span>
+          <input
+            type="text"
+            value={(() => {
+              try {
+                const parsed = JSON.parse(formData.citiesCovered);
+                return Array.isArray(parsed) ? parsed.join(", ") : formData.citiesCovered;
+              } catch {
+                return formData.citiesCovered.replace(/[\[\]"]/g, "").replace(/,/g, ", ");
+              }
+            })()}
+            onChange={(e) => {
+              const values = e.target.value.split(",").map(v => v.trim()).filter(Boolean);
+              updateForm("citiesCovered", JSON.stringify(values));
+            }}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            placeholder="Dubai, Abu Dhabi, Sharjah"
+          />
+        </label>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Region Tags (comma-separated)</span>
+          <input
+            type="text"
+            value={(() => {
+              try {
+                const parsed = JSON.parse(formData.regionTags);
+                return Array.isArray(parsed) ? parsed.join(", ") : formData.regionTags;
+              } catch {
+                return formData.regionTags.replace(/[\[\]"]/g, "").replace(/,/g, ", ");
+              }
+            })()}
+            onChange={(e) => {
+              const values = e.target.value.split(",").map(v => v.trim()).filter(Boolean);
+              updateForm("regionTags", JSON.stringify(values));
+            }}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            placeholder="Beach, Hills, City"
+          />
+        </label>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Themes (comma-separated)</span>
+          <input
+            type="text"
+            value={(() => {
+              try {
+                const parsed = JSON.parse(formData.themes);
+                return Array.isArray(parsed) ? parsed.join(", ") : formData.themes;
+              } catch {
+                return formData.themes.replace(/[\[\]"]/g, "").replace(/,/g, ", ");
+              }
+            })()}
+            onChange={(e) => {
+              const values = e.target.value.split(",").map(v => v.trim()).filter(Boolean);
+              updateForm("themes", JSON.stringify(values));
+            }}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            placeholder="Honeymoon, Adventure, Beach, Culture"
+          />
+        </label>
+      </div>
+    );
+  }
+
+  function DurationTab() {
+    return (
+      <div className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-4">
+          <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">
-              Duration <span className="text-red-500">*</span>
+              Duration (Display) <span className="text-red-500">*</span>
             </span>
             <input
               type="text"
@@ -603,46 +1138,175 @@ export default function AdminTourEditorPage() {
             />
           </label>
           <label className="flex flex-col">
-            <span className="text-sm font-medium text-neutral-700">Subtitle</span>
-            <input
-              type="text"
-              value={formData.subtitle}
-              onChange={(e) => updateForm("subtitle", e.target.value)}
+            <span className="text-sm font-medium text-neutral-700">Difficulty Level</span>
+            <select
+              value={formData.difficultyLevel}
+              onChange={(e) => updateForm("difficultyLevel", e.target.value)}
               className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
-              placeholder="Skyline views, desert adventures & premium stays"
+            >
+              <option value="">Select level</option>
+              <option value="Easy">Easy</option>
+              <option value="Moderate">Moderate</option>
+              <option value="Difficult">Difficult</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Duration (Days)</span>
+            <input
+              type="number"
+              min={1}
+              value={formData.durationDays ?? ""}
+              onChange={(e) => updateForm("durationDays", e.target.value ? Number(e.target.value) : null)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            />
+          </label>
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Duration (Nights)</span>
+            <input
+              type="number"
+              min={0}
+              value={formData.durationNights ?? ""}
+              onChange={(e) => updateForm("durationNights", e.target.value ? Number(e.target.value) : null)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
             />
           </label>
         </div>
 
         <div className="grid md:grid-cols-2 gap-4">
           <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Group Size Min</span>
+            <input
+              type="number"
+              min={1}
+              value={formData.groupSizeMin ?? ""}
+              onChange={(e) => updateForm("groupSizeMin", e.target.value ? Number(e.target.value) : null)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            />
+          </label>
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Group Size Max</span>
+            <input
+              type="number"
+              min={1}
+              value={formData.groupSizeMax ?? ""}
+              onChange={(e) => updateForm("groupSizeMax", e.target.value ? Number(e.target.value) : null)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            />
+          </label>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Minimum Travelers</span>
+            <input
+              type="number"
+              min={1}
+              value={formData.minimumTravelers ?? ""}
+              onChange={(e) => updateForm("minimumTravelers", e.target.value ? Number(e.target.value) : null)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            />
+          </label>
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Maximum Travelers</span>
+            <input
+              type="number"
+              min={1}
+              value={formData.maximumTravelers ?? ""}
+              onChange={(e) => updateForm("maximumTravelers", e.target.value ? Number(e.target.value) : null)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            />
+          </label>
+        </div>
+      </div>
+    );
+  }
+
+  function PricingTab() {
+    return (
+      <div className="space-y-4">
+        <div className="grid md:grid-cols-2 gap-4">
+          <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">
-              Price (INR) <span className="text-red-500">*</span>
+              Price <span className="text-red-500">*</span>
             </span>
             <input
               type="number"
               min={0}
+              required
               value={formData.price}
               onChange={(e) => updateForm("price", Number(e.target.value) || 0)}
               className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
             />
           </label>
           <label className="flex flex-col">
-            <span className="text-sm font-medium text-neutral-700">
-              Base Price Override
-            </span>
+            <span className="text-sm font-medium text-neutral-700">Currency</span>
+            <select
+              value={formData.currency}
+              onChange={(e) => updateForm("currency", e.target.value)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="INR">INR (₹)</option>
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Original Price</span>
+            <input
+              type="number"
+              min={0}
+              value={formData.originalPrice ?? ""}
+              onChange={(e) => updateForm("originalPrice", e.target.value ? Number(e.target.value) : null)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              placeholder="For showing strikethrough price"
+            />
+          </label>
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Base Price Override</span>
             <input
               type="number"
               min={0}
               value={formData.basePriceInInr}
-              onChange={(e) =>
-                updateForm("basePriceInInr", Number(e.target.value) || 0)
-              }
+              onChange={(e) => updateForm("basePriceInInr", Number(e.target.value) || 0)}
               className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
               placeholder="Defaults to price above"
             />
           </label>
         </div>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Package Type</span>
+          <select
+            value={formData.packageType}
+            onChange={(e) => updateForm("packageType", e.target.value)}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="">Select type</option>
+            <option value="fixed_departure">Fixed Departure</option>
+            <option value="on_demand">On Demand</option>
+            <option value="private">Private</option>
+          </select>
+        </label>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Seasonal Pricing (JSON)</span>
+          <textarea
+            rows={6}
+            value={formData.seasonalPricing}
+            onChange={(e) => updateForm("seasonalPricing", e.target.value)}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 font-mono text-sm focus:ring-2 focus:ring-primary-500"
+            placeholder='{"peak": {"from": "2025-12-15", "to": "2026-01-10", "price": 65000}}'
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            JSON format: Define seasons with date ranges and price overrides
+          </p>
+        </label>
 
         <div className="grid md:grid-cols-2 gap-4">
           <label className="inline-flex items-center gap-2 border border-neutral-200 rounded-lg px-3 py-2">
@@ -677,60 +1341,209 @@ export default function AdminTourEditorPage() {
             </label>
           )}
         </div>
+      </div>
+    );
+  }
 
-        <div className="grid md:grid-cols-2 gap-4">
-          <label className="inline-flex items-center gap-2 border border-neutral-200 rounded-lg px-3 py-2">
-            <input
-              type="checkbox"
-              checked={formData.isFeatured}
-              onChange={(e) => updateForm("isFeatured", e.target.checked)}
-              className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-            />
-            <span className="text-sm font-medium text-neutral-700">
-              Featured package
-            </span>
-          </label>
-          <label className="inline-flex items-center gap-2 border border-neutral-200 rounded-lg px-3 py-2">
-            <input
-              type="checkbox"
-              checked={formData.isActive}
-              onChange={(e) => updateForm("isActive", e.target.checked)}
-              className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-            />
-            <span className="text-sm font-medium text-neutral-700">
-              Visible to travellers
-            </span>
-          </label>
-        </div>
+  function AvailabilityTab() {
+    return (
+      <div className="space-y-4">
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Status</span>
+          <select
+            value={formData.status}
+            onChange={(e) => {
+              updateForm("status", e.target.value);
+              updateForm("isActive", e.target.value === "active");
+            }}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="draft">Draft</option>
+          </select>
+        </label>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Available Dates (comma-separated or JSON array)</span>
+          <textarea
+            rows={4}
+            value={(() => {
+              try {
+                const parsed = JSON.parse(formData.availableDates);
+                return Array.isArray(parsed) ? parsed.join("\n") : formData.availableDates;
+              } catch {
+                return formData.availableDates.replace(/[\[\]"]/g, "").replace(/,/g, "\n");
+              }
+            })()}
+            onChange={(e) => {
+              const values = e.target.value.split("\n").map(v => v.trim()).filter(Boolean);
+              updateForm("availableDates", JSON.stringify(values));
+            }}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 font-mono text-sm"
+            placeholder="2025-12-15&#10;2025-12-22&#10;2026-01-05"
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            One date per line (YYYY-MM-DD format) for fixed departure tours
+          </p>
+        </label>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Booking Deadline</span>
+          <input
+            type="date"
+            value={formData.bookingDeadline}
+            onChange={(e) => updateForm("bookingDeadline", e.target.value)}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            Last date for booking (leave empty for no deadline)
+          </p>
+        </label>
       </div>
     );
   }
 
   function ContentTab() {
-    const fields = [
-      { key: "overview", label: "Overview", rows: 5 },
-      { key: "description", label: "Description", rows: 4 },
-      { key: "inclusions", label: "Inclusions (one per line)", rows: 4 },
-      { key: "exclusions", label: "Exclusions (one per line)", rows: 4 },
-      { key: "importantNotes", label: "Important Notes", rows: 3 },
-    ] as const;
     return (
       <div className="space-y-4">
-        {fields.map((field) => (
-          <div key={field.key}>
-            <label className="text-sm font-medium text-neutral-700">
-              {field.label}
-            </label>
-            <textarea
-              rows={field.rows}
-              value={(formData as any)[field.key]}
-              onChange={(e) =>
-                updateForm(field.key as keyof FormState, e.target.value)
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Overview</span>
+          <textarea
+            rows={5}
+            value={formData.overview}
+            onChange={(e) => updateForm("overview", e.target.value)}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+          />
+        </label>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Highlights (one per line)</span>
+          <textarea
+            rows={6}
+            value={(() => {
+              try {
+                const parsed = JSON.parse(formData.highlights);
+                return Array.isArray(parsed) ? parsed.join("\n") : formData.highlights;
+              } catch {
+                return formData.highlights.replace(/[\[\]"]/g, "").replace(/,/g, "\n");
               }
+            })()}
+            onChange={(e) => {
+              const values = e.target.value.split("\n").map(v => v.trim()).filter(Boolean);
+              updateForm("highlights", JSON.stringify(values));
+            }}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            placeholder="Key highlights of the tour"
+          />
+        </label>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Inclusions (one per line)</span>
+            <textarea
+              rows={6}
+              value={(() => {
+                try {
+                  const parsed = JSON.parse(formData.inclusions);
+                  return Array.isArray(parsed) ? parsed.join("\n") : formData.inclusions;
+                } catch {
+                  return formData.inclusions.replace(/[\[\]"]/g, "").replace(/,/g, "\n");
+                }
+              })()}
+              onChange={(e) => {
+                const values = e.target.value.split("\n").map(v => v.trim()).filter(Boolean);
+                updateForm("inclusions", JSON.stringify(values));
+              }}
               className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
             />
-          </div>
-        ))}
+          </label>
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Exclusions (one per line)</span>
+            <textarea
+              rows={6}
+              value={(() => {
+                try {
+                  const parsed = JSON.parse(formData.exclusions);
+                  return Array.isArray(parsed) ? parsed.join("\n") : formData.exclusions;
+                } catch {
+                  return formData.exclusions.replace(/[\[\]"]/g, "").replace(/,/g, "\n");
+                }
+              })()}
+              onChange={(e) => {
+                const values = e.target.value.split("\n").map(v => v.trim()).filter(Boolean);
+                updateForm("exclusions", JSON.stringify(values));
+              }}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            />
+          </label>
+        </div>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Hotel Categories (comma-separated)</span>
+          <input
+            type="text"
+            value={(() => {
+              try {
+                const parsed = JSON.parse(formData.hotelCategories);
+                return Array.isArray(parsed) ? parsed.join(", ") : formData.hotelCategories;
+              } catch {
+                return formData.hotelCategories.replace(/[\[\]"]/g, "").replace(/,/g, ", ");
+              }
+            })()}
+            onChange={(e) => {
+              const values = e.target.value.split(",").map(v => v.trim()).filter(Boolean);
+              updateForm("hotelCategories", JSON.stringify(values));
+            }}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            placeholder="3-star, 4-star, 5-star"
+          />
+        </label>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Customization Options (JSON)</span>
+          <textarea
+            rows={6}
+            value={formData.customizationOptions}
+            onChange={(e) => updateForm("customizationOptions", e.target.value)}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 font-mono text-sm focus:ring-2 focus:ring-primary-500"
+            placeholder='{"Private Transfers": {"price": 5000, "type": "per_person"}, "Extra Night": {"price": 3000, "type": "flat"}}'
+          />
+          <p className="text-xs text-neutral-500 mt-1">
+            JSON format: Define customization options with pricing
+          </p>
+        </label>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Booking Policies</span>
+            <textarea
+              rows={4}
+              value={formData.bookingPolicies}
+              onChange={(e) => updateForm("bookingPolicies", e.target.value)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            />
+          </label>
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Cancellation Terms</span>
+            <textarea
+              rows={4}
+              value={formData.cancellationTerms}
+              onChange={(e) => updateForm("cancellationTerms", e.target.value)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            />
+          </label>
+        </div>
+
+        <label className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-700">Important Notes</span>
+          <textarea
+            rows={3}
+            value={formData.importantNotes}
+            onChange={(e) => updateForm("importantNotes", e.target.value)}
+            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+          />
+        </label>
       </div>
     );
   }
@@ -820,10 +1633,105 @@ export default function AdminTourEditorPage() {
     );
   }
 
+  const handleFeaturedImageUpload = async (file: File | null) => {
+      if (!file) return;
+      if (!file.type.startsWith("image/")) {
+        alert("Please select a valid image (JPG, PNG, WEBP).");
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Image too large. Maximum 5 MB allowed.");
+        return;
+      }
+
+      setFeaturedUploading(true);
+      setFeaturedUploadError(null);
+      try {
+        const url = await uploadCmsImage(file, "tours", "featured");
+        if (!url) {
+          throw new Error("No URL returned from upload");
+        }
+        updateForm("featuredImage", url);
+        setFeaturedImageMode("upload");
+      } catch (error: any) {
+        console.error("Featured image upload failed", error);
+        const errorMessage = error.message || "Failed to upload featured image";
+        setFeaturedUploadError(errorMessage);
+        alert(`Featured image upload failed: ${errorMessage}`);
+      } finally {
+        setFeaturedUploading(false);
+      }
+    };
+
   function MediaTab() {
     return (
       <div className="space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-neutral-700">
+                Featured Image
+              </span>
+              <div className="inline-flex rounded-lg border border-neutral-200 overflow-hidden text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => setFeaturedImageMode("url")}
+                  className={`px-3 py-1.5 ${
+                    featuredImageMode === "url" ? "bg-primary-600 text-white" : "text-neutral-600"
+                  }`}
+                >
+                  Use URL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFeaturedImageMode("upload")}
+                  className={`px-3 py-1.5 ${
+                    featuredImageMode === "upload" ? "bg-primary-600 text-white" : "text-neutral-600"
+                  }`}
+                >
+                  Upload
+                </button>
+              </div>
+            </div>
+            {featuredImageMode === "url" ? (
+              <input
+                type="url"
+                value={formData.featuredImage}
+                onChange={(e) => updateForm("featuredImage", e.target.value)}
+                className="mt-2 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                placeholder="https://..."
+              />
+            ) : (
+              <div className="mt-2 space-y-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleFeaturedImageUpload(e.target.files?.[0] || null)}
+                  className="w-full px-4 py-3 border border-dashed border-neutral-300 rounded-lg text-sm text-neutral-600 hover:border-primary-400 cursor-pointer"
+                />
+                <p className="text-xs text-neutral-500">JPG, PNG or WEBP up to 5 MB.</p>
+                {featuredUploading && (
+                  <div className="flex items-center gap-2 text-sm text-neutral-600">
+                    <Loader2 size={16} className="animate-spin" />
+                    Uploading featured image...
+                  </div>
+                )}
+                {featuredUploadError && (
+                  <p className="text-sm text-red-600">{featuredUploadError}</p>
+                )}
+              </div>
+            )}
+            {formData.featuredImage && (
+              <div className="mt-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={getMediaProxyUrl(formData.featuredImage)}
+                  alt="Featured preview"
+                  className="w-full max-h-48 object-cover rounded-lg border border-neutral-200"
+                />
+              </div>
+            )}
+          </div>
           <div>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-neutral-700">
@@ -1024,26 +1932,111 @@ export default function AdminTourEditorPage() {
             </div>
           )}
         </label>
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-neutral-900">SEO Metadata</h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            <label className="flex flex-col">
+              <span className="text-sm font-medium text-neutral-700">Meta Title</span>
+              <input
+                type="text"
+                value={formData.metaTitle}
+                onChange={(e) => updateForm("metaTitle", e.target.value)}
+                className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              />
+            </label>
+            <label className="flex flex-col">
+              <span className="text-sm font-medium text-neutral-700">Meta Keywords</span>
+              <input
+                type="text"
+                value={formData.metaKeywords}
+                onChange={(e) => updateForm("metaKeywords", e.target.value)}
+                className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                placeholder="comma, separated, keywords"
+              />
+            </label>
+          </div>
           <label className="flex flex-col">
-            <span className="text-sm font-medium text-neutral-700">
-              Meta title
-            </span>
-            <input
-              type="text"
-              value={formData.metaTitle}
-              onChange={(e) => updateForm("metaTitle", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
-            />
-          </label>
-          <label className="flex flex-col">
-            <span className="text-sm font-medium text-neutral-700">
-              Meta description
-            </span>
+            <span className="text-sm font-medium text-neutral-700">Meta Description</span>
             <textarea
               rows={3}
               value={formData.metaDescription}
               onChange={(e) => updateForm("metaDescription", e.target.value)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            />
+          </label>
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Canonical URL</span>
+            <input
+              type="url"
+              value={formData.canonicalUrl}
+              onChange={(e) => updateForm("canonicalUrl", e.target.value)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              placeholder="https://travunited.com/tours/slug"
+            />
+          </label>
+        </div>
+
+        <div className="space-y-4 border-t border-neutral-200 pt-4">
+          <h3 className="text-lg font-semibold text-neutral-900">Open Graph (Facebook/LinkedIn)</h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            <label className="flex flex-col">
+              <span className="text-sm font-medium text-neutral-700">OG Title</span>
+              <input
+                type="text"
+                value={formData.ogTitle}
+                onChange={(e) => updateForm("ogTitle", e.target.value)}
+                className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              />
+            </label>
+            <label className="flex flex-col">
+              <span className="text-sm font-medium text-neutral-700">OG Image URL</span>
+              <input
+                type="url"
+                value={formData.ogImage}
+                onChange={(e) => updateForm("ogImage", e.target.value)}
+                className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              />
+            </label>
+          </div>
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">OG Description</span>
+            <textarea
+              rows={2}
+              value={formData.ogDescription}
+              onChange={(e) => updateForm("ogDescription", e.target.value)}
+              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            />
+          </label>
+        </div>
+
+        <div className="space-y-4 border-t border-neutral-200 pt-4">
+          <h3 className="text-lg font-semibold text-neutral-900">Twitter Cards</h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            <label className="flex flex-col">
+              <span className="text-sm font-medium text-neutral-700">Twitter Title</span>
+              <input
+                type="text"
+                value={formData.twitterTitle}
+                onChange={(e) => updateForm("twitterTitle", e.target.value)}
+                className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              />
+            </label>
+            <label className="flex flex-col">
+              <span className="text-sm font-medium text-neutral-700">Twitter Image URL</span>
+              <input
+                type="url"
+                value={formData.twitterImage}
+                onChange={(e) => updateForm("twitterImage", e.target.value)}
+                className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              />
+            </label>
+          </div>
+          <label className="flex flex-col">
+            <span className="text-sm font-medium text-neutral-700">Twitter Description</span>
+            <textarea
+              rows={2}
+              value={formData.twitterDescription}
+              onChange={(e) => updateForm("twitterDescription", e.target.value)}
               className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
             />
           </label>

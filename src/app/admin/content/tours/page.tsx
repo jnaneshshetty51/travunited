@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Plus, Edit, Calendar, Search, Filter, Star, RefreshCw, CheckSquare, Square, ChevronDown, Upload } from "lucide-react";
+import { Plus, Edit, Calendar, Search, Filter, Star, RefreshCw, CheckSquare, Square, ChevronDown, Upload, Globe, Package, Tag } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { ImportModal } from "@/components/admin/ImportModal";
 
@@ -17,14 +17,28 @@ interface TourRecord {
   name: string;
   slug: string | null;
   destination: string;
+  primaryDestination?: string | null;
+  destinationCountry?: string | null;
+  destinationState?: string | null;
   duration: string;
+  durationDays?: number | null;
+  durationNights?: number | null;
   price: number;
   basePriceInInr?: number | null;
+  originalPrice?: number | null;
+  currency?: string | null;
   isActive: boolean;
   isFeatured: boolean;
+  status?: string | null;
   allowAdvance: boolean;
   advancePercentage?: number | null;
+  tourType?: string | null;
+  tourSubType?: string | null;
+  region?: string | null;
+  packageType?: string | null;
   country?: { id: string; name: string } | null;
+  updatedAt: Date;
+  createdAt: Date;
 }
 
 interface CountryOption {
@@ -34,13 +48,21 @@ interface CountryOption {
 
 type TourFilters = {
   countryId: string;
-  status: "all" | "active" | "inactive";
+  status: "all" | "active" | "inactive" | "draft";
+  tourType: string;
+  region: string;
+  packageType: string;
+  featured: "all" | "yes" | "no";
   search: string;
 };
 
 const TOUR_FILTER_DEFAULT: TourFilters = {
   countryId: "",
   status: "all",
+  tourType: "all",
+  region: "all",
+  packageType: "all",
+  featured: "all",
   search: "",
 };
 
@@ -88,7 +110,23 @@ export default function AdminToursPage() {
       );
       if (response.ok) {
         const data = await response.json();
-        setTours(data);
+        // Apply client-side filters for tourType, region, packageType, featured
+        let filtered = data;
+        if (activeFilters.tourType !== "all") {
+          filtered = filtered.filter((t: TourRecord) => t.tourType === activeFilters.tourType);
+        }
+        if (activeFilters.region !== "all") {
+          filtered = filtered.filter((t: TourRecord) => t.region === activeFilters.region);
+        }
+        if (activeFilters.packageType !== "all") {
+          filtered = filtered.filter((t: TourRecord) => t.packageType === activeFilters.packageType);
+        }
+        if (activeFilters.featured === "yes") {
+          filtered = filtered.filter((t: TourRecord) => t.isFeatured);
+        } else if (activeFilters.featured === "no") {
+          filtered = filtered.filter((t: TourRecord) => !t.isFeatured);
+        }
+        setTours(filtered);
       }
     } catch (error) {
       console.error("Error fetching tours:", error);
@@ -142,6 +180,65 @@ export default function AdminToursPage() {
       }
       return newSet;
     });
+  };
+
+  const handleBulkStatusUpdate = async (status: "active" | "inactive") => {
+    if (selectedIds.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const response = await fetch("/api/admin/content/tours/bulk/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: Array.from(selectedIds),
+          status,
+          isActive: status === "active",
+        }),
+      });
+
+      if (response.ok) {
+        await fetchTours(filters);
+        setSelectedIds(new Set());
+      } else {
+        const error = await response.json();
+        alert(error.error || "Failed to update tours");
+      }
+    } catch (error) {
+      console.error("Error bulk updating status:", error);
+      alert("An error occurred while updating");
+    } finally {
+      setBulkActionLoading(false);
+    }
+  };
+
+  const handleBulkFeatured = async (featured: boolean) => {
+    if (selectedIds.size === 0) return;
+
+    setBulkActionLoading(true);
+    try {
+      const response = await fetch("/api/admin/content/tours/bulk/featured", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: Array.from(selectedIds),
+          featured,
+        }),
+      });
+
+      if (response.ok) {
+        await fetchTours(filters);
+        setSelectedIds(new Set());
+      } else {
+        const error = await response.json();
+        alert(error.error || "Failed to update tours");
+      }
+    } catch (error) {
+      console.error("Error bulk updating featured:", error);
+      alert("An error occurred while updating");
+    } finally {
+      setBulkActionLoading(false);
+    }
   };
 
   const handleBulkDelete = async () => {
@@ -273,6 +370,47 @@ export default function AdminToursPage() {
                 <option value="all">All statuses</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
+                <option value="draft">Draft</option>
+              </select>
+              <select
+                value={filters.tourType}
+                onChange={(e) => handleFilterChange("tourType", e.target.value)}
+                className="px-3 py-2 border border-neutral-200 rounded-lg text-sm"
+              >
+                <option value="all">All tour types</option>
+                <option value="group">Group</option>
+                <option value="private">Private</option>
+                <option value="fixed_departure">Fixed Departure</option>
+                <option value="on_demand">On Demand</option>
+              </select>
+              <select
+                value={filters.region}
+                onChange={(e) => handleFilterChange("region", e.target.value)}
+                className="px-3 py-2 border border-neutral-200 rounded-lg text-sm"
+              >
+                <option value="all">All regions</option>
+                {Array.from(new Set(tours.map(t => t.region).filter(Boolean))).map((region) => (
+                  <option key={region} value={region}>{region}</option>
+                ))}
+              </select>
+              <select
+                value={filters.packageType}
+                onChange={(e) => handleFilterChange("packageType", e.target.value)}
+                className="px-3 py-2 border border-neutral-200 rounded-lg text-sm"
+              >
+                <option value="all">All package types</option>
+                <option value="fixed_departure">Fixed Departure</option>
+                <option value="on_demand">On Demand</option>
+                <option value="private">Private</option>
+              </select>
+              <select
+                value={filters.featured}
+                onChange={(e) => handleFilterChange("featured", e.target.value)}
+                className="px-3 py-2 border border-neutral-200 rounded-lg text-sm"
+              >
+                <option value="all">All</option>
+                <option value="yes">Featured</option>
+                <option value="no">Not Featured</option>
               </select>
             </div>
           </div>
@@ -303,7 +441,48 @@ export default function AdminToursPage() {
                   <ChevronDown size={16} />
                 </button>
                 {showBulkActions && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white border border-neutral-200 rounded-lg shadow-lg z-10">
+                  <div className="absolute right-0 mt-2 w-56 bg-white border border-neutral-200 rounded-lg shadow-lg z-10">
+                    <button
+                      onClick={async () => {
+                        setShowBulkActions(false);
+                        await handleBulkStatusUpdate("active");
+                      }}
+                      disabled={bulkActionLoading}
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+                    >
+                      Mark as Active
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setShowBulkActions(false);
+                        await handleBulkStatusUpdate("inactive");
+                      }}
+                      disabled={bulkActionLoading}
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+                    >
+                      Mark as Inactive
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setShowBulkActions(false);
+                        await handleBulkFeatured(true);
+                      }}
+                      disabled={bulkActionLoading}
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+                    >
+                      Mark as Featured
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setShowBulkActions(false);
+                        await handleBulkFeatured(false);
+                      }}
+                      disabled={bulkActionLoading}
+                      className="w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+                    >
+                      Remove Featured
+                    </button>
+                    <div className="border-t border-neutral-200 my-1" />
                     <button
                       onClick={() => {
                         setShowBulkActions(false);
@@ -365,14 +544,38 @@ export default function AdminToursPage() {
                   </button>
                 </div>
                 <div className="flex items-start justify-between gap-2 pl-6">
-                  <div>
+                  <div className="flex-1">
                     <h3 className="text-lg font-semibold text-neutral-900">{tour.name}</h3>
                     <p className="text-sm text-neutral-500">
-                      {tour.country?.name ? `${tour.country.name} · ` : ""}
-                      {tour.destination}
+                      {tour.primaryDestination || tour.destination}
+                      {tour.destinationState && `, ${tour.destinationState}`}
+                      {tour.destinationCountry && `, ${tour.destinationCountry}`}
+                      {tour.country?.name && ` · ${tour.country.name}`}
                     </p>
+                    {(tour.tourType || tour.region) && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {tour.tourType && (
+                          <span className="inline-flex items-center gap-1 text-xs bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded">
+                            <Tag size={10} />
+                            {tour.tourType}
+                          </span>
+                        )}
+                        {tour.region && (
+                          <span className="inline-flex items-center gap-1 text-xs bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded">
+                            <Globe size={10} />
+                            {tour.region}
+                          </span>
+                        )}
+                        {tour.packageType && (
+                          <span className="inline-flex items-center gap-1 text-xs bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded">
+                            <Package size={10} />
+                            {tour.packageType}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {tour.isFeatured && (
                       <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
                         <Star size={12} className="fill-amber-500 text-amber-500" />
@@ -381,35 +584,44 @@ export default function AdminToursPage() {
                     )}
                     <span
                       className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        tour.isActive ? "bg-green-50 text-green-700" : "bg-neutral-100 text-neutral-600"
+                        tour.status === "active" || (tour.isActive && !tour.status)
+                          ? "bg-green-50 text-green-700"
+                          : tour.status === "draft"
+                          ? "bg-yellow-50 text-yellow-700"
+                          : "bg-neutral-100 text-neutral-600"
                       }`}
                     >
-                      {tour.isActive ? "Active" : "Inactive"}
+                      {tour.status || (tour.isActive ? "Active" : "Inactive")}
                     </span>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-neutral-600 mt-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm text-neutral-600 mt-4">
                   <div>
                     <div className="text-xs text-neutral-500 uppercase">Duration</div>
-                    <div className="font-medium text-neutral-900">{tour.duration}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-neutral-500 uppercase">Base Price</div>
                     <div className="font-medium text-neutral-900">
-                      ₹{(tour.basePriceInInr ?? tour.price).toLocaleString()}
+                      {tour.durationDays && tour.durationNights
+                        ? `${tour.durationDays}D/${tour.durationNights}N`
+                        : tour.duration}
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-neutral-500 uppercase">Advance</div>
+                    <div className="text-xs text-neutral-500 uppercase">Price</div>
                     <div className="font-medium text-neutral-900">
-                      {tour.allowAdvance && tour.advancePercentage
-                        ? `${tour.advancePercentage}% allowed`
-                        : "Full payment"}
+                      {tour.currency === "INR" ? "₹" : tour.currency || "₹"}
+                      {(tour.basePriceInInr ?? tour.price).toLocaleString()}
+                      {tour.originalPrice && tour.originalPrice > (tour.basePriceInInr ?? tour.price) && (
+                        <span className="text-xs text-neutral-500 line-through ml-1">
+                          {tour.currency === "INR" ? "₹" : tour.currency || "₹"}
+                          {tour.originalPrice.toLocaleString()}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-neutral-500 uppercase">Slug</div>
-                    <div className="font-mono text-xs text-neutral-600">{tour.slug || "—"}</div>
+                    <div className="text-xs text-neutral-500 uppercase">Updated</div>
+                    <div className="font-medium text-neutral-900 text-xs">
+                      {new Date(tour.updatedAt).toLocaleDateString()}
+                    </div>
                   </div>
                 </div>
                 <div className="mt-4 flex items-center justify-between text-sm font-medium">

@@ -7,7 +7,10 @@ export const revalidate = 0;
 
 export default async function ToursPage() {
   const tours = await prisma.tour.findMany({
-    where: { isActive: true },
+    where: { 
+      isActive: true,
+      status: "active",
+    },
     orderBy: { createdAt: "desc" },
     include: {
       country: true,
@@ -21,32 +24,107 @@ export default async function ToursPage() {
       }
       return a.isFeatured ? -1 : 1;
     })
-    .map((tour) => ({
-    id: tour.slug ?? tour.id,
-    name: tour.name,
-    destination: tour.destination,
-    duration: tour.duration,
-    price: tour.basePriceInInr ?? tour.price,
-    countryName: tour.country?.name || "Global",
-    countryCode: tour.country?.code || "GLOBAL",
-    isFeatured: tour.isFeatured,
-    allowAdvance: tour.allowAdvance,
-    image:
-      getMediaProxyUrl(tour.heroImageUrl) ||
-      getMediaProxyUrl(tour.imageUrl) ||
-      "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=900&q=80",
-    }));
+    .map((tour) => {
+      // Format duration
+      const durationParts: string[] = [];
+      if (tour.durationDays) durationParts.push(`${tour.durationDays} day${tour.durationDays !== 1 ? "s" : ""}`);
+      if (tour.durationNights) durationParts.push(`${tour.durationNights} night${tour.durationNights !== 1 ? "s" : ""}`);
+      const durationDisplay = durationParts.length > 0 ? durationParts.join(" / ") : tour.duration || "5 days";
 
+      // Format destination
+      const destinationParts: string[] = [];
+      if (tour.primaryDestination) destinationParts.push(tour.primaryDestination);
+      if (tour.destinationState) destinationParts.push(tour.destinationState);
+      if (tour.destinationCountry) destinationParts.push(tour.destinationCountry);
+      const destinationDisplay = destinationParts.length > 0 ? destinationParts.join(", ") : tour.destination || "";
+
+      // Parse JSON fields
+      const themes = tour.themes ? (() => {
+        try {
+          const parsed = JSON.parse(tour.themes);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })() : [];
+
+      const bestFor = tour.bestFor ? (() => {
+        try {
+          const parsed = JSON.parse(tour.bestFor);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })() : [];
+
+      return {
+        id: tour.slug ?? tour.id,
+        name: tour.name,
+        destination: destinationDisplay,
+        primaryDestination: tour.primaryDestination,
+        destinationCountry: tour.destinationCountry,
+        destinationState: tour.destinationState,
+        duration: durationDisplay,
+        durationDays: tour.durationDays,
+        durationNights: tour.durationNights,
+        price: tour.basePriceInInr ?? tour.price ?? 0,
+        originalPrice: tour.originalPrice,
+        currency: tour.currency || "INR",
+        countryName: tour.country?.name || tour.destinationCountry || "Global",
+        countryCode: tour.country?.code || "GLOBAL",
+        isFeatured: tour.isFeatured,
+        allowAdvance: tour.allowAdvance,
+        tourType: tour.tourType,
+        tourSubType: tour.tourSubType,
+        region: tour.region,
+        themes: themes,
+        bestFor: bestFor,
+        difficultyLevel: tour.difficultyLevel,
+        groupSizeMin: tour.groupSizeMin,
+        groupSizeMax: tour.groupSizeMax,
+        packageType: tour.packageType,
+        image:
+          getMediaProxyUrl(tour.featuredImage) ||
+          getMediaProxyUrl(tour.heroImageUrl) ||
+          getMediaProxyUrl(tour.imageUrl) ||
+          "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=900&q=80",
+      };
+    });
+
+  // Extract filters
   const countryFilters = Array.from(
     new Map(
       tours
-        .filter((tour) => tour.country?.code)
-        .map((tour) => [
-          tour.country!.code,
-          { code: tour.country!.code, name: tour.country!.name },
-        ])
+        .filter((tour) => tour.country?.code || tour.destinationCountry)
+        .map((tour) => {
+          const code = tour.country?.code || tour.destinationCountry?.substring(0, 3).toUpperCase() || "GLOBAL";
+          const name = tour.country?.name || tour.destinationCountry || "Global";
+          return [code, { code, name }];
+        })
     ).values()
   ).sort((a, b) => a.name.localeCompare(b.name));
+
+  const regions = Array.from(
+    new Set(tours.map((tour) => tour.region).filter(Boolean))
+  ).sort() as string[];
+
+  const tourTypes = Array.from(
+    new Set(tours.map((tour) => tour.tourType).filter(Boolean))
+  ).sort() as string[];
+
+  const allThemes = Array.from(
+    new Set(
+      tours.flatMap((tour) => {
+        if (!tour.themes) return [];
+        try {
+          const parsed = JSON.parse(tour.themes);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })
+    )
+  ).sort() as string[];
 
   return (
     <div className="min-h-screen bg-white">
@@ -61,7 +139,13 @@ export default async function ToursPage() {
         </div>
       </div>
 
-      <ToursGridClient tours={formatted} countries={countryFilters} />
+      <ToursGridClient 
+        tours={formatted} 
+        countries={countryFilters}
+        regions={regions}
+        tourTypes={tourTypes}
+        themes={allThemes}
+      />
     </div>
   );
 }

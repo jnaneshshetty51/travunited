@@ -19,9 +19,27 @@ export async function logAuditEvent({
   metadata,
 }: LogAuditEventOptions) {
   try {
+    // Verify adminId exists in User table before using it
+    let validAdminId: string | null = null;
+    if (adminId) {
+      try {
+        const admin = await prisma.user.findUnique({
+          where: { id: adminId },
+          select: { id: true },
+        });
+        if (admin) {
+          validAdminId = adminId;
+        } else {
+          console.warn(`Audit log: Admin ID ${adminId} not found in User table, using null`);
+        }
+      } catch (error) {
+        console.warn(`Audit log: Error verifying admin ID ${adminId}:`, error);
+      }
+    }
+
     await prisma.auditLog.create({
       data: {
-        adminId: adminId ?? null,
+        adminId: validAdminId,
         entityId: entityId ?? null,
         entityType,
         action,
