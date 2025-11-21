@@ -13,47 +13,90 @@ export const CountryImportRowSchema = z.object({
 
 export type CountryImportRow = z.infer<typeof CountryImportRowSchema>;
 
-// Visa Import Schema - matches new CSV template
+// Visa Import Schema - matches new CSV template format
 export const VisaImportRowSchema = z.object({
-  country_code: z.string().min(2).max(3).toUpperCase(),
-  country_name: z.string().min(1),
-  visa_name: z.string().min(1),
-  visa_slug: z.string().min(1).toLowerCase(),
-  entry_type: z.string().optional(),
-  stay_duration_days: z.string().min(1).transform((val) => {
-    const num = parseInt(val);
-    if (isNaN(num) || num < 1) {
-      throw new Error("stay_duration_days must be a positive integer");
-    }
-    return num;
+  // Core fields
+  id: z.string().optional(), // UUID, optional for new visas
+  name: z.string().min(1),
+  slug: z.string().min(1).toLowerCase(),
+  visa_type: z.string().optional(),
+  duration: z.string().optional(), // e.g., "30 Days"
+  price: z.string().optional().transform((val) => {
+    if (!val) return null;
+    const num = parseFloat(val);
+    return isNaN(num) ? null : Math.round(num);
   }),
-  validity_days: z.string().min(1).transform((val) => {
+  image: z.string().optional().nullable(),
+  description: z.string().optional(),
+  processing_time: z.string().optional(), // e.g., "1 to 2 Working Days"
+  validity: z.string().optional(), // e.g., "3 Months"
+  
+  // JSON array strings
+  requirements: z.string().optional().nullable(), // JSON array of requirement names
+  document_requirements: z.string().optional().nullable(), // JSON array of document requirement objects
+  content_sections: z.string().optional().nullable(), // JSON array of content section objects
+  faqs: z.string().optional().nullable(), // JSON array of FAQ objects
+  visa_types: z.string().optional().nullable(), // JSON array
+  structured_data: z.string().optional().nullable(), // JSON object
+  
+  // Dates
+  created_at: z.string().optional().transform((val) => {
+    if (!val) return null;
+    const date = new Date(val);
+    return isNaN(date.getTime()) ? null : date;
+  }),
+  updated_at: z.string().optional().transform((val) => {
+    if (!val) return null;
+    const date = new Date(val);
+    return isNaN(date.getTime()) ? null : date;
+  }),
+  
+  // Media
+  visa_sample_image: z.string().optional().nullable(),
+  
+  // Country/flag
+  flag_emoji: z.string().optional(),
+  
+  // SEO fields
+  meta_title: z.string().optional().nullable(),
+  meta_description: z.string().optional().nullable(),
+  meta_keywords: z.string().optional().nullable(),
+  canonical_url: z.string().optional().nullable(),
+  og_title: z.string().optional().nullable(),
+  og_description: z.string().optional().nullable(),
+  og_image: z.string().optional().nullable(),
+  
+  // Legacy fields for backward compatibility (if CSV still has them)
+  country_code: z.string().optional(),
+  country_name: z.string().optional(),
+  visa_name: z.string().optional(),
+  visa_slug: z.string().optional(),
+  entry_type: z.string().optional(),
+  stay_duration_days: z.string().optional().transform((val) => {
+    if (!val) return null;
     const num = parseInt(val);
-    if (isNaN(num) || num < 1) {
-      throw new Error("validity_days must be a positive integer");
-    }
-    return num;
+    return isNaN(num) ? null : num;
+  }),
+  validity_days: z.string().optional().transform((val) => {
+    if (!val) return null;
+    const num = parseInt(val);
+    return isNaN(num) ? null : num;
   }),
   processing_time_days: z.string().optional(),
-  govt_fee: z.string().min(1).transform((val) => {
+  govt_fee: z.string().optional().transform((val) => {
+    if (!val) return null;
     const num = parseFloat(val);
-    if (isNaN(num) || num < 0) {
-      throw new Error("govt_fee must be a valid non-negative number");
-    }
-    return Math.round(num);
+    return isNaN(num) ? null : Math.round(num);
   }),
-  service_fee: z.string().min(1).transform((val) => {
+  service_fee: z.string().optional().transform((val) => {
+    if (!val) return null;
     const num = parseFloat(val);
-    if (isNaN(num) || num < 0) {
-      throw new Error("service_fee must be a valid non-negative number");
-    }
-    return Math.round(num);
+    return isNaN(num) ? null : Math.round(num);
   }),
-  currency: z.string().min(1).default("INR"),
-  is_active: z.enum(["TRUE", "FALSE", "true", "false", "1", "0"]).transform((val) => 
-    val === "TRUE" || val === "true" || val === "1"
+  currency: z.string().optional().default("INR"),
+  is_active: z.enum(["TRUE", "FALSE", "true", "false", "1", "0"]).optional().transform((val) => 
+    val ? (val === "TRUE" || val === "true" || val === "1") : true
   ),
-  // Optional fields for backward compatibility
   short_description: z.string().optional(),
   long_description: z.string().optional(),
   tags: z.string().optional(),
