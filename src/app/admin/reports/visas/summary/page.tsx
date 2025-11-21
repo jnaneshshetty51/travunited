@@ -37,6 +37,7 @@ export default function VisaApplicationsReportPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<VisaSummary | null>(null);
   const [applications, setApplications] = useState<ApplicationRow[]>([]);
   const [countries, setCountries] = useState<Array<{ id: string; name: string }>>([]);
@@ -49,9 +50,9 @@ export default function VisaApplicationsReportPage() {
   const [totalPages, setTotalPages] = useState(1);
 
   // Memoize filter values to prevent infinite re-renders
-  const dateFrom = filters.dateFrom;
-  const dateTo = filters.dateTo;
-  const filterStatus = filters.status;
+  const dateFrom = useMemo(() => filters.dateFrom, [filters.dateFrom]);
+  const dateTo = useMemo(() => filters.dateTo, [filters.dateTo]);
+  const filterStatus = useMemo(() => filters.status, [filters.status]);
   const countryIds = useMemo(() => filters.countryIds || [], [filters.countryIds]);
 
   const fetchCountries = useCallback(async () => {
@@ -68,6 +69,7 @@ export default function VisaApplicationsReportPage() {
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams();
       if (dateFrom) params.append("dateFrom", dateFrom);
@@ -80,14 +82,16 @@ export default function VisaApplicationsReportPage() {
       params.append("limit", "50");
 
       const response = await fetch(`/api/admin/reports/visas/summary?${params.toString()}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSummary(data.summary);
-        setApplications(data.rows || []);
-        setTotalPages(data.pagination?.totalPages || 1);
+      if (!response.ok) {
+        throw new Error(`Failed to load report: ${response.statusText}`);
       }
-    } catch (error) {
+      const data = await response.json();
+      setSummary(data.summary);
+      setApplications(data.rows || []);
+      setTotalPages(data.pagination?.totalPages || 1);
+    } catch (error: any) {
       console.error("Error fetching report:", error);
+      setError(error.message || "Failed to load report. Please try again or contact support.");
     } finally {
       setLoading(false);
     }
@@ -97,6 +101,7 @@ export default function VisaApplicationsReportPage() {
     fetchCountries();
   }, [fetchCountries]);
 
+  // Fetch report when authenticated
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
@@ -110,7 +115,16 @@ export default function VisaApplicationsReportPage() {
       }
       fetchReport();
     }
-  }, [session?.user?.role, status, router, fetchReport]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.role, status]);
+
+  // Refetch when filters or page change
+  useEffect(() => {
+    if (status === "authenticated" && session?.user?.role === "SUPER_ADMIN") {
+      fetchReport();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateFrom, dateTo, filterStatus, countryIds, page]);
 
   const handleExport = (format: "xlsx" | "csv" | "pdf") => {
     const url = buildExportUrl("/api/admin/reports/visas/summary", filters, format);
@@ -132,13 +146,33 @@ export default function VisaApplicationsReportPage() {
     }
   };
 
-  if (loading) {
+  if (loading && !summary) {
     return (
       <AdminLayout>
         <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
             <p className="mt-4 text-neutral-600">Loading report...</p>
+          </div>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (error && !summary) {
+    return (
+      <AdminLayout>
+        <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+          <div className="text-center max-w-md">
+            <div className="text-red-600 text-5xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-bold text-neutral-900 mb-2">Failed to Load Report</h2>
+            <p className="text-neutral-600 mb-6">{error}</p>
+            <button
+              onClick={() => fetchReport()}
+              className="px-6 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700"
+            >
+              Try Again
+            </button>
           </div>
         </div>
       </AdminLayout>
