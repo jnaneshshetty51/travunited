@@ -83,17 +83,22 @@ export function NotificationBell() {
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await fetch(`/api/notifications/${notificationId}/read`, {
+      const response = await fetch(`/api/notifications/${notificationId}/read`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
       });
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === notificationId ? { ...n, readAt: new Date() } : n
-        )
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-      // Refresh unread count after marking as read
-      fetchUnreadCount();
+      if (response.ok) {
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n.id === notificationId ? { ...n, readAt: new Date() } : n
+          )
+        );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+        // Refresh unread count after marking as read
+        fetchUnreadCount();
+      } else {
+        console.error("Failed to mark notification as read");
+      }
     } catch (error) {
       console.error("Error marking notification as read:", error);
     }

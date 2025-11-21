@@ -1,4 +1,4 @@
-npx prisma migrate dev --name align_visa_with_csv_template#!/bin/bash
+#!/bin/bash
 # VPS Deployment Script - Resets to GitHub version and redeploys
 # Usage: ./deploy-vps.sh
 

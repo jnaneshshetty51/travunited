@@ -486,7 +486,7 @@ export default function AdminVisasPage() {
 
                 <div className="flex items-center justify-between">
                   <div>
-                    {visa.govtFee !== null && visa.serviceFee !== null ? (
+                    {visa.govtFee !== null && visa.govtFee !== undefined && visa.serviceFee !== null && visa.serviceFee !== undefined ? (
                       <>
                         <div className="text-2xl font-bold text-primary-600">
                           {visa.currency === "INR" ? "₹" : visa.currency || "₹"}

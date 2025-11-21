@@ -389,7 +389,7 @@ export default function AdminToursPage() {
                 className="px-3 py-2 border border-neutral-200 rounded-lg text-sm"
               >
                 <option value="all">All regions</option>
-                {Array.from(new Set(tours.map(t => t.region).filter(Boolean))).map((region) => (
+                {Array.from(new Set(tours.map(t => t.region).filter((r): r is string => Boolean(r)))).map((region) => (
                   <option key={region} value={region}>{region}</option>
                 ))}
               </select>

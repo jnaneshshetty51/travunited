@@ -80,15 +80,20 @@ export function NotificationBell() {
 
   const markAsRead = async (id: string) => {
     try {
-      await fetch(`/api/notifications/${id}/read`, {
+      const response = await fetch(`/api/notifications/${id}/read`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
       });
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, readAt: new Date() } : n))
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-      // Refresh unread count after marking as read
-      fetchUnreadCount();
+      if (response.ok) {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, readAt: new Date() } : n))
+        );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+        // Refresh unread count after marking as read
+        fetchUnreadCount();
+      } else {
+        console.error("Failed to mark notification as read");
+      }
     } catch (error) {
       console.error("Error marking notification as read:", error);
     }
@@ -96,15 +101,20 @@ export function NotificationBell() {
 
   const markAllAsRead = async () => {
     try {
-      await fetch("/api/notifications/read-all", {
+      const response = await fetch("/api/notifications/read-all", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
       });
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, readAt: n.readAt || new Date() }))
-      );
-      setUnreadCount(0);
-      // Refresh unread count after marking all as read
-      fetchUnreadCount();
+      if (response.ok) {
+        setNotifications((prev) =>
+          prev.map((n) => ({ ...n, readAt: new Date() }))
+        );
+        setUnreadCount(0);
+        // Refresh unread count after marking all as read
+        fetchUnreadCount();
+      } else {
+        console.error("Failed to mark all notifications as read");
+      }
     } catch (error) {
       console.error("Error marking all as read:", error);
     }

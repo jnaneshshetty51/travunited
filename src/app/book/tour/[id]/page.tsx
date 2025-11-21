@@ -852,7 +852,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                     <div className="flex-1">
                       <div className="font-medium text-neutral-900">Advance Payment</div>
                       <div className="text-sm text-neutral-600">
-                        Pay {advancePercentage}% now, remaining before departure
+                        Pay {tour.advancePercentage ?? 0}% now, remaining before departure
                       </div>
                       <div className="text-lg font-bold text-primary-600 mt-1">
                         ₹{advanceAmount.toLocaleString()} now
@@ -869,7 +869,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
         );
 
       case 5:
-        const finalAmount = formData.paymentType === "full" ? baseAmount : advanceAmount;
+        const paymentFinalAmount = formData.paymentType === "full" ? baseAmount : advanceAmount;
         
         return (
           <div className="space-y-6">
@@ -908,12 +908,12 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                       {formData.paymentType === "full" ? "Total Amount" : "Advance Amount"}
                     </span>
                     <span className="text-2xl font-bold text-primary-600">
-                      ₹{finalAmount.toLocaleString()}
+                      ₹{paymentFinalAmount.toLocaleString()}
                     </span>
                   </div>
                   {formData.paymentType === "advance" && (
                     <p className="text-sm text-neutral-600 mb-4">
-                      Remaining balance of ₹{Math.max(baseAmount - finalAmount, 0).toLocaleString()} due before departure.
+                      Remaining balance of ₹{Math.max(baseAmount - paymentFinalAmount, 0).toLocaleString()} due before departure.
                     </p>
                   )}
                   <p className="text-sm text-neutral-600 mb-6">
