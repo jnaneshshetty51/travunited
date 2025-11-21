@@ -37,6 +37,13 @@ const blogSchema = z.object({
   readTime: z.string().optional(),
   content: z.string().min(20),
   published: z.boolean().optional(),
+  // SEO & Metadata
+  metaTitle: z.string().optional().nullable(),
+  metaDescription: z.string().optional().nullable(),
+  focusKeyword: z.string().optional().nullable(),
+  author: z.string().optional().nullable(),
+  status: z.enum(["DRAFT", "PUBLISHED", "SCHEDULED"]).optional().nullable(),
+  publishedAt: z.string().optional().nullable(),
 });
 
 export async function GET(req: Request) {
@@ -114,6 +121,17 @@ export async function POST(req: Request) {
       normalizedCover,
     });
 
+    // Determine status and published state
+    const status = data.status || (data.published ? "PUBLISHED" : "DRAFT");
+    const isPublished = status === "PUBLISHED";
+    let publishedAtDate: Date | null = null;
+    
+    if (status === "PUBLISHED") {
+      publishedAtDate = data.publishedAt ? new Date(data.publishedAt) : new Date();
+    } else if (status === "SCHEDULED" && data.publishedAt) {
+      publishedAtDate = new Date(data.publishedAt);
+    }
+
     const post = await prisma.blogPost.create({
       data: {
         title: data.title,
@@ -123,8 +141,14 @@ export async function POST(req: Request) {
         category: data.category || null,
         readTime: data.readTime || null,
         content: data.content,
-        isPublished: data.published ?? false,
-        publishedAt: data.published ? new Date() : null,
+        isPublished,
+        publishedAt: publishedAtDate,
+        // SEO & Metadata
+        metaTitle: data.metaTitle || null,
+        metaDescription: data.metaDescription || null,
+        focusKeyword: data.focusKeyword || null,
+        author: data.author || null,
+        status: status || "DRAFT",
       },
     });
 

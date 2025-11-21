@@ -75,6 +75,7 @@ export async function GET(
     return NextResponse.json({
       ...visa,
       heroImageUrl: getMediaProxyUrl(visa.heroImageUrl),
+      sampleVisaImageUrl: getMediaProxyUrl(visa.sampleVisaImageUrl),
     });
   } catch (error) {
     console.error("Error fetching visa:", error);
@@ -115,6 +116,7 @@ export async function PUT(
       whyTravunited,
       statistics,
       heroImageUrl,
+      sampleVisaImageUrl,
       metaTitle,
       metaDescription,
       // New fields
@@ -171,6 +173,10 @@ export async function PUT(
           whyTravunited: whyTravunited || null,
           statistics: statistics || null,
           heroImageUrl: normalizeMediaInput(heroImageUrl),
+          sampleVisaImageUrl:
+            sampleVisaImageUrl !== undefined
+              ? normalizeMediaInput(sampleVisaImageUrl)
+              : undefined,
           metaTitle: metaTitle || null,
           metaDescription: metaDescription || null,
           // New fields

@@ -37,6 +37,7 @@ interface VisaRecord {
   // New fields
   stayDurationDays?: number | null;
   validityDays?: number | null;
+  sampleVisaImageUrl?: string | null;
   currency?: string | null;
   country: {
     id: string;

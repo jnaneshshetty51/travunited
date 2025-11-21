@@ -44,6 +44,13 @@ const blogSchema = z.object({
     z.literal("").transform(() => undefined),
   ]).optional(),
   published: z.boolean().optional(),
+  // SEO & Metadata
+  metaTitle: z.string().optional().nullable(),
+  metaDescription: z.string().optional().nullable(),
+  focusKeyword: z.string().optional().nullable(),
+  author: z.string().optional().nullable(),
+  status: z.enum(["DRAFT", "PUBLISHED", "SCHEDULED"]).optional().nullable(),
+  publishedAt: z.string().optional().nullable(),
 });
 
 export async function GET(
@@ -82,6 +89,7 @@ export async function GET(
       ...post,
       published: post.isPublished, // Map isPublished to published for frontend consistency
       coverImage: getMediaProxyUrl(post.coverImage),
+      status: post.status || "DRAFT",
     });
   } catch (error) {
     console.error("Error fetching blog post:", error);
@@ -206,6 +214,37 @@ export async function PUT(
       updateData.publishedAt = data.published 
         ? (existing.publishedAt ?? new Date())
         : null;
+    }
+    // Handle status field
+    if (data.status !== undefined) {
+      updateData.status = data.status || "DRAFT";
+      // Sync isPublished with status
+      if (data.status === "PUBLISHED") {
+        updateData.isPublished = true;
+        if (!updateData.publishedAt) {
+          updateData.publishedAt = existing.publishedAt ?? new Date();
+        }
+      } else if (data.status === "DRAFT") {
+        updateData.isPublished = false;
+      }
+      // SCHEDULED keeps isPublished as false but sets publishedAt
+    }
+    // Handle publishedAt separately (for scheduled posts)
+    if (data.publishedAt !== undefined && data.publishedAt !== null) {
+      updateData.publishedAt = new Date(data.publishedAt);
+    }
+    // SEO & Metadata fields
+    if (data.metaTitle !== undefined) {
+      updateData.metaTitle = data.metaTitle || null;
+    }
+    if (data.metaDescription !== undefined) {
+      updateData.metaDescription = data.metaDescription || null;
+    }
+    if (data.focusKeyword !== undefined) {
+      updateData.focusKeyword = data.focusKeyword || null;
+    }
+    if (data.author !== undefined) {
+      updateData.author = data.author || null;
     }
 
     const updated = await prisma.blogPost.update({

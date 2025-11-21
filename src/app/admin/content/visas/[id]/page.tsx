@@ -44,6 +44,7 @@ interface FormState {
   // New fields matching CSV template
   stayDurationDays: number | null;
   validityDays: number | null;
+  sampleVisaImageUrl: string;
   currency: string;
 }
 
@@ -126,13 +127,17 @@ export default function AdminVisaEditorPage() {
     // New fields
     stayDurationDays: null,
     validityDays: null,
+    sampleVisaImageUrl: "",
     currency: "INR",
   });
   const [requirements, setRequirements] = useState<RequirementState[]>([]);
   const [faqs, setFaqs] = useState<FaqState[]>([]);
   const [heroImageMode, setHeroImageMode] = useState<"url" | "upload">("url");
+  const [sampleVisaImageMode, setSampleVisaImageMode] = useState<"url" | "upload">("url");
   const [heroImageUploading, setHeroImageUploading] = useState(false);
   const [heroImageUploadError, setHeroImageUploadError] = useState<string | null>(null);
+  const [sampleVisaImageUploading, setSampleVisaImageUploading] = useState(false);
+  const [sampleVisaImageUploadError, setSampleVisaImageUploadError] = useState<string | null>(null);
 
   const tabs = useMemo(
     () => [
@@ -189,6 +194,7 @@ export default function AdminVisaEditorPage() {
       // New fields
       stayDurationDays: data.stayDurationDays ?? null,
       validityDays: data.validityDays ?? null,
+      sampleVisaImageUrl: data.sampleVisaImageUrl || "",
       currency: data.currency || "INR",
     });
     setRequirements(
@@ -320,6 +326,7 @@ const handleFaqChange = (
     try {
       const payload = {
         ...formData,
+        sampleVisaImageUrl: formData.sampleVisaImageUrl ? formData.sampleVisaImageUrl : null,
         priceInInr: Number(formData.priceInInr),
         requirements: requirements.map((req, index) => ({
           name: req.name,
@@ -399,6 +406,50 @@ const handleFaqChange = (
       setHeroImageUploadError(error.message || "Failed to upload image");
     } finally {
       setHeroImageUploading(false);
+    }
+  };
+
+  const handleSampleVisaImageFileUpload = async (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Please select a JPG, PNG or WEBP image.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image too large. Maximum size is 5 MB.");
+      return;
+    }
+
+    setSampleVisaImageUploading(true);
+    setSampleVisaImageUploadError(null);
+    try {
+      const uploadData = new FormData();
+      uploadData.append("file", file);
+      uploadData.append("folder", "visas");
+      uploadData.append("scope", "sample");
+
+      const response = await fetch("/api/admin/uploads", {
+        method: "POST",
+        body: uploadData,
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.error || "Failed to upload image");
+      }
+
+      const payload = await response.json();
+      setFormData((prev) => ({
+        ...prev,
+        sampleVisaImageUrl: payload.proxyUrl || payload.url,
+      }));
+      setSampleVisaImageMode("upload");
+    } catch (error: any) {
+      console.error("Sample visa image upload failed", error);
+      setSampleVisaImageUploadError(error.message || "Failed to upload image");
+    } finally {
+      setSampleVisaImageUploading(false);
     }
   };
 
@@ -1073,16 +1124,120 @@ const handleFaqChange = (
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-neutral-700">Meta Description</label>
-                  <textarea
-                    value={formData.metaDescription}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, metaDescription: e.target.value }))
-                    }
-                    className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
-                    rows={3}
-                  />
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-neutral-700">
+                        Sample Visa Image
+                      </label>
+                      <div className="inline-flex rounded-lg border border-neutral-200 overflow-hidden text-xs font-medium">
+                        <button
+                          type="button"
+                          onClick={() => setSampleVisaImageMode("url")}
+                          className={`px-3 py-1.5 ${
+                            sampleVisaImageMode === "url"
+                              ? "bg-primary-600 text-white"
+                              : "text-neutral-600"
+                          }`}
+                        >
+                          Use URL
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSampleVisaImageMode("upload")}
+                          className={`px-3 py-1.5 ${
+                            sampleVisaImageMode === "upload"
+                              ? "bg-primary-600 text-white"
+                              : "text-neutral-600"
+                          }`}
+                        >
+                          Upload
+                        </button>
+                      </div>
+                    </div>
+                    {sampleVisaImageMode === "url" ? (
+                      <input
+                        type="url"
+                        value={formData.sampleVisaImageUrl}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, sampleVisaImageUrl: e.target.value }))
+                        }
+                        className="mt-2 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                        placeholder="https://..."
+                      />
+                    ) : (
+                      <div className="mt-2 space-y-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) =>
+                            handleSampleVisaImageFileUpload(e.target.files?.[0] || null)
+                          }
+                          className="w-full border border-dashed border-neutral-300 rounded-lg px-4 py-3 text-sm text-neutral-600 hover:border-primary-400 cursor-pointer"
+                        />
+                        <p className="text-xs text-neutral-500">
+                          Upload a redacted example visa stamp/page. JPG, PNG or WEBP up to 5 MB.
+                        </p>
+                        {sampleVisaImageUploading && (
+                          <div className="text-sm text-neutral-600 flex items-center gap-2">
+                            <Loader2 size={16} className="animate-spin" />
+                            Uploading image...
+                          </div>
+                        )}
+                        {sampleVisaImageUploadError && (
+                          <p className="text-sm text-red-600">{sampleVisaImageUploadError}</p>
+                        )}
+                        {formData.sampleVisaImageUrl && (
+                          <div className="text-xs text-neutral-500 break-all bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+                            <span className="truncate">{formData.sampleVisaImageUrl}</span>
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={formData.sampleVisaImageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary-600 hover:text-primary-700 font-semibold"
+                              >
+                                Open
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setFormData((prev) => ({ ...prev, sampleVisaImageUrl: "" }))
+                                }
+                                className="text-red-500 hover:text-red-600 font-semibold"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {formData.sampleVisaImageUrl && (
+                      <div className="mt-3 space-y-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={getMediaProxyUrl(formData.sampleVisaImageUrl)}
+                          alt="Sample visa preview"
+                          className="w-full max-h-56 object-cover rounded-xl border border-neutral-200"
+                        />
+                        <p className="text-xs text-neutral-500">
+                          This image is for reference inside the admin panel and CMS.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-neutral-700">Meta Description</label>
+                    <textarea
+                      value={formData.metaDescription}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, metaDescription: e.target.value }))
+                      }
+                      className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                      rows={3}
+                    />
+                  </div>
                 </div>
               </div>
             )}

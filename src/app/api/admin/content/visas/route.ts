@@ -126,6 +126,7 @@ export async function POST(req: Request) {
       whyTravunited,
       statistics,
       heroImageUrl,
+      sampleVisaImageUrl,
       metaTitle,
       metaDescription,
       // New fields
@@ -179,6 +180,7 @@ export async function POST(req: Request) {
         whyTravunited: whyTravunited || null,
         statistics: statistics || null,
         heroImageUrl: heroImageUrl || null,
+        sampleVisaImageUrl: sampleVisaImageUrl || null,
         metaTitle: metaTitle || null,
         metaDescription: metaDescription || null,
         // New fields

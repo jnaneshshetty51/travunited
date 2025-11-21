@@ -28,6 +28,15 @@ interface BlogPost {
   readTime: string | null;
   content: string;
   published: boolean;
+  // SEO & Metadata
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  focusKeyword?: string | null;
+  author?: string | null;
+  publishedAt?: string | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
+  status?: string | null;
 }
 
 export default function AdminBlogEditPage() {
@@ -50,6 +59,13 @@ export default function AdminBlogEditPage() {
     readTime: "",
     content: "",
     published: false,
+    metaTitle: "",
+    metaDescription: "",
+    focusKeyword: "",
+    author: "",
+    status: "DRAFT",
+    publishedAt: null,
+    updatedAt: null,
   });
 
   const fetchPost = useCallback(async () => {
@@ -61,6 +77,14 @@ export default function AdminBlogEditPage() {
           ...data,
           published: data.published ?? data.isPublished ?? false, // Handle both field names
           coverImage: getMediaProxyUrl(data.coverImage),
+          metaTitle: data.metaTitle || "",
+          metaDescription: data.metaDescription || "",
+          focusKeyword: data.focusKeyword || "",
+          author: data.author || "",
+          status: data.status || "DRAFT",
+          publishedAt: data.publishedAt ? new Date(data.publishedAt).toISOString().split('T')[0] : null,
+          updatedAt: data.updatedAt ? new Date(data.updatedAt).toISOString().split('T')[0] : null,
+          createdAt: data.createdAt ? new Date(data.createdAt).toISOString().split('T')[0] : null,
         });
         if (data.coverImage && !data.coverImage.startsWith("http")) {
           setCoverImageMode("upload");
@@ -197,6 +221,33 @@ export default function AdminBlogEditPage() {
       // Published is a boolean, so include it if it's explicitly set
       if (formData.published !== undefined && formData.published !== null) {
         submitData.published = formData.published;
+      }
+      // SEO & Metadata fields
+      if (formData.metaTitle && formData.metaTitle.trim()) {
+        submitData.metaTitle = formData.metaTitle.trim();
+      } else {
+        submitData.metaTitle = null;
+      }
+      if (formData.metaDescription && formData.metaDescription.trim()) {
+        submitData.metaDescription = formData.metaDescription.trim();
+      } else {
+        submitData.metaDescription = null;
+      }
+      if (formData.focusKeyword && formData.focusKeyword.trim()) {
+        submitData.focusKeyword = formData.focusKeyword.trim();
+      } else {
+        submitData.focusKeyword = null;
+      }
+      if (formData.author && formData.author.trim()) {
+        submitData.author = formData.author.trim();
+      } else {
+        submitData.author = null;
+      }
+      if (formData.status) {
+        submitData.status = formData.status;
+      }
+      if (formData.publishedAt) {
+        submitData.publishedAt = formData.publishedAt;
       }
 
       console.log("Submitting blog post:", {
@@ -427,22 +478,135 @@ export default function AdminBlogEditPage() {
               </p>
             </div>
 
-            {/* Publish Status */}
-            <div>
-              <label className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  checked={formData.published ?? false}
-                  onChange={(e) => setFormData({ ...formData, published: e.target.checked })}
-                  className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="text-sm font-medium text-neutral-700">
-                  Publish this post
-                </span>
-              </label>
-              <p className="text-xs text-neutral-500 mt-1">
-                Unpublished posts are saved as drafts and won&rsquo;t appear on the public blog
-              </p>
+            {/* SEO & Metadata */}
+            <div className="border-t border-neutral-200 pt-6">
+              <h2 className="text-xl font-bold text-neutral-900 mb-4">SEO & Metadata</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Meta Title
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.metaTitle || ""}
+                    onChange={(e) => setFormData({ ...formData, metaTitle: e.target.value })}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    placeholder="SEO title for search engines..."
+                  />
+                  <p className="text-xs text-neutral-500 mt-1">
+                    Recommended: 50-60 characters. If empty, the post title will be used.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Meta Description
+                  </label>
+                  <textarea
+                    value={formData.metaDescription || ""}
+                    onChange={(e) => setFormData({ ...formData, metaDescription: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    placeholder="SEO description for search engines..."
+                  />
+                  <p className="text-xs text-neutral-500 mt-1">
+                    Recommended: 150-160 characters. If empty, the excerpt will be used.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Focus Keyword
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.focusKeyword || ""}
+                    onChange={(e) => setFormData({ ...formData, focusKeyword: e.target.value })}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    placeholder="Primary keyword for SEO..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Author
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.author || ""}
+                    onChange={(e) => setFormData({ ...formData, author: e.target.value })}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    placeholder="Author name..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Publishing & Status */}
+            <div className="border-t border-neutral-200 pt-6">
+              <h2 className="text-xl font-bold text-neutral-900 mb-4">Publishing</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={formData.status || "DRAFT"}
+                    onChange={(e) => {
+                      const newStatus = e.target.value;
+                      setFormData({ 
+                        ...formData, 
+                        status: newStatus,
+                        published: newStatus === "PUBLISHED",
+                        publishedAt: newStatus === "PUBLISHED" && !formData.publishedAt 
+                          ? new Date().toISOString().split('T')[0] 
+                          : formData.publishedAt
+                      });
+                    }}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="DRAFT">Draft</option>
+                    <option value="PUBLISHED">Published</option>
+                    <option value="SCHEDULED">Scheduled</option>
+                  </select>
+                </div>
+                {(formData.status === "PUBLISHED" || formData.status === "SCHEDULED") && (
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
+                      {formData.status === "SCHEDULED" ? "Scheduled Date" : "Published Date"}
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.publishedAt || ""}
+                      onChange={(e) => setFormData({ ...formData, publishedAt: e.target.value })}
+                      className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                )}
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
+                      Created Date
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.createdAt ? new Date(formData.createdAt).toISOString().split('T')[0] : ""}
+                      disabled
+                      className="w-full px-4 py-2 border border-neutral-300 rounded-lg bg-neutral-50 text-neutral-500"
+                    />
+                    <p className="text-xs text-neutral-500 mt-1">Auto-generated</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
+                      Last Updated
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.updatedAt || ""}
+                      disabled
+                      className="w-full px-4 py-2 border border-neutral-300 rounded-lg bg-neutral-50 text-neutral-500"
+                    />
+                    <p className="text-xs text-neutral-500 mt-1">Auto-updated</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

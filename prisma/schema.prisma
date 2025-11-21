@@ -178,6 +178,7 @@ model Visa {
   whyTravunited  String?
   statistics     String?
   heroImageUrl   String?
+  sampleVisaImageUrl String?
   metaTitle      String?
   metaDescription String?
   // New fields matching CSV template
@@ -433,18 +434,24 @@ model Setting {
 }
 
 model BlogPost {
-  id          String   @id @default(cuid())
-  title       String
-  slug        String   @unique
-  excerpt     String?
-  coverImage  String?
-  content     String
-  category    String?
-  readTime    String?
-  isPublished Boolean  @default(false)
-  publishedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  title          String
+  slug           String   @unique
+  excerpt        String?
+  coverImage     String?
+  content        String
+  category       String?
+  readTime       String?
+  isPublished    Boolean  @default(false)
+  publishedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  // SEO & Metadata
+  metaTitle      String?
+  metaDescription String?
+  focusKeyword   String?
+  author         String?
+  status         String?  @default("DRAFT") // DRAFT, PUBLISHED, SCHEDULED
 }
 
 model Notification {
