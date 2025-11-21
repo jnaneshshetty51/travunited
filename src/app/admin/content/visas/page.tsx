@@ -37,8 +37,6 @@ interface VisaRecord {
   // New fields
   stayDurationDays?: number | null;
   validityDays?: number | null;
-  govtFee?: number | null;
-  serviceFee?: number | null;
   currency?: string | null;
   country: {
     id: string;
@@ -483,27 +481,11 @@ export default function AdminVisasPage() {
 
                 <div className="flex items-center justify-between">
                   <div>
-                    {visa.govtFee !== null && visa.govtFee !== undefined && visa.serviceFee !== null && visa.serviceFee !== undefined ? (
-                      <>
-                        <div className="text-2xl font-bold text-primary-600">
-                          {visa.currency === "INR" ? "₹" : visa.currency || "₹"}
-                          {(visa.govtFee + visa.serviceFee).toLocaleString()}
-                        </div>
-                        <div className="text-xs text-neutral-500">
-                          Govt: {visa.currency === "INR" ? "₹" : visa.currency || "₹"}
-                          {visa.govtFee.toLocaleString()} + Service: {visa.currency === "INR" ? "₹" : visa.currency || "₹"}
-                          {visa.serviceFee.toLocaleString()}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-2xl font-bold text-primary-600">
-                          {visa.currency === "INR" ? "₹" : visa.currency || "₹"}
-                          {visa.priceInInr.toLocaleString()}
-                        </div>
-                        <div className="text-xs text-neutral-500">Per traveller</div>
-                      </>
-                    )}
+                    <div className="text-2xl font-bold text-primary-600">
+                      {visa.currency === "INR" ? "₹" : visa.currency === "USD" ? "$" : visa.currency === "EUR" ? "€" : visa.currency === "AED" ? "د.إ" : visa.currency === "GBP" ? "£" : visa.currency || "₹"}
+                      {visa.priceInInr.toLocaleString()}
+                    </div>
+                    <div className="text-xs text-neutral-500">Per traveller</div>
                   </div>
                   <div className="flex items-center gap-3 text-sm font-medium">
                     <Link

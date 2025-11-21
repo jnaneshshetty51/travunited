@@ -44,8 +44,6 @@ interface FormState {
   // New fields matching CSV template
   stayDurationDays: number | null;
   validityDays: number | null;
-  govtFee: number | null;
-  serviceFee: number | null;
   currency: string;
 }
 
@@ -128,8 +126,6 @@ export default function AdminVisaEditorPage() {
     // New fields
     stayDurationDays: null,
     validityDays: null,
-    govtFee: null,
-    serviceFee: null,
     currency: "INR",
   });
   const [requirements, setRequirements] = useState<RequirementState[]>([]);
@@ -193,8 +189,6 @@ export default function AdminVisaEditorPage() {
       // New fields
       stayDurationDays: data.stayDurationDays ?? null,
       validityDays: data.validityDays ?? null,
-      govtFee: data.govtFee ?? null,
-      serviceFee: data.serviceFee ?? null,
       currency: data.currency || "INR",
     });
     setRequirements(
@@ -600,46 +594,24 @@ const handleFaqChange = (
             {activeTab === "pricing" && (
               <div className="space-y-6">
                 <div className="border-b border-neutral-200 pb-4">
-                  <h3 className="text-lg font-semibold text-neutral-900 mb-2">Pricing Breakdown</h3>
-                  <p className="text-sm text-neutral-500">Set government fee and service fee separately</p>
+                  <h3 className="text-lg font-semibold text-neutral-900 mb-2">Pricing</h3>
+                  <p className="text-sm text-neutral-500">Set the fixed price for this visa</p>
                 </div>
-                <div className="grid md:grid-cols-3 gap-4">
+                <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-neutral-700">
-                      Government Fee
+                      Price *
                     </label>
                     <input
                       type="number"
                       min={0}
-                      value={formData.govtFee ?? ""}
+                      value={formData.priceInInr}
                       onChange={(e) =>
-                        setFormData((prev) => ({ 
-                          ...prev, 
-                          govtFee: e.target.value ? Number(e.target.value) : null,
-                          priceInInr: (prev.serviceFee ?? 0) + (e.target.value ? Number(e.target.value) : 0)
-                        }))
+                        setFormData((prev) => ({ ...prev, priceInInr: Number(e.target.value) || 0 }))
                       }
                       className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
                       placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-neutral-700">
-                      Service Fee
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={formData.serviceFee ?? ""}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ 
-                          ...prev, 
-                          serviceFee: e.target.value ? Number(e.target.value) : null,
-                          priceInInr: (prev.govtFee ?? 0) + (e.target.value ? Number(e.target.value) : 0)
-                        }))
-                      }
-                      className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
-                      placeholder="0"
+                      required
                     />
                   </div>
                   <div>
@@ -661,36 +633,15 @@ const handleFaqChange = (
                     </select>
                   </div>
                 </div>
-                {(formData.govtFee !== null || formData.serviceFee !== null) && (
+                {formData.priceInInr > 0 && (
                   <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
-                    <div className="text-sm text-neutral-600 mb-1">Total Fee</div>
+                    <div className="text-sm text-neutral-600 mb-1">Total Price</div>
                     <div className="text-2xl font-bold text-primary-600">
                       {formData.currency === "INR" ? "₹" : formData.currency === "USD" ? "$" : formData.currency === "EUR" ? "€" : formData.currency === "AED" ? "د.إ" : formData.currency === "GBP" ? "£" : formData.currency}
-                      {((formData.govtFee ?? 0) + (formData.serviceFee ?? 0)).toLocaleString()}
-                    </div>
-                    <div className="text-xs text-neutral-500 mt-1">
-                      Govt: {formData.currency === "INR" ? "₹" : formData.currency} {(formData.govtFee ?? 0).toLocaleString()} + Service: {formData.currency === "INR" ? "₹" : formData.currency} {(formData.serviceFee ?? 0).toLocaleString()}
+                      {formData.priceInInr.toLocaleString()}
                     </div>
                   </div>
                 )}
-                <div className="border-t border-neutral-200 pt-4">
-                  <div className="text-sm text-neutral-500 mb-4">Legacy total price (auto-calculated from govt + service fees)</div>
-                  <div>
-                    <label className="text-sm font-medium text-neutral-700">
-                      Total Price (Legacy)
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={formData.priceInInr}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, priceInInr: Number(e.target.value) || 0 }))
-                      }
-                      className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 bg-neutral-50"
-                      readOnly
-                    />
-                  </div>
-                </div>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-neutral-700">

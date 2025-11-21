@@ -131,8 +131,6 @@ export async function POST(req: Request) {
       // New fields
       stayDurationDays,
       validityDays,
-      govtFee,
-      serviceFee,
       currency,
       requirements = [],
       faqs = [],
@@ -186,8 +184,6 @@ export async function POST(req: Request) {
         // New fields
         stayDurationDays: stayDurationDays !== undefined && stayDurationDays !== null ? Number(stayDurationDays) : null,
         validityDays: validityDays !== undefined && validityDays !== null ? Number(validityDays) : null,
-        govtFee: govtFee !== undefined && govtFee !== null ? Number(govtFee) : null,
-        serviceFee: serviceFee !== undefined && serviceFee !== null ? Number(serviceFee) : null,
         currency: currency || "INR",
         requirements: requirements.length
           ? {
