@@ -314,13 +314,52 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
         setBookingId(data.bookingId);
         setCurrentStep(5);
       } else {
-        const errorData = await response.json();
-        const errorMessage = errorData.error || errorData.details?.[0]?.message || "Failed to create booking. Please try again.";
-        alert(errorMessage);
+        // Try to parse error response
+        let errorMessage = "Failed to create booking. Please try again.";
+        let errorDetails = null;
+        
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+          
+          // Build detailed error message from validation details if available
+          if (errorData.details && Array.isArray(errorData.details) && errorData.details.length > 0) {
+            const detailMessages = errorData.details.map((d: any) => {
+              const fieldName = d.field ? d.field.replace(/_/g, " ").replace(/([A-Z])/g, " $1").trim() : "Field";
+              return `${fieldName}: ${d.message}`;
+            });
+            errorDetails = detailMessages.join("\n");
+          }
+          
+          // Log error details for debugging
+          console.error("Booking creation error:", {
+            status: response.status,
+            error: errorData.error,
+            details: errorData.details,
+            fullResponse: errorData,
+          });
+        } catch (parseError) {
+          // If response is not JSON, try to get text
+          try {
+            const text = await response.text();
+            console.error("Non-JSON error response:", text);
+            errorMessage = text || errorMessage;
+          } catch (textError) {
+            console.error("Could not parse error response:", textError);
+          }
+        }
+        
+        // Show error to user
+        const finalMessage = errorDetails ? `${errorMessage}\n\n${errorDetails}` : errorMessage;
+        alert(finalMessage);
       }
-    } catch (error) {
-      console.error("Error creating booking:", error);
-      alert("An error occurred. Please try again.");
+    } catch (error: any) {
+      console.error("Error creating booking:", {
+        error: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
+      alert(error?.message || "An error occurred. Please check your internet connection and try again.");
     } finally {
       setLoading(false);
     }

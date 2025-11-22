@@ -35,8 +35,58 @@ const bookingSchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    // Log the incoming request for debugging
     const body = await req.json();
-    const data = bookingSchema.parse(body);
+    console.log("Booking creation request received:", {
+      tourId: body.tourId,
+      tourName: body.tourName,
+      travelDate: body.travelDate,
+      numberOfAdults: body.numberOfAdults,
+      numberOfChildren: body.numberOfChildren,
+      travellersCount: body.travellers?.length,
+      primaryContactEmail: body.primaryContact?.email,
+      paymentType: body.paymentType,
+      hasCustomizations: !!body.customizations,
+      hasHotelCategory: !!body.hotelCategory,
+    });
+
+    // Validate request body with detailed error messages
+    let data;
+    try {
+      data = bookingSchema.parse(body);
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        const errorMessages = validationError.errors.map((err) => {
+          const path = err.path.join(".");
+          return `${path}: ${err.message}`;
+        });
+        
+        const errorMessage = `Validation failed: ${errorMessages.join(", ")}`;
+        console.error("Booking validation error:", {
+          errors: validationError.errors,
+          body: {
+            tourId: body.tourId,
+            travelDate: body.travelDate,
+            numberOfAdults: body.numberOfAdults,
+            numberOfChildren: body.numberOfChildren,
+            travellersLength: body.travellers?.length,
+            primaryContact: body.primaryContact ? { name: body.primaryContact.name, email: body.primaryContact.email } : null,
+          },
+        });
+
+        return NextResponse.json(
+          {
+            error: errorMessage,
+            details: validationError.errors.map((err) => ({
+              field: err.path.join("."),
+              message: err.message,
+            })),
+          },
+          { status: 400 }
+        );
+      }
+      throw validationError;
+    }
 
     const tourRecord = await prisma.tour.findFirst({
       where: {
@@ -168,17 +218,44 @@ export async function POST(req: Request) {
       bookingId: booking.id,
       message: "Booking created successfully",
     });
-  } catch (error) {
+  } catch (error: any) {
+    // Handle Zod validation errors (should already be caught above, but as a fallback)
     if (error instanceof z.ZodError) {
+      const errorMessages = error.errors.map((err) => {
+        const path = err.path.join(".");
+        return `${path}: ${err.message}`;
+      });
+      
+      console.error("Booking validation error (catch block):", {
+        errors: error.errors,
+      });
+
       return NextResponse.json(
-        { error: "Invalid input", details: error.errors },
+        {
+          error: `Validation failed: ${errorMessages.join(", ")}`,
+          details: error.errors.map((err) => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
+        },
         { status: 400 }
       );
     }
 
-    console.error("Error creating booking:", error);
+    // Log full error details for debugging
+    console.error("Error creating booking:", {
+      message: error?.message,
+      stack: error?.stack,
+      code: error?.code,
+      meta: error?.meta,
+    });
+
+    // Return user-friendly error message
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: error?.message || "Failed to create booking. Please try again.",
+        details: process.env.NODE_ENV === "development" ? error?.stack : undefined,
+      },
       { status: 500 }
     );
   }
