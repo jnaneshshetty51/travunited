@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
+import { getMediaProxyUrl } from "@/lib/media";
 import { 
   Search, 
   Calendar, 
@@ -469,12 +470,19 @@ export default function ToursGridClient({ tours, countries, regions, tourTypes, 
               <Link href={`/tours/${tour.id}`}>
                 <div className="bg-white rounded-2xl shadow-medium hover:shadow-large transition-shadow duration-300 overflow-hidden h-full flex flex-col">
                   {/* Image */}
-                  <div className="aspect-[4/3] relative">
+                  <div className="aspect-[4/3] relative bg-neutral-100">
                     <Image
-                      src={tour.image}
+                      src={getMediaProxyUrl(tour.image) || "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=600&q=80"}
                       alt={tour.name}
                       fill
                       className="object-cover group-hover:scale-110 transition-transform duration-500"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      onError={(e) => {
+                        // Fallback to placeholder if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null; // Prevent infinite loop
+                        target.src = "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=600&q=80";
+                      }}
                     />
                     {tour.isFeatured && (
                       <div className="absolute top-4 left-4 bg-primary-600 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">

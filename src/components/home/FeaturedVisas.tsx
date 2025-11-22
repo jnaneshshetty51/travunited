@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, MapPin, Clock } from "lucide-react";
 import Image from "next/image";
+import { getMediaProxyUrl } from "@/lib/media";
 
 type FeaturedVisa = {
   id: string;
@@ -54,15 +55,22 @@ export function FeaturedVisas({ visas }: { visas: FeaturedVisa[] }) {
             >
               <Link href={`/visas/${visa.countryCode}/${visa.slug}`}>
                 <div className="bg-white rounded-2xl shadow-medium hover:shadow-large transition-shadow duration-300 overflow-hidden h-full flex flex-col">
-                  <div className="aspect-[4/3] relative">
+                  <div className="aspect-[4/3] relative bg-neutral-100">
                     <Image
                       src={
-                        visa.image ||
+                        getMediaProxyUrl(visa.image) ||
                         "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=600&q=80"
                       }
                       alt={visa.name}
                       fill
                       className="object-cover group-hover:scale-110 transition-transform duration-500"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      onError={(e) => {
+                        // Fallback to placeholder if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null; // Prevent infinite loop
+                        target.src = "https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=600&q=80";
+                      }}
                     />
                   </div>
                   <div className="p-6 flex-1 flex flex-col">

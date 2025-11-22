@@ -99,7 +99,7 @@ export function BlogClient({ posts }: { posts: BlogClientPost[] }) {
           >
             <Link href={`/blog/${post.id}`}>
               <div className="bg-white rounded-2xl shadow-medium hover:shadow-large transition-shadow duration-300 overflow-hidden border border-neutral-200">
-                <div className="aspect-[16/9] relative">
+                <div className="aspect-[16/9] relative bg-neutral-100">
                   <Image
                     src={
                       getMediaProxyUrl(post.coverImage) ||
@@ -108,6 +108,13 @@ export function BlogClient({ posts }: { posts: BlogClientPost[] }) {
                     alt={post.title}
                     fill
                     className="object-cover group-hover:scale-110 transition-transform duration-500"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    onError={(e) => {
+                      // Fallback to placeholder if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.onerror = null; // Prevent infinite loop
+                      target.src = "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&q=80";
+                    }}
                   />
                   {post.category && (
                     <div className="absolute top-4 left-4 bg-primary-600 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center space-x-1">

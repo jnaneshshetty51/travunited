@@ -439,13 +439,20 @@ export default async function TourDetailPage({
                   {gallery.slice(0, 6).map((src, index) => (
                     <div
                       key={index}
-                      className="relative aspect-video rounded-xl overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                      className="relative aspect-video rounded-xl overflow-hidden cursor-pointer hover:opacity-90 transition-opacity bg-neutral-100"
                     >
                       <Image
-                        src={getMediaProxyUrl(src) || src}
+                        src={getMediaProxyUrl(src) || src || "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=900&q=80"}
                         alt={`${tour.name} - Image ${index + 1}`}
                         fill
                         className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        onError={(e) => {
+                          // Fallback to placeholder if image fails to load
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null; // Prevent infinite loop
+                          target.src = "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=900&q=80";
+                        }}
                       />
                     </div>
                   ))}
@@ -524,8 +531,21 @@ function Hero({
     "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80";
 
   return (
-    <div className="relative h-[500px] md:h-[600px]">
-      <Image src={heroImage} alt={tour.name} fill className="object-cover" priority />
+    <div className="relative h-[500px] md:h-[600px] bg-neutral-100">
+      <Image 
+        src={heroImage} 
+        alt={tour.name} 
+        fill 
+        className="object-cover" 
+        priority
+        sizes="100vw"
+        onError={(e) => {
+          // Fallback to placeholder if image fails to load
+          const target = e.target as HTMLImageElement;
+          target.onerror = null; // Prevent infinite loop
+          target.src = "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=1200&q=80";
+        }}
+      />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
       <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
         <div className="max-w-7xl mx-auto">

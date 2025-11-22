@@ -19,7 +19,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="relative h-[400px] md:h-[500px]">
+      <div className="relative h-[400px] md:h-[500px] bg-neutral-100">
         <Image
           src={
             getMediaProxyUrl(post.coverImage) ||
@@ -28,6 +28,13 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
           alt={post.title}
           fill
           className="object-cover"
+          sizes="100vw"
+          onError={(e) => {
+            // Fallback to placeholder if image fails to load
+            const target = e.target as HTMLImageElement;
+            target.onerror = null; // Prevent infinite loop
+            target.src = "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1600&q=80";
+          }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-8 text-white">

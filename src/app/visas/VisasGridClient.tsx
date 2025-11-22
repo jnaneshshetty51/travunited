@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Search, ArrowRight } from "lucide-react";
 import { getCountryFlagUrl } from "@/lib/flags";
+import { getMediaProxyUrl } from "@/lib/media";
 
 interface CountryCard {
   id: string;
@@ -121,12 +122,19 @@ export default function VisasGridClient({ countries }: Props) {
             >
               <Link href={`/visas/${country.code.toLowerCase()}`}>
                 <div className="bg-white rounded-2xl shadow-medium hover:shadow-large transition-shadow duration-300 overflow-hidden">
-                  <div className="aspect-[4/3] relative">
+                  <div className="aspect-[4/3] relative bg-neutral-100">
                     <Image
-                      src={country.heroImage}
+                      src={getMediaProxyUrl(country.heroImage) || "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=900&q=80"}
                       alt={country.name}
                       fill
                       className="object-cover group-hover:scale-110 transition-transform duration-500"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                      onError={(e) => {
+                        // Fallback to placeholder if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null; // Prevent infinite loop
+                        target.src = "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=900&q=80";
+                      }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
                     <div className="absolute top-4 left-4 flex items-center gap-2 text-white">
