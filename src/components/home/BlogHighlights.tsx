@@ -75,7 +75,7 @@ export function BlogHighlights({ posts }: { posts?: HighlightPost[] }) {
                       alt={post.title}
                       fill
                       className="object-cover group-hover:scale-110 transition-transform duration-500"
-                      unoptimized={shouldUseUnoptimizedImage(post.image)}
+                      unoptimized={shouldUseUnoptimizedImage(post.image) || true}
                       onError={(e) => {
                         // Fallback to placeholder if image fails to load
                         const target = e.target as HTMLImageElement;

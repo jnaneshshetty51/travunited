@@ -30,7 +30,7 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
           fill
           className="object-cover"
           sizes="100vw"
-          unoptimized={shouldUseUnoptimizedImage(post.coverImage)}
+          unoptimized={shouldUseUnoptimizedImage(post.coverImage) || true}
           onError={(e) => {
             // Fallback to placeholder if image fails to load
             const target = e.target as HTMLImageElement;

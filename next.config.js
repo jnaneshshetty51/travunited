@@ -21,6 +21,18 @@ const nextConfig = {
     minimumCacheTTL: 60,
     // Formats to allow
     formats: ['image/avif', 'image/webp'],
+    // Disable image optimization errors from breaking the page
+    loader: 'default',
+    // Add retry configuration
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+  },
+  // Add error handling configuration
+  onDemandEntries: {
+    // Period (in ms) where the server will keep pages in the buffer
+    maxInactiveAge: 25 * 1000,
+    // Number of pages that should be kept simultaneously without being disposed
+    pagesBufferLength: 2,
   },
 }
 
