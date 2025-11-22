@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ArrowLeft, Calendar, Users, DollarSign, Download, CheckCircle, Clock, AlertCircle, FileText } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatDate } from "@/lib/dateFormat";
+import { loadRazorpayScript } from "@/lib/razorpay-client";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -35,6 +36,7 @@ export default function BookingDetailPage() {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [pendingBalance, setPendingBalance] = useState(0);
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   const fetchBooking = useCallback(async () => {
     try {
@@ -66,6 +68,7 @@ export default function BookingDetailPage() {
     if (!booking) return;
     
     try {
+      setPaymentLoading(true);
       const response = await fetch("/api/payments/create-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -76,13 +79,77 @@ export default function BookingDetailPage() {
         }),
       });
 
-      if (response.ok) {
-        const { orderId } = await response.json();
-        // Redirect to payment
-        router.push(`/bookings/thank-you?bookingId=${booking.id}`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to create payment order");
       }
-    } catch (error) {
-      alert("Payment failed. Please try again.");
+
+      const { orderId, keyId, amount, currency } = await response.json();
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded || !window.Razorpay) {
+        throw new Error("Failed to load Razorpay SDK.");
+      }
+
+      const options = {
+        key: keyId,
+        amount,
+        currency,
+        name: "Travunited",
+        description: `${booking.tourName} - Remaining Balance`,
+        order_id: orderId,
+        prefill: {
+          name: session?.user?.name || "",
+          email: session?.user?.email || "",
+        },
+        notes: {
+          bookingId: booking.id,
+        },
+        handler: async (response: any) => {
+          try {
+            const verifyResponse = await fetch("/api/payments/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                bookingId: booking.id,
+              }),
+            });
+
+            if (verifyResponse.ok) {
+              router.push(`/bookings/thank-you?bookingId=${booking.id}`);
+            } else {
+              const errorData = await verifyResponse.json();
+              throw new Error(errorData.error || "Payment verification failed");
+            }
+          } catch (error: any) {
+            console.error("Payment verification error:", error);
+            alert(`Payment verification failed: ${error.message || "Please contact support"}`);
+            setPaymentLoading(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setPaymentLoading(false);
+          },
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      
+      razorpay.on("payment.failed", (response: any) => {
+        console.error("Payment failed:", response);
+        setPaymentLoading(false);
+        const errorMessage = response.error?.description || response.error?.reason || "Payment failed. Please try again.";
+        alert(errorMessage);
+      });
+
+      razorpay.open();
+    } catch (error: any) {
+      console.error("Payment error:", error);
+      alert(`Unable to process payment: ${error.message || "Please try again."}`);
+      setPaymentLoading(false);
     }
   };
 
@@ -216,9 +283,10 @@ export default function BookingDetailPage() {
                   </div>
                   <button
                     onClick={handlePayRemaining}
-                    className="w-full bg-yellow-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-yellow-700 transition-colors"
+                    disabled={paymentLoading}
+                    className="w-full bg-yellow-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Pay Remaining Amount
+                    {paymentLoading ? "Processing..." : "Pay Remaining Amount"}
                   </button>
                 </div>
               </div>
@@ -256,8 +324,97 @@ export default function BookingDetailPage() {
                 <p className="text-yellow-700 mb-4">
                   Your booking is ready but payment is pending. Complete payment to proceed.
                 </p>
-                <button className="bg-yellow-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-yellow-700 transition-colors">
-                  Pay Now
+                <button
+                  onClick={async () => {
+                    try {
+                      setPaymentLoading(true);
+                      const response = await fetch("/api/payments/create-order", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          amount: booking.totalAmount,
+                          bookingId: booking.id,
+                          paymentType: "full",
+                        }),
+                      });
+
+                      if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || "Failed to create payment order");
+                      }
+
+                      const { orderId, keyId, amount, currency } = await response.json();
+                      const scriptLoaded = await loadRazorpayScript();
+                      if (!scriptLoaded || !window.Razorpay) {
+                        throw new Error("Failed to load Razorpay SDK.");
+                      }
+
+                      const options = {
+                        key: keyId,
+                        amount,
+                        currency,
+                        name: "Travunited",
+                        description: `${booking.tourName} - Tour Booking`,
+                        order_id: orderId,
+                        prefill: {
+                          name: session?.user?.name || "",
+                          email: session?.user?.email || "",
+                        },
+                        notes: {
+                          bookingId: booking.id,
+                        },
+                        handler: async (response: any) => {
+                          try {
+                            const verifyResponse = await fetch("/api/payments/verify", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                bookingId: booking.id,
+                              }),
+                            });
+
+                            if (verifyResponse.ok) {
+                              router.push(`/bookings/thank-you?bookingId=${booking.id}`);
+                            } else {
+                              const errorData = await verifyResponse.json();
+                              throw new Error(errorData.error || "Payment verification failed");
+                            }
+                          } catch (error: any) {
+                            console.error("Payment verification error:", error);
+                            alert(`Payment verification failed: ${error.message || "Please contact support"}`);
+                            setPaymentLoading(false);
+                          }
+                        },
+                        modal: {
+                          ondismiss: () => {
+                            setPaymentLoading(false);
+                          },
+                        },
+                      };
+
+                      const razorpay = new window.Razorpay(options);
+                      
+                      razorpay.on("payment.failed", (response: any) => {
+                        console.error("Payment failed:", response);
+                        setPaymentLoading(false);
+                        const errorMessage = response.error?.description || response.error?.reason || "Payment failed. Please try again.";
+                        alert(errorMessage);
+                      });
+
+                      razorpay.open();
+                    } catch (error: any) {
+                      console.error("Payment error:", error);
+                      alert(`Unable to process payment: ${error.message || "Please try again."}`);
+                      setPaymentLoading(false);
+                    }
+                  }}
+                  disabled={paymentLoading}
+                  className="bg-yellow-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {paymentLoading ? "Processing..." : "Pay Now"}
                 </button>
               </div>
             )}

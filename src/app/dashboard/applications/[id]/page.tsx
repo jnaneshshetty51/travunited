@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ArrowLeft, FileText, Upload, Download, CheckCircle, X, Clock, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatDate } from "@/lib/dateFormat";
+import { loadRazorpayScript } from "@/lib/razorpay-client";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -43,6 +44,7 @@ export default function ApplicationDetailPage() {
   const [application, setApplication] = useState<Application | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
 
   const fetchApplication = useCallback(async () => {
     try {
@@ -307,8 +309,96 @@ export default function ApplicationDetailPage() {
                 <p className="text-yellow-700 mb-4">
                   Your application is ready but payment is pending. Complete payment to proceed.
                 </p>
-                <button className="bg-yellow-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-yellow-700 transition-colors">
-                  Pay Now
+                <button
+                  onClick={async () => {
+                    try {
+                      setPaymentLoading(true);
+                      const response = await fetch("/api/payments/create-order", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          amount: application.totalAmount,
+                          applicationId: application.id,
+                        }),
+                      });
+
+                      if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || "Failed to create payment order");
+                      }
+
+                      const { orderId, keyId, amount, currency } = await response.json();
+                      const scriptLoaded = await loadRazorpayScript();
+                      if (!scriptLoaded || !window.Razorpay) {
+                        throw new Error("Failed to load Razorpay SDK.");
+                      }
+
+                      const options = {
+                        key: keyId,
+                        amount,
+                        currency,
+                        name: "Travunited",
+                        description: `${application.country} - ${application.visaType} - Visa Application`,
+                        order_id: orderId,
+                        prefill: {
+                          name: session?.user?.name || "",
+                          email: session?.user?.email || "",
+                        },
+                        notes: {
+                          applicationId: application.id,
+                        },
+                        handler: async (response: any) => {
+                          try {
+                            const verifyResponse = await fetch("/api/payments/verify", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                applicationId: application.id,
+                              }),
+                            });
+
+                            if (verifyResponse.ok) {
+                              router.push(`/applications/thank-you?applicationId=${application.id}`);
+                            } else {
+                              const errorData = await verifyResponse.json();
+                              throw new Error(errorData.error || "Payment verification failed");
+                            }
+                          } catch (error: any) {
+                            console.error("Payment verification error:", error);
+                            alert(`Payment verification failed: ${error.message || "Please contact support"}`);
+                            setPaymentLoading(false);
+                          }
+                        },
+                        modal: {
+                          ondismiss: () => {
+                            setPaymentLoading(false);
+                          },
+                        },
+                      };
+
+                      const razorpay = new window.Razorpay(options);
+                      
+                      razorpay.on("payment.failed", (response: any) => {
+                        console.error("Payment failed:", response);
+                        setPaymentLoading(false);
+                        const errorMessage = response.error?.description || response.error?.reason || "Payment failed. Please try again.";
+                        alert(errorMessage);
+                      });
+
+                      razorpay.open();
+                    } catch (error: any) {
+                      console.error("Payment error:", error);
+                      alert(`Unable to process payment: ${error.message || "Please try again."}`);
+                      setPaymentLoading(false);
+                    }
+                  }}
+                  disabled={paymentLoading}
+                  className="bg-yellow-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {paymentLoading ? "Processing..." : "Pay Now"}
                 </button>
               </div>
             )}

@@ -33,6 +33,12 @@ export async function GET(
           select: {
             name: true,
             email: true,
+            phone: true,
+          },
+        },
+        visa: {
+          include: {
+            country: true,
           },
         },
       },

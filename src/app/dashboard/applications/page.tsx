@@ -80,8 +80,8 @@ export default function ApplicationsPage() {
 
     if (app.status === "DRAFT") {
       actions.push({
-        label: "Continue Application",
-        href: `/apply/visa/${app.country}/${app.visaType}?edit=${app.id}`,
+        label: "Edit Application",
+        href: `/dashboard/applications/${app.id}/edit`,
         icon: ArrowLeft,
       });
     }
@@ -95,11 +95,19 @@ export default function ApplicationsPage() {
       });
     }
 
-    if (app.status === "SUBMITTED" || app.status === "IN_PROCESS") {
+    if (app.status === "SUBMITTED" || app.status === "IN_PROCESS" || app.status === "APPROVED") {
       actions.push({
         label: "View Details",
         href: `/dashboard/applications/${app.id}`,
         icon: Eye,
+      });
+      
+      // Add Invoice button for paid applications
+      actions.push({
+        label: "Invoice",
+        href: `/api/invoices/application/${app.id}`,
+        icon: FileText,
+        download: true,
       });
       
       const rejectedDocs = app.documents?.filter(d => d.status === "REJECTED");
@@ -263,6 +271,46 @@ export default function ApplicationsPage() {
                             {actions.map((action, index) => {
                               const Icon = action.icon;
                               const isExternal = action.href.startsWith("http");
+                              const isInvoice = (action as any).download;
+                              
+                              if (isInvoice) {
+                                return (
+                                  <button
+                                    key={index}
+                                    onClick={async () => {
+                                      try {
+                                        const response = await fetch(action.href);
+                                        if (!response.ok) {
+                                          throw new Error("Failed to download invoice");
+                                        }
+                                        const blob = await response.blob();
+                                        const url = window.URL.createObjectURL(blob);
+                                        const a = document.createElement("a");
+                                        a.href = url;
+                                        a.download = `invoice-application-${app.id}.pdf`;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        window.URL.revokeObjectURL(url);
+                                        document.body.removeChild(a);
+                                      } catch (error) {
+                                        console.error("Error downloading invoice:", error);
+                                        alert("Failed to download invoice. Please try again.");
+                                      }
+                                    }}
+                                    className={`inline-flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                                      action.variant === "primary"
+                                        ? "bg-primary-600 text-white hover:bg-primary-700"
+                                        : action.variant === "warning"
+                                        ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
+                                        : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                                    }`}
+                                  >
+                                    <Icon size={16} />
+                                    <span>{action.label}</span>
+                                  </button>
+                                );
+                              }
+                              
                               const Component = isExternal ? "a" : Link;
                               const props = isExternal
                                 ? { href: action.href, target: "_blank", rel: "noopener noreferrer" }

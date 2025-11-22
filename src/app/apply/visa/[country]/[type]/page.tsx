@@ -215,8 +215,74 @@ export default function VisaApplicationPage({ params }: { params: { country: str
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.country, params.type, router]);
 
+  // Load existing application data if editing
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    const applicationId = searchParams.get("applicationId");
+    
+    if (editId || applicationId) {
+      const appId = editId || applicationId;
+      fetch(`/api/applications/${appId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.id) {
+            // Load application data into form
+            setFormData(prev => ({
+              ...prev,
+              country: data.country || prev.country,
+              visaType: data.visaType || prev.visaType,
+              visaId: data.visa?.id || prev.visaId,
+              primaryContact: {
+                name: data.user?.name || prev.primaryContact?.name || "",
+                email: data.user?.email || prev.primaryContact?.email || "",
+                phone: data.user?.phone || prev.primaryContact?.phone || "",
+                address: prev.primaryContact?.address || "",
+              },
+              applicationId: data.id,
+            }));
+            
+            setDraftId(data.id);
+            
+            // Load travellers if available
+            if (data.travellers && data.travellers.length > 0) {
+              const travellersWithIds: FormDataTraveller[] = data.travellers.map((t: any, idx: number) => ({
+                id: t.traveller?.id || `traveller-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`,
+                firstName: t.traveller?.firstName || "",
+                lastName: t.traveller?.lastName || "",
+                dateOfBirth: t.traveller?.dateOfBirth ? new Date(t.traveller.dateOfBirth).toISOString().split('T')[0] : "",
+                gender: t.traveller?.gender || "",
+                passportNumber: t.traveller?.passportNumber || "",
+                passportIssueDate: t.traveller?.passportIssueDate ? new Date(t.traveller.passportIssueDate).toISOString().split('T')[0] : "",
+                passportExpiryDate: t.traveller?.passportExpiryDate ? new Date(t.traveller.passportExpiryDate).toISOString().split('T')[0] : "",
+                nationality: t.traveller?.nationality || "Indian",
+                currentCity: t.traveller?.currentCity || "",
+              }));
+              
+              setFormData(prev => ({
+                ...prev,
+                travellers: travellersWithIds,
+              }));
+              
+              setCreatedTravellerIds(travellersWithIds.map(t => t.id));
+            }
+          }
+        })
+        .catch(err => {
+          console.error("Error loading application:", err);
+        });
+    }
+  }, [searchParams]);
+
   // Load draft from localStorage on mount - only run once on mount or when params change
   useEffect(() => {
+    const editId = searchParams.get("edit");
+    const applicationId = searchParams.get("applicationId");
+    
+    // Skip localStorage if editing existing application
+    if (editId || applicationId) {
+      return;
+    }
+    
     const draft = getDraftFromLocalStorage();
     if (draft && (draft.country === params.country && draft.visaType === params.type)) {
       // Ensure travellers have IDs when loading from localStorage
