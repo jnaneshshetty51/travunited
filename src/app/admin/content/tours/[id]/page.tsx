@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, memo } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -14,6 +14,104 @@ import {
 } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { getMediaProxyUrl } from "@/lib/media";
+
+// Stable component for JSON array textareas to prevent re-render focus loss
+const JsonArrayTextarea = memo(({ value, onChange, rows, placeholder, className }: {
+  value: string;
+  onChange: (value: string) => void;
+  rows?: number;
+  placeholder?: string;
+  className?: string;
+}) => {
+  // Parse JSON value to display format once per value change
+  const displayValue = useMemo(() => {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.join("\n") : value;
+    } catch {
+      return value.replace(/[\[\]"]/g, "").replace(/,/g, "\n");
+    }
+  }, [value]);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const values = e.target.value.split("\n").map(v => v.trim()).filter(Boolean);
+    onChange(JSON.stringify(values));
+  }, [onChange]);
+
+  return (
+    <textarea
+      rows={rows || 6}
+      value={displayValue}
+      onChange={handleChange}
+      className={`mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 ${className || ""}`}
+      placeholder={placeholder}
+    />
+  );
+});
+JsonArrayTextarea.displayName = "JsonArrayTextarea";
+
+// Stable component for comma-separated inputs
+const CommaSeparatedInput = memo(({ value, onChange, placeholder }: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) => {
+  const displayValue = useMemo(() => {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.join(", ") : value;
+    } catch {
+      return value.replace(/[\[\]"]/g, "").replace(/,/g, ", ");
+    }
+  }, [value]);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const values = e.target.value.split(",").map(v => v.trim()).filter(Boolean);
+    onChange(JSON.stringify(values));
+  }, [onChange]);
+
+  return (
+    <input
+      type="text"
+      value={displayValue}
+      onChange={handleChange}
+      className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+      placeholder={placeholder}
+    />
+  );
+});
+CommaSeparatedInput.displayName = "CommaSeparatedInput";
+
+// Stable component for bestFor input
+const BestForInput = memo(({ value, onChange }: {
+  value: string;
+  onChange: (value: string) => void;
+}) => {
+  const displayValue = useMemo(() => {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.join(", ") : value;
+    } catch {
+      return value.replace(/[\[\]"]/g, "").replace(/,/g, ", ");
+    }
+  }, [value]);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const values = e.target.value.split(",").map(v => v.trim()).filter(Boolean);
+    onChange(JSON.stringify(values));
+  }, [onChange]);
+
+  return (
+    <input
+      type="text"
+      value={displayValue}
+      onChange={handleChange}
+      className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+      placeholder="Couples, Families, Solo Travelers"
+    />
+  );
+});
+BestForInput.displayName = "BestForInput";
 
 type CountryOption = { id: string; name: string };
 
@@ -417,9 +515,9 @@ export default function AdminTourEditorPage() {
     fetchTour();
   }, [session, status, router, fetchCountries, fetchTour]);
 
-  const updateForm = (key: keyof FormState, value: string | number | boolean | null) => {
+  const updateForm = useCallback((key: keyof FormState, value: string | number | boolean | null) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
-  };
+  }, []);
 
   const addDay = () => {
     setDays((prev) => [
@@ -924,22 +1022,9 @@ export default function AdminTourEditorPage() {
 
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Best For (comma-separated)</span>
-          <input
-            type="text"
-            value={(() => {
-              try {
-                const parsed = JSON.parse(formData.bestFor);
-                return Array.isArray(parsed) ? parsed.join(", ") : formData.bestFor;
-              } catch {
-                return formData.bestFor.replace(/[\[\]"]/g, "").replace(/,/g, ", ");
-              }
-            })()}
-            onChange={(e) => {
-              const values = e.target.value.split(",").map(v => v.trim()).filter(Boolean);
-              updateForm("bestFor", JSON.stringify(values));
-            }}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
-            placeholder="Couples, Families, Solo Travelers"
+          <BestForInput
+            value={formData.bestFor}
+            onChange={(value) => updateForm("bestFor", value)}
           />
         </label>
 
@@ -1053,63 +1138,27 @@ export default function AdminTourEditorPage() {
 
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Cities Covered (comma-separated)</span>
-          <input
-            type="text"
-            value={(() => {
-              try {
-                const parsed = JSON.parse(formData.citiesCovered);
-                return Array.isArray(parsed) ? parsed.join(", ") : formData.citiesCovered;
-              } catch {
-                return formData.citiesCovered.replace(/[\[\]"]/g, "").replace(/,/g, ", ");
-              }
-            })()}
-            onChange={(e) => {
-              const values = e.target.value.split(",").map(v => v.trim()).filter(Boolean);
-              updateForm("citiesCovered", JSON.stringify(values));
-            }}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+          <CommaSeparatedInput
+            value={formData.citiesCovered}
+            onChange={(value) => updateForm("citiesCovered", value)}
             placeholder="Dubai, Abu Dhabi, Sharjah"
           />
         </label>
 
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Region Tags (comma-separated)</span>
-          <input
-            type="text"
-            value={(() => {
-              try {
-                const parsed = JSON.parse(formData.regionTags);
-                return Array.isArray(parsed) ? parsed.join(", ") : formData.regionTags;
-              } catch {
-                return formData.regionTags.replace(/[\[\]"]/g, "").replace(/,/g, ", ");
-              }
-            })()}
-            onChange={(e) => {
-              const values = e.target.value.split(",").map(v => v.trim()).filter(Boolean);
-              updateForm("regionTags", JSON.stringify(values));
-            }}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+          <CommaSeparatedInput
+            value={formData.regionTags}
+            onChange={(value) => updateForm("regionTags", value)}
             placeholder="Beach, Hills, City"
           />
         </label>
 
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Themes (comma-separated)</span>
-          <input
-            type="text"
-            value={(() => {
-              try {
-                const parsed = JSON.parse(formData.themes);
-                return Array.isArray(parsed) ? parsed.join(", ") : formData.themes;
-              } catch {
-                return formData.themes.replace(/[\[\]"]/g, "").replace(/,/g, ", ");
-              }
-            })()}
-            onChange={(e) => {
-              const values = e.target.value.split(",").map(v => v.trim()).filter(Boolean);
-              updateForm("themes", JSON.stringify(values));
-            }}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+          <CommaSeparatedInput
+            value={formData.themes}
+            onChange={(value) => updateForm("themes", value)}
             placeholder="Honeymoon, Adventure, Beach, Culture"
           />
         </label>
@@ -1363,21 +1412,11 @@ export default function AdminTourEditorPage() {
 
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Available Dates (comma-separated or JSON array)</span>
-          <textarea
+          <JsonArrayTextarea
+            value={formData.availableDates}
+            onChange={(value) => updateForm("availableDates", value)}
             rows={4}
-            value={(() => {
-              try {
-                const parsed = JSON.parse(formData.availableDates);
-                return Array.isArray(parsed) ? parsed.join("\n") : formData.availableDates;
-              } catch {
-                return formData.availableDates.replace(/[\[\]"]/g, "").replace(/,/g, "\n");
-              }
-            })()}
-            onChange={(e) => {
-              const values = e.target.value.split("\n").map(v => v.trim()).filter(Boolean);
-              updateForm("availableDates", JSON.stringify(values));
-            }}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 font-mono text-sm"
+            className="font-mono text-sm"
             placeholder="2025-12-15&#10;2025-12-22&#10;2026-01-05"
           />
           <p className="text-xs text-neutral-500 mt-1">
@@ -1416,21 +1455,10 @@ export default function AdminTourEditorPage() {
 
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Highlights (one per line)</span>
-          <textarea
+          <JsonArrayTextarea
+            value={formData.highlights}
+            onChange={(value) => updateForm("highlights", value)}
             rows={6}
-            value={(() => {
-              try {
-                const parsed = JSON.parse(formData.highlights);
-                return Array.isArray(parsed) ? parsed.join("\n") : formData.highlights;
-              } catch {
-                return formData.highlights.replace(/[\[\]"]/g, "").replace(/,/g, "\n");
-              }
-            })()}
-            onChange={(e) => {
-              const values = e.target.value.split("\n").map(v => v.trim()).filter(Boolean);
-              updateForm("highlights", JSON.stringify(values));
-            }}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
             placeholder="Key highlights of the tour"
           />
         </label>
@@ -1438,61 +1466,27 @@ export default function AdminTourEditorPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Inclusions (one per line)</span>
-            <textarea
+            <JsonArrayTextarea
+              value={formData.inclusions}
+              onChange={(value) => updateForm("inclusions", value)}
               rows={6}
-              value={(() => {
-                try {
-                  const parsed = JSON.parse(formData.inclusions);
-                  return Array.isArray(parsed) ? parsed.join("\n") : formData.inclusions;
-                } catch {
-                  return formData.inclusions.replace(/[\[\]"]/g, "").replace(/,/g, "\n");
-                }
-              })()}
-              onChange={(e) => {
-                const values = e.target.value.split("\n").map(v => v.trim()).filter(Boolean);
-                updateForm("inclusions", JSON.stringify(values));
-              }}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
             />
           </label>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Exclusions (one per line)</span>
-            <textarea
+            <JsonArrayTextarea
+              value={formData.exclusions}
+              onChange={(value) => updateForm("exclusions", value)}
               rows={6}
-              value={(() => {
-                try {
-                  const parsed = JSON.parse(formData.exclusions);
-                  return Array.isArray(parsed) ? parsed.join("\n") : formData.exclusions;
-                } catch {
-                  return formData.exclusions.replace(/[\[\]"]/g, "").replace(/,/g, "\n");
-                }
-              })()}
-              onChange={(e) => {
-                const values = e.target.value.split("\n").map(v => v.trim()).filter(Boolean);
-                updateForm("exclusions", JSON.stringify(values));
-              }}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
             />
           </label>
         </div>
 
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Hotel Categories (comma-separated)</span>
-          <input
-            type="text"
-            value={(() => {
-              try {
-                const parsed = JSON.parse(formData.hotelCategories);
-                return Array.isArray(parsed) ? parsed.join(", ") : formData.hotelCategories;
-              } catch {
-                return formData.hotelCategories.replace(/[\[\]"]/g, "").replace(/,/g, ", ");
-              }
-            })()}
-            onChange={(e) => {
-              const values = e.target.value.split(",").map(v => v.trim()).filter(Boolean);
-              updateForm("hotelCategories", JSON.stringify(values));
-            }}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+          <CommaSeparatedInput
+            value={formData.hotelCategories}
+            onChange={(value) => updateForm("hotelCategories", value)}
             placeholder="3-star, 4-star, 5-star"
           />
         </label>

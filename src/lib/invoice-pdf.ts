@@ -43,9 +43,12 @@ export interface InvoiceData {
 
 export function generateInvoicePDF(data: InvoiceData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
+    // Use PDFDocument with built-in fonts - no need to load external font files
+    // PDFKit comes with Helvetica, Helvetica-Bold, Helvetica-Oblique built-in
     const doc = new PDFDocument({ 
       margin: 50,
       size: "A4",
+      // Don't specify font files - use built-in fonts only
     });
     const buffers: Buffer[] = [];
 

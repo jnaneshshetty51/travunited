@@ -13,52 +13,27 @@ const verifyEmailSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { token } = verifyEmailSchema.parse(body);
-
-    // If token provided, verify it (for email link verification)
-    if (token) {
-      // Look for token with "verify_" prefix
-      const prefixedToken = `verify_${token}`;
-      
-      const user = await prisma.user.findFirst({
-        where: {
-          passwordResetToken: prefixedToken,
-        },
-      });
-
-      if (!user || !user.passwordResetExpires) {
-        return NextResponse.json(
-          { error: "Invalid or expired verification token" },
-          { status: 400 }
-        );
+    // Try to parse JSON body, but handle empty body gracefully
+    let body: any = {};
+    let token: string | undefined;
+    
+    try {
+      const contentType = req.headers.get("content-type");
+      if (contentType?.includes("application/json")) {
+        body = await req.json();
+        token = body?.token;
       }
-
-      // Check if token has expired
-      if (new Date() > user.passwordResetExpires) {
-        return NextResponse.json(
-          { error: "Verification token has expired. Please request a new one." },
-          { status: 400 }
-        );
-      }
-
-      // Mark email as verified and clear token
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          emailVerified: true,
-          emailVerifiedAt: new Date(),
-          passwordResetToken: null,
-          passwordResetExpires: null,
-        },
-      });
-
-      return NextResponse.json({
-        message: "Email verified successfully",
-      });
+    } catch (parseError) {
+      // If JSON parsing fails (empty body), that's okay - we'll handle GET instead
+      console.log("No JSON body in POST request, token should be in query params");
     }
 
-    // If no token, require session (for manual verification from settings)
+    // If token provided in body, verify it (for API calls)
+    if (token) {
+      return await verifyToken(token);
+    }
+
+    // If no token in body, require session (for manual verification from settings)
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.id) {
@@ -96,8 +71,63 @@ export async function POST(req: Request) {
   }
 }
 
+async function verifyToken(token: string) {
+  // Look for token - use passwordResetToken field for email verification tokens
+  // Tokens are stored with "verify_" prefix for email verification
+  let prefixedToken = token.startsWith("verify_") ? token : `verify_${token}`;
+  
+  const user = await prisma.user.findFirst({
+    where: {
+      passwordResetToken: prefixedToken,
+      passwordResetExpires: {
+        gt: new Date(),
+      },
+    },
+  });
+
+  if (!user || !user.passwordResetExpires) {
+    return NextResponse.json(
+      { error: "Invalid or expired verification token" },
+      { status: 400 }
+    );
+  }
+
+  // Check if token has expired (additional check)
+  if (new Date() > user.passwordResetExpires) {
+    return NextResponse.json(
+      { error: "Verification token has expired. Please request a new one." },
+      { status: 400 }
+    );
+  }
+
+  // Mark email as verified and clear token
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+      passwordResetToken: null,
+      passwordResetExpires: null,
+    },
+  });
+
+  return NextResponse.json({
+    message: "Email verified successfully",
+  });
+}
+
 export async function GET(req: Request) {
   try {
+    // Check if token is in query params (from email verification link)
+    const { searchParams } = new URL(req.url);
+    const token = searchParams.get("token");
+
+    if (token) {
+      // Verify token from email link
+      return await verifyToken(token);
+    }
+
+    // If no token, check verification status (requires session)
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.id) {
