@@ -1,53 +1,147 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Search, Plane, MapPin, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+interface Country {
+  id: string;
+  name: string;
+  code: string;
+  flagUrl?: string | null;
+}
+
+interface VisaType {
+  id: string;
+  name: string;
+  slug: string;
+  subtitle?: string | null;
+  category: string;
+  country: {
+    id: string;
+    name: string;
+    code: string;
+  };
+}
 
 export function Hero() {
+  const router = useRouter();
   const [mode, setMode] = useState<"visa" | "tour">("visa");
   const [selectedCountry, setSelectedCountry] = useState("");
   const [selectedVisaType, setSelectedVisaType] = useState("");
   const [tourDestination, setTourDestination] = useState("");
   const [tourDate, setTourDate] = useState("");
+  
+  // Backend data
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [visaTypes, setVisaTypes] = useState<VisaType[]>([]);
+  const [tourDestinations, setTourDestinations] = useState<string[]>([]);
+  const [destinationSuggestions, setDestinationSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const countries = [
-    "UAE", "Schengen", "USA", "UK", "Singapore", "Thailand", "Malaysia", "Australia"
-  ];
+  // Fetch countries on mount
+  useEffect(() => {
+    const fetchCountries = async () => {
+      try {
+        const response = await fetch("/api/search/countries");
+        if (response.ok) {
+          const data = await response.json();
+          setCountries(data);
+        }
+      } catch (error) {
+        console.error("Error fetching countries:", error);
+      }
+    };
+    fetchCountries();
+  }, []);
 
-  const visaTypes: Record<string, string[]> = {
-    "UAE": ["Tourist Visa", "Business Visa", "Transit Visa"],
-    "Schengen": ["Tourist Visa", "Business Visa"],
-    "USA": ["Tourist Visa (B2)", "Business Visa (B1)"],
-    "UK": ["Tourist Visa", "Business Visa"],
-    "Singapore": ["Tourist Visa", "Business Visa"],
-    "Thailand": ["Tourist Visa", "Business Visa"],
-    "Malaysia": ["Tourist Visa", "Business Visa"],
-    "Australia": ["Tourist Visa", "Business Visa"],
+  // Fetch visa types when country is selected
+  useEffect(() => {
+    if (selectedCountry && mode === "visa") {
+      const fetchVisaTypes = async () => {
+        try {
+          // selectedCountry is the country ID, find the country to get code/name
+          const country = countries.find((c) => c.id === selectedCountry);
+          const countryParam = country?.code || country?.name || selectedCountry;
+          const response = await fetch(`/api/search/visa-types?country=${encodeURIComponent(countryParam)}`);
+          if (response.ok) {
+            const data = await response.json();
+            setVisaTypes(data);
+          }
+        } catch (error) {
+          console.error("Error fetching visa types:", error);
+        }
+      };
+      fetchVisaTypes();
+    } else {
+      setVisaTypes([]);
+    }
+  }, [selectedCountry, mode, countries]);
+
+  // Fetch destination suggestions for autocomplete
+  const fetchDestinationSuggestions = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setDestinationSuggestions([]);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/search/tour-destinations?q=${encodeURIComponent(query)}`);
+      if (response.ok) {
+        const data = await response.json();
+        setDestinationSuggestions(data);
+        setShowSuggestions(true);
+      }
+    } catch (error) {
+      console.error("Error fetching destination suggestions:", error);
+    }
+  }, []);
+
+  // Handle destination input change
+  const handleDestinationChange = (value: string) => {
+    setTourDestination(value);
+    fetchDestinationSuggestions(value);
   };
 
-  const availableVisaTypes = selectedCountry ? (visaTypes[selectedCountry] || []) : [];
+  // Handle suggestion selection
+  const handleSuggestionSelect = (suggestion: string) => {
+    setTourDestination(suggestion);
+    setShowSuggestions(false);
+    setDestinationSuggestions([]);
+  };
 
   const handleSearch = () => {
     if (mode === "visa") {
       if (selectedCountry && selectedVisaType && selectedVisaType !== "not-sure") {
-        // Exact match - navigate directly to visa detail page
-        const countrySlug = selectedCountry.toLowerCase();
-        const visaSlug = selectedVisaType.toLowerCase().replace(/\s+/g, "-").replace(/[()]/g, "");
-        window.location.href = `/visas/${countrySlug}/${visaSlug}`;
+        // Find the selected visa to get its slug
+        const visa = visaTypes.find((v) => v.id === selectedVisaType);
+        if (visa) {
+          // Use the actual slug from database
+          const countryCode = visa.country.code.toLowerCase();
+          router.push(`/visas/${countryCode}/${visa.slug}`);
+        } else {
+          // Fallback: navigate to country visas page
+          const country = countries.find((c) => c.id === selectedCountry || c.code.toLowerCase() === selectedCountry.toLowerCase() || c.name.toLowerCase() === selectedCountry.toLowerCase());
+          if (country) {
+            router.push(`/visas/${country.code.toLowerCase()}`);
+          }
+        }
       } else if (selectedCountry) {
         // Show visa types for country
-        window.location.href = `/visas/${selectedCountry.toLowerCase()}`;
+        const country = countries.find((c) => c.id === selectedCountry || c.code.toLowerCase() === selectedCountry.toLowerCase() || c.name.toLowerCase() === selectedCountry.toLowerCase());
+        if (country) {
+          router.push(`/visas/${country.code.toLowerCase()}`);
+        }
       }
     } else if (mode === "tour") {
       if (tourDestination) {
-        // Try to find exact match first, otherwise show search results
-        const destinationSlug = tourDestination.toLowerCase().replace(/\s+/g, "-");
         // Navigate to tours with search query
         const params = new URLSearchParams({ destination: tourDestination });
         if (tourDate) params.append("date", tourDate);
-        window.location.href = `/tours?${params.toString()}`;
+        router.push(`/tours?${params.toString()}`);
       }
     }
   };
@@ -96,7 +190,11 @@ export function Hero() {
           <div className="flex items-center justify-center mb-6">
             <div className="bg-neutral-100 rounded-lg p-1 flex flex-col gap-2 w-full max-w-md sm:inline-flex sm:flex-row sm:w-auto">
               <button
-                onClick={() => setMode("visa")}
+                onClick={() => {
+                  setMode("visa");
+                  setTourDestination("");
+                  setSelectedVisaType("");
+                }}
                 className={`px-4 py-2 rounded-md font-medium text-sm sm:text-base transition-all w-full sm:w-auto ${
                   mode === "visa"
                     ? "bg-white text-primary-600 shadow-soft"
@@ -107,7 +205,11 @@ export function Hero() {
                 Visa Services
               </button>
               <button
-                onClick={() => setMode("tour")}
+                onClick={() => {
+                  setMode("tour");
+                  setSelectedCountry("");
+                  setSelectedVisaType("");
+                }}
                 className={`px-4 py-2 rounded-md font-medium text-sm sm:text-base transition-all w-full sm:w-auto ${
                   mode === "tour"
                     ? "bg-white text-primary-600 shadow-soft"
@@ -137,8 +239,8 @@ export function Hero() {
                 >
                   <option value="">Choose a country</option>
                   {countries.map((country) => (
-                    <option key={country} value={country}>
-                      {country}
+                    <option key={country.id} value={country.id}>
+                      {country.name}
                     </option>
                   ))}
                 </select>
@@ -150,14 +252,14 @@ export function Hero() {
                 <select
                   value={selectedVisaType}
                   onChange={(e) => setSelectedVisaType(e.target.value)}
-                  disabled={!selectedCountry}
+                  disabled={!selectedCountry || visaTypes.length === 0}
                   className="w-full px-4 py-3 rounded-lg border border-neutral-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">Select visa type</option>
                   <option value="not-sure">Not sure - Show all types</option>
-                  {availableVisaTypes.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
+                  {visaTypes.map((visa) => (
+                    <option key={visa.id} value={visa.id}>
+                      {visa.name}
                     </option>
                   ))}
                 </select>
@@ -175,17 +277,40 @@ export function Hero() {
             </div>
           ) : (
             <div className="grid md:grid-cols-3 gap-4">
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-neutral-700 mb-2">
                   Destination or Tour Name
                 </label>
                 <input
                   type="text"
                   value={tourDestination}
-                  onChange={(e) => setTourDestination(e.target.value)}
+                  onChange={(e) => handleDestinationChange(e.target.value)}
+                  onFocus={() => {
+                    if (destinationSuggestions.length > 0) {
+                      setShowSuggestions(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    // Delay to allow click on suggestion
+                    setTimeout(() => setShowSuggestions(false), 200);
+                  }}
                   placeholder="e.g., Dubai, Singapore, Europe"
                   className="w-full px-4 py-3 rounded-lg border border-neutral-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
+                {showSuggestions && destinationSuggestions.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-neutral-300 rounded-lg shadow-lg max-h-60 overflow-auto">
+                    {destinationSuggestions.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => handleSuggestionSelect(suggestion)}
+                        className="w-full text-left px-4 py-2 hover:bg-neutral-100 transition-colors"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-2">
@@ -237,4 +362,3 @@ export function Hero() {
     </div>
   );
 }
-

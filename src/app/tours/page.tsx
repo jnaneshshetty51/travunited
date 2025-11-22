@@ -5,12 +5,29 @@ import ToursGridClient from "./ToursGridClient";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function ToursPage() {
+export default async function ToursPage({
+  searchParams,
+}: {
+  searchParams: { destination?: string; date?: string };
+}) {
+  const where: any = {
+    isActive: true,
+    status: "active",
+  };
+
+  // Filter by destination if provided
+  if (searchParams?.destination) {
+    const destination = searchParams.destination;
+    where.OR = [
+      { destinationCountry: { contains: destination, mode: "insensitive" } },
+      { destinationState: { contains: destination, mode: "insensitive" } },
+      { primaryDestination: { contains: destination, mode: "insensitive" } },
+      { name: { contains: destination, mode: "insensitive" } },
+    ];
+  }
+
   const tours = await prisma.tour.findMany({
-    where: { 
-      isActive: true,
-      status: "active",
-    },
+    where,
     orderBy: { createdAt: "desc" },
     include: {
       country: true,

@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
@@ -62,8 +63,18 @@ interface Props {
 }
 
 export default function ToursGridClient({ tours, countries, regions, tourTypes, themes }: Props) {
-  const [searchQuery, setSearchQuery] = useState("");
+  const searchParams = useSearchParams();
+  const destinationParam = searchParams?.get("destination") || "";
+  
+  const [searchQuery, setSearchQuery] = useState(destinationParam);
   const [selectedCountry, setSelectedCountry] = useState<string>("all");
+  
+  // Initialize search query from URL params
+  useEffect(() => {
+    if (destinationParam) {
+      setSearchQuery(destinationParam);
+    }
+  }, [destinationParam]);
   const [selectedRegion, setSelectedRegion] = useState<string>("all");
   const [selectedTourType, setSelectedTourType] = useState<string>("all");
   const [selectedThemes, setSelectedThemes] = useState<string[]>([]);
