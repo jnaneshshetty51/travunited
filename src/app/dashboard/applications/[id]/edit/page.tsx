@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -13,13 +13,7 @@ export default function EditApplicationPage() {
   const [loading, setLoading] = useState(true);
   const [application, setApplication] = useState<any>(null);
 
-  useEffect(() => {
-    if (session) {
-      fetchApplication();
-    }
-  }, [session]);
-
-  const fetchApplication = async () => {
+  const fetchApplication = useCallback(async () => {
     try {
       const response = await fetch(`/api/applications/${params.id}`);
       if (response.ok) {
@@ -44,7 +38,13 @@ export default function EditApplicationPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id, router]);
+
+  useEffect(() => {
+    if (session) {
+      fetchApplication();
+    }
+  }, [session, fetchApplication]);
 
   if (loading) {
     return (

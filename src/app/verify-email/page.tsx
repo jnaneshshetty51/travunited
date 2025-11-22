@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { CheckCircle, AlertCircle, ArrowRight, Mail } from "lucide-react";
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get("token");
@@ -15,15 +15,7 @@ export default function VerifyEmailPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (token) {
-      verifyEmail();
-    } else {
-      setError("Invalid verification link. No token provided.");
-    }
-  }, [token]);
-
-  const verifyEmail = async () => {
+  const verifyEmail = useCallback(async () => {
     if (!token) return;
     
     setLoading(true);
@@ -51,7 +43,15 @@ export default function VerifyEmailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token, router]);
+
+  useEffect(() => {
+    if (token) {
+      verifyEmail();
+    } else {
+      setError("Invalid verification link. No token provided.");
+    }
+  }, [token, verifyEmail]);
 
   if (loading) {
     return (
@@ -128,3 +128,21 @@ export default function VerifyEmailPage() {
   );
 }
 
+function VerifyEmailLoading() {
+  return (
+    <div className="min-h-screen bg-neutral-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-large p-8 text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+        <p className="text-neutral-600">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<VerifyEmailLoading />}>
+      <VerifyEmailContent />
+    </Suspense>
+  );
+}
