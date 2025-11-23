@@ -14,6 +14,14 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: "Travunited - Visas & Holidays, Seamlessly Managed",
   description: "Premium visa services and tour packages for Indian travellers. Trusted by thousands for seamless travel experiences.",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/favicon.svg", sizes: "180x180", type: "image/svg+xml" },
+    ],
+  },
 };
 
 export default function RootLayout({

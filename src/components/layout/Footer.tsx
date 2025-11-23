@@ -32,7 +32,11 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           {/* Brand */}
           <div className="lg:col-span-2">
-            <div className="text-2xl font-bold text-white mb-4">Travunited</div>
+            <img 
+              src="/logo.svg" 
+              alt="Travunited Logo" 
+              className="h-10 w-auto mb-4"
+            />
             <p className="text-neutral-400 mb-4 max-w-md">
               Premium visa services and tour packages for Indian travellers. 
               Trusted by thousands for seamless travel experiences.
