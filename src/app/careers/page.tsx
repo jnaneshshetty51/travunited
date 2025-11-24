@@ -1,8 +1,38 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Briefcase, MapPin, Clock } from "lucide-react";
+import { ArrowLeft, Briefcase, MapPin, Clock, X, Upload, FileText, CheckCircle, AlertCircle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+
+interface Position {
+  title: string;
+  location: string;
+  type: string;
+  department: string;
+}
 
 export default function CareersPage() {
-  const openPositions = [
+  const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    location: "",
+    positionTitle: "",
+    experience: "",
+    currentCompany: "",
+    expectedCtc: "",
+    coverNote: "",
+    resume: null as File | null,
+  });
+
+  const openPositions: Position[] = [
     {
       title: "Visa Consultant",
       location: "Udupi, Karnataka / Remote",
@@ -22,6 +52,117 @@ export default function CareersPage() {
       department: "Marketing",
     },
   ];
+
+  const handleApplyClick = (position: Position) => {
+    setSelectedPosition(position);
+    setFormData((prev) => ({ ...prev, positionTitle: position.title }));
+    setShowForm(true);
+    setSubmitSuccess(false);
+    setErrors({});
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = "Full name is required";
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = "Invalid email address";
+    }
+
+    if (!formData.phone.trim()) {
+      newErrors.phone = "Phone number is required";
+    }
+
+    if (!formData.positionTitle) {
+      newErrors.positionTitle = "Position is required";
+    }
+
+    if (!formData.resume) {
+      newErrors.resume = "Resume is required";
+    } else {
+      const allowedTypes = [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ];
+      if (!allowedTypes.includes(formData.resume.type)) {
+        newErrors.resume = "Resume must be PDF, DOC, or DOCX";
+      }
+      if (formData.resume.size > 5 * 1024 * 1024) {
+        newErrors.resume = "Resume file size must be less than 5MB";
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setSubmitting(true);
+    setErrors({});
+
+    try {
+      const submitFormData = new FormData();
+      submitFormData.append("name", formData.name);
+      submitFormData.append("email", formData.email);
+      submitFormData.append("phone", formData.phone);
+      submitFormData.append("location", formData.location);
+      submitFormData.append("positionTitle", formData.positionTitle);
+      submitFormData.append("experience", formData.experience);
+      submitFormData.append("currentCompany", formData.currentCompany);
+      submitFormData.append("expectedCtc", formData.expectedCtc);
+      submitFormData.append("coverNote", formData.coverNote);
+      if (formData.resume) {
+        submitFormData.append("resume", formData.resume);
+      }
+
+      const response = await fetch("/api/careers/apply", {
+        method: "POST",
+        body: submitFormData,
+      });
+
+      if (response.ok) {
+        setSubmitSuccess(true);
+        // Reset form
+        setFormData({
+          name: "",
+          email: "",
+          phone: "",
+          location: "",
+          positionTitle: "",
+          experience: "",
+          currentCompany: "",
+          expectedCtc: "",
+          coverNote: "",
+          resume: null,
+        });
+        // Close form after 3 seconds
+        setTimeout(() => {
+          setShowForm(false);
+          setSubmitSuccess(false);
+        }, 3000);
+      } else {
+        const errorData = await response.json();
+        setErrors({ submit: errorData.error || "Failed to submit application. Please try again." });
+      }
+    } catch (error) {
+      console.error("Error submitting application:", error);
+      setErrors({ submit: "Unable to upload resume right now. Please try again in a few minutes." });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -103,12 +244,12 @@ export default function CareersPage() {
                         </div>
                       </div>
                     </div>
-                    <Link
-                      href={`/contact?subject=Application for ${position.title}`}
+                    <button
+                      onClick={() => handleApplyClick(position)}
                       className="bg-primary-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors whitespace-nowrap"
                     >
                       Apply Now
-                    </Link>
+                    </button>
                   </div>
                 </div>
               ))}
@@ -153,15 +294,288 @@ export default function CareersPage() {
             We&apos;re always looking for talented individuals to join our team. Send us your resume and 
             we&apos;ll keep you in mind for future opportunities.
           </p>
-          <Link
-            href="/contact?subject=General Career Inquiry"
+          <button
+            onClick={() => handleApplyClick({ title: "General Application", location: "", type: "", department: "" })}
             className="inline-block bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors"
           >
             Send Your Resume
-          </Link>
+          </button>
         </section>
       </div>
+
+      {/* Application Form Modal */}
+      <AnimatePresence>
+        {showForm && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex min-h-screen items-center justify-center p-4">
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => !submitting && setShowForm(false)}
+                className="fixed inset-0 bg-black/50"
+              />
+
+              {/* Modal */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              >
+                <div className="sticky top-0 bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
+                  <h2 className="text-2xl font-bold text-neutral-900">
+                    Apply for {selectedPosition?.title || "Position"}
+                  </h2>
+                  <button
+                    onClick={() => !submitting && setShowForm(false)}
+                    disabled={submitting}
+                    className="text-neutral-400 hover:text-neutral-600 disabled:opacity-50"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                  {submitSuccess ? (
+                    <div className="text-center py-8">
+                      <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+                        <CheckCircle size={32} className="text-green-600" />
+                      </div>
+                      <h3 className="text-xl font-semibold text-neutral-900 mb-2">Application Submitted!</h3>
+                      <p className="text-neutral-600">
+                        Thank you! Your application has been submitted. Our team will get back to you if shortlisted.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Basic Details */}
+                      <div>
+                        <h3 className="text-lg font-semibold text-neutral-900 mb-4">Basic Details</h3>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
+                              Full Name <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.name}
+                              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                                errors.name ? "border-red-300" : "border-neutral-300"
+                              }`}
+                              required
+                            />
+                            {errors.name && <p className="text-red-600 text-sm mt-1">{errors.name}</p>}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
+                              Email <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="email"
+                              value={formData.email}
+                              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                                errors.email ? "border-red-300" : "border-neutral-300"
+                              }`}
+                              required
+                            />
+                            {errors.email && <p className="text-red-600 text-sm mt-1">{errors.email}</p>}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
+                              Phone Number <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="tel"
+                              value={formData.phone}
+                              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                                errors.phone ? "border-red-300" : "border-neutral-300"
+                              }`}
+                              required
+                            />
+                            {errors.phone && <p className="text-red-600 text-sm mt-1">{errors.phone}</p>}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
+                              Location / City
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.location}
+                              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Job Details */}
+                      <div>
+                        <h3 className="text-lg font-semibold text-neutral-900 mb-4">Job Details</h3>
+                        <div className="grid md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
+                              Position Applying For <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              value={formData.positionTitle}
+                              onChange={(e) => setFormData({ ...formData, positionTitle: e.target.value })}
+                              className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                                errors.positionTitle ? "border-red-300" : "border-neutral-300"
+                              }`}
+                              required
+                            >
+                              <option value="">Select Position</option>
+                              {openPositions.map((pos, idx) => (
+                                <option key={idx} value={pos.title}>
+                                  {pos.title}
+                                </option>
+                              ))}
+                              <option value="General Application">General Application</option>
+                            </select>
+                            {errors.positionTitle && (
+                              <p className="text-red-600 text-sm mt-1">{errors.positionTitle}</p>
+                            )}
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
+                              Experience (Years)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={formData.experience}
+                              onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                              placeholder="e.g., 3"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
+                              Current Company
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.currentCompany}
+                              onChange={(e) => setFormData({ ...formData, currentCompany: e.target.value })}
+                              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
+                              Expected CTC
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.expectedCtc}
+                              onChange={(e) => setFormData({ ...formData, expectedCtc: e.target.value })}
+                              className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                              placeholder="e.g., ₹5,00,000"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Resume Upload */}
+                      <div>
+                        <h3 className="text-lg font-semibold text-neutral-900 mb-4">Resume Upload</h3>
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 mb-2">
+                            Upload Resume (PDF/DOC/DOCX, max 5 MB) <span className="text-red-500">*</span>
+                          </label>
+                          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-neutral-50 transition-colors border-neutral-300">
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                              <Upload className="w-10 h-10 mb-3 text-neutral-400" />
+                              <p className="mb-2 text-sm text-neutral-500">
+                                <span className="font-semibold">Click to upload</span> or drag and drop
+                              </p>
+                              <p className="text-xs text-neutral-500">PDF, DOC, DOCX (MAX. 5MB)</p>
+                            </div>
+                            <input
+                              type="file"
+                              accept=".pdf,.doc,.docx"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  setFormData({ ...formData, resume: file });
+                                  setErrors({ ...errors, resume: "" });
+                                }
+                              }}
+                              className="hidden"
+                              required
+                            />
+                          </label>
+                          {formData.resume && (
+                            <div className="mt-2 flex items-center space-x-2 text-sm text-neutral-600">
+                              <FileText size={16} />
+                              <span>{formData.resume.name}</span>
+                              <span className="text-neutral-400">
+                                ({(formData.resume.size / 1024 / 1024).toFixed(2)} MB)
+                              </span>
+                            </div>
+                          )}
+                          {errors.resume && <p className="text-red-600 text-sm mt-1">{errors.resume}</p>}
+                        </div>
+                      </div>
+
+                      {/* Cover Note */}
+                      <div>
+                        <label className="block text-sm font-medium text-neutral-700 mb-2">
+                          Cover Note / Why should we hire you?
+                        </label>
+                        <textarea
+                          value={formData.coverNote}
+                          onChange={(e) => setFormData({ ...formData, coverNote: e.target.value })}
+                          rows={4}
+                          className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          placeholder="Tell us why you're a great fit for this position..."
+                        />
+                      </div>
+
+                      {/* Error Message */}
+                      {errors.submit && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-2">
+                          <AlertCircle className="text-red-600 mt-0.5" size={20} />
+                          <p className="text-red-800 text-sm">{errors.submit}</p>
+                        </div>
+                      )}
+
+                      {/* Submit Button */}
+                      <div className="flex space-x-3">
+                        <button
+                          type="submit"
+                          disabled={submitting}
+                          className="flex-1 bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {submitting ? "Submitting..." : "Submit Application"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowForm(false)}
+                          disabled={submitting}
+                          className="px-6 py-3 border border-neutral-300 rounded-lg font-medium text-neutral-700 hover:bg-neutral-50 transition-colors disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </form>
+              </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
-

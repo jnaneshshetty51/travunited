@@ -25,6 +25,7 @@ import {
   DollarSign,
   Clock,
   TrendingUp,
+  Briefcase,
 } from "lucide-react";
 
 const BASE_MENU_ITEMS = [
@@ -56,6 +57,12 @@ const BASE_MENU_ITEMS = [
     label: "Customers",
     href: "/admin/customers",
     icon: Users,
+    roles: ["STAFF_ADMIN", "SUPER_ADMIN"],
+  },
+  {
+    label: "Careers",
+    href: "/admin/careers",
+    icon: Briefcase,
     roles: ["STAFF_ADMIN", "SUPER_ADMIN"],
   },
 ];

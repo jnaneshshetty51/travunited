@@ -496,3 +496,33 @@ model UserNotificationSettings {
   // FK to User intentionally removed for now - will be re-added when User model is finalized
   // user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+enum CareerApplicationStatus {
+  NEW
+  REVIEWED
+  SHORTLISTED
+  REJECTED
+  ON_HOLD
+}
+
+model CareerApplication {
+  id            String                  @id @default(cuid())
+  name          String
+  email         String
+  phone         String
+  location      String?
+  positionTitle String // Position they're applying for
+  experience    Int? // Years of experience
+  currentCompany String?
+  expectedCtc   String? // Expected CTC
+  coverNote     String? // Cover letter/notes
+  resumeUrl     String // MinIO/S3 URL to resume file
+  status        CareerApplicationStatus @default(NEW)
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  @@index([status])
+  @@index([positionTitle])
+  @@index([email])
+  @@index([createdAt])
+}
