@@ -4,50 +4,45 @@ import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Download, Mail, Phone, MapPin, Briefcase, Calendar, FileText, CheckCircle, X, Clock, AlertCircle, Save } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Building2, Calendar, User, Save } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { formatDate } from "@/lib/dateFormat";
 
-interface CareerApplication {
+interface CorporateLead {
   id: string;
-  name: string;
+  companyName: string;
+  contactName: string;
   email: string;
-  phone: string;
-  location: string | null;
-  positionTitle: string;
-  experience: number | null;
-  currentCompany: string | null;
-  expectedCtc: string | null;
-  coverNote: string | null;
-  resumeUrl: string;
+  phone: string | null;
+  message: string | null;
   status: string;
   internalNotes: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-export default function AdminCareerApplicationDetailPage() {
+export default function AdminCorporateLeadDetailPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
-  const [application, setApplication] = useState<CareerApplication | null>(null);
+  const [lead, setLead] = useState<CorporateLead | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState("");
   const [internalNotes, setInternalNotes] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
 
-  const fetchApplication = useCallback(async () => {
+  const fetchLead = useCallback(async () => {
     try {
-      const response = await fetch(`/api/admin/careers/${params.id}`);
+      const response = await fetch(`/api/admin/corporate-leads/${params.id}`);
       if (response.ok) {
         const data = await response.json();
-        setApplication(data);
+        setLead(data);
         setSelectedStatus(data.status);
         setInternalNotes(data.internalNotes || "");
       }
     } catch (error) {
-      console.error("Error fetching career application:", error);
+      console.error("Error fetching corporate lead:", error);
     } finally {
       setLoading(false);
     }
@@ -61,24 +56,24 @@ export default function AdminCareerApplicationDetailPage() {
       if (!isAdmin) {
         router.push("/dashboard");
       } else {
-        fetchApplication();
+        fetchLead();
       }
     }
-  }, [session, status, router, fetchApplication]);
+  }, [session, status, router, fetchLead]);
 
   const handleStatusChange = async () => {
-    if (!application) return;
+    if (!lead) return;
 
     setUpdating(true);
     try {
-      const response = await fetch(`/api/admin/careers/${params.id}`, {
+      const response = await fetch(`/api/admin/corporate-leads/${params.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: selectedStatus }),
       });
 
       if (response.ok) {
-        await fetchApplication();
+        await fetchLead();
         alert("Status updated successfully");
       } else {
         alert("Failed to update status");
@@ -91,18 +86,18 @@ export default function AdminCareerApplicationDetailPage() {
   };
 
   const handleSaveNotes = async () => {
-    if (!application) return;
+    if (!lead) return;
 
     setSavingNotes(true);
     try {
-      const response = await fetch(`/api/admin/careers/${params.id}`, {
+      const response = await fetch(`/api/admin/corporate-leads/${params.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ internalNotes }),
       });
 
       if (response.ok) {
-        await fetchApplication();
+        await fetchLead();
         alert("Notes saved successfully");
       } else {
         alert("Failed to save notes");
@@ -117,10 +112,10 @@ export default function AdminCareerApplicationDetailPage() {
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       NEW: "bg-blue-100 text-blue-700",
-      REVIEWED: "bg-yellow-100 text-yellow-700",
-      SHORTLISTED: "bg-green-100 text-green-700",
-      REJECTED: "bg-red-100 text-red-700",
-      ON_HOLD: "bg-neutral-100 text-neutral-700",
+      CONTACTED: "bg-yellow-100 text-yellow-700",
+      PROPOSAL_SENT: "bg-purple-100 text-purple-700",
+      WON: "bg-green-100 text-green-700",
+      LOST: "bg-red-100 text-red-700",
     };
     return colors[status] || "bg-neutral-100 text-neutral-700";
   };
@@ -135,20 +130,18 @@ export default function AdminCareerApplicationDetailPage() {
     );
   }
 
-  if (!application) {
+  if (!lead) {
     return (
       <AdminLayout>
         <div className="text-center py-12">
-          <h1 className="text-2xl font-bold text-neutral-900 mb-4">Application Not Found</h1>
-          <Link href="/admin/careers" className="text-primary-600 hover:text-primary-700">
-            ← Back to Career Applications
+          <h1 className="text-2xl font-bold text-neutral-900 mb-4">Corporate Lead Not Found</h1>
+          <Link href="/admin/corporate-leads" className="text-primary-600 hover:text-primary-700">
+            ← Back to Corporate Requirements
           </Link>
         </div>
       </AdminLayout>
     );
   }
-
-  const resumeDownloadUrl = `/api/files?key=${encodeURIComponent(application.resumeUrl)}`;
 
   return (
     <AdminLayout>
@@ -156,114 +149,75 @@ export default function AdminCareerApplicationDetailPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Link
-              href="/admin/careers"
+              href="/admin/corporate-leads"
               className="text-neutral-600 hover:text-neutral-900"
             >
               <ArrowLeft size={20} />
             </Link>
             <div>
-              <h1 className="text-3xl font-bold text-neutral-900">{application.name}</h1>
-              <p className="text-neutral-600 mt-1">Application ID: {application.id.slice(0, 8)}...</p>
+              <h1 className="text-3xl font-bold text-neutral-900">{lead.companyName}</h1>
+              <p className="text-neutral-600 mt-1">Lead ID: {lead.id.slice(0, 8)}...</p>
             </div>
           </div>
-          <span className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(application.status)}`}>
-            {application.status.replace("_", " ")}
+          <span className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(lead.status)}`}>
+            {lead.status.replace("_", " ")}
           </span>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Basic Information */}
+            {/* Company Information */}
             <div className="bg-white rounded-2xl shadow-medium p-6 border border-neutral-200">
-              <h2 className="text-xl font-bold text-neutral-900 mb-4">Basic Information</h2>
+              <h2 className="text-xl font-bold text-neutral-900 mb-4">Company Information</h2>
               <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <div className="flex items-center space-x-2 text-sm text-neutral-600 mb-1">
+                    <Building2 size={16} />
+                    <span>Company Name</span>
+                  </div>
+                  <div className="font-medium text-neutral-900">{lead.companyName}</div>
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2 text-sm text-neutral-600 mb-1">
+                    <User size={16} />
+                    <span>Contact Name</span>
+                  </div>
+                  <div className="font-medium text-neutral-900">{lead.contactName}</div>
+                </div>
                 <div>
                   <div className="flex items-center space-x-2 text-sm text-neutral-600 mb-1">
                     <Mail size={16} />
                     <span>Email</span>
                   </div>
-                  <div className="font-medium text-neutral-900">{application.email}</div>
+                  <div className="font-medium text-neutral-900">{lead.email}</div>
                 </div>
-                <div>
-                  <div className="flex items-center space-x-2 text-sm text-neutral-600 mb-1">
-                    <Phone size={16} />
-                    <span>Phone</span>
-                  </div>
-                  <div className="font-medium text-neutral-900">{application.phone}</div>
-                </div>
-                {application.location && (
+                {lead.phone && (
                   <div>
                     <div className="flex items-center space-x-2 text-sm text-neutral-600 mb-1">
-                      <MapPin size={16} />
-                      <span>Location</span>
+                      <Phone size={16} />
+                      <span>Phone</span>
                     </div>
-                    <div className="font-medium text-neutral-900">{application.location}</div>
+                    <div className="font-medium text-neutral-900">{lead.phone}</div>
                   </div>
                 )}
                 <div>
                   <div className="flex items-center space-x-2 text-sm text-neutral-600 mb-1">
                     <Calendar size={16} />
-                    <span>Applied On</span>
+                    <span>Submitted On</span>
                   </div>
-                  <div className="font-medium text-neutral-900">{formatDate(application.createdAt)}</div>
+                  <div className="font-medium text-neutral-900">{formatDate(lead.createdAt)}</div>
                 </div>
               </div>
             </div>
 
-            {/* Job Details */}
-            <div className="bg-white rounded-2xl shadow-medium p-6 border border-neutral-200">
-              <h2 className="text-xl font-bold text-neutral-900 mb-4">Job Details</h2>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center space-x-2 text-sm text-neutral-600 mb-1">
-                    <Briefcase size={16} />
-                    <span>Position</span>
-                  </div>
-                  <div className="font-medium text-neutral-900">{application.positionTitle}</div>
-                </div>
-                {application.experience !== null && (
-                  <div>
-                    <div className="text-sm text-neutral-600 mb-1">Experience</div>
-                    <div className="font-medium text-neutral-900">{application.experience} years</div>
-                  </div>
-                )}
-                {application.currentCompany && (
-                  <div>
-                    <div className="text-sm text-neutral-600 mb-1">Current Company</div>
-                    <div className="font-medium text-neutral-900">{application.currentCompany}</div>
-                  </div>
-                )}
-                {application.expectedCtc && (
-                  <div>
-                    <div className="text-sm text-neutral-600 mb-1">Expected CTC</div>
-                    <div className="font-medium text-neutral-900">{application.expectedCtc}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Cover Note */}
-            {application.coverNote && (
+            {/* Message */}
+            {lead.message && (
               <div className="bg-white rounded-2xl shadow-medium p-6 border border-neutral-200">
-                <h2 className="text-xl font-bold text-neutral-900 mb-4">Cover Note</h2>
-                <p className="text-neutral-700 whitespace-pre-wrap">{application.coverNote}</p>
+                <h2 className="text-xl font-bold text-neutral-900 mb-4">Message</h2>
+                <p className="text-neutral-700 whitespace-pre-wrap">{lead.message}</p>
               </div>
             )}
-
-            {/* Resume */}
-            <div className="bg-white rounded-2xl shadow-medium p-6 border border-neutral-200">
-              <h2 className="text-xl font-bold text-neutral-900 mb-4">Resume</h2>
-              <a
-                href={resumeDownloadUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center space-x-2 bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors"
-              >
-                <Download size={20} />
-                <span>Download Resume</span>
-              </a>
-            </div>
           </div>
 
           {/* Sidebar */}
@@ -278,14 +232,14 @@ export default function AdminCareerApplicationDetailPage() {
                   className="w-full px-4 py-2 border border-neutral-300 rounded-lg text-sm"
                 >
                   <option value="NEW">New</option>
-                  <option value="REVIEWED">Reviewed</option>
-                  <option value="SHORTLISTED">Shortlisted</option>
-                  <option value="REJECTED">Rejected</option>
-                  <option value="ON_HOLD">On Hold</option>
+                  <option value="CONTACTED">Contacted</option>
+                  <option value="PROPOSAL_SENT">Proposal Sent</option>
+                  <option value="WON">Won</option>
+                  <option value="LOST">Lost</option>
                 </select>
                 <button
                   onClick={handleStatusChange}
-                  disabled={updating || selectedStatus === application.status}
+                  disabled={updating || selectedStatus === lead.status}
                   className="w-full bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {updating ? "Updating..." : "Update Status"}
@@ -302,7 +256,7 @@ export default function AdminCareerApplicationDetailPage() {
                   onChange={(e) => setInternalNotes(e.target.value)}
                   rows={8}
                   className="w-full px-4 py-2 border border-neutral-300 rounded-lg text-sm"
-                  placeholder="Add internal notes about this application..."
+                  placeholder="Add internal notes about this lead..."
                 />
                 <button
                   onClick={handleSaveNotes}

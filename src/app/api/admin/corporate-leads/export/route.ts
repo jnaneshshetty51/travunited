@@ -49,9 +49,40 @@ export async function GET(req: Request) {
       },
     });
 
-    return NextResponse.json(leads);
+    // Generate CSV
+    const headers = [
+      "Lead ID",
+      "Company Name",
+      "Contact Name",
+      "Email",
+      "Phone",
+      "Status",
+      "Submitted Date",
+    ];
+
+    const rows = leads.map((lead) => [
+      lead.id,
+      lead.companyName,
+      lead.contactName,
+      lead.email,
+      lead.phone || "",
+      lead.status,
+      new Date(lead.createdAt).toISOString().split("T")[0],
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")),
+    ].join("\n");
+
+    return new NextResponse(csvContent, {
+      headers: {
+        "Content-Type": "text/csv",
+        "Content-Disposition": `attachment; filename="corporate-requirements-${new Date().toISOString().split("T")[0]}.csv"`,
+      },
+    });
   } catch (error) {
-    console.error("Error fetching corporate leads:", error);
+    console.error("Error exporting corporate leads:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -98,6 +98,37 @@ function AdminCareersPageContent() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-neutral-900">Career Applications</h1>
+          <button
+            onClick={async () => {
+              try {
+                const params = new URLSearchParams();
+                if (statusFilter !== "ALL") params.append("status", statusFilter);
+                if (positionFilter) params.append("position", positionFilter);
+                if (searchQuery) params.append("search", searchQuery);
+
+                const response = await fetch(`/api/admin/careers/export?${params.toString()}`);
+                if (response.ok) {
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `career-applications-${new Date().toISOString().split("T")[0]}.csv`;
+                  document.body.appendChild(a);
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                  document.body.removeChild(a);
+                } else {
+                  alert("Failed to export applications");
+                }
+              } catch (error) {
+                alert("An error occurred while exporting");
+              }
+            }}
+            className="inline-flex items-center space-x-2 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors"
+          >
+            <Download size={18} />
+            <span>Export CSV</span>
+          </button>
         </div>
 
         {/* Filters */}

@@ -26,20 +26,20 @@ export async function GET(
       );
     }
 
-    const application = await prisma.careerApplication.findUnique({
+    const lead = await prisma.corporateLead.findUnique({
       where: { id: params.id },
     });
 
-    if (!application) {
+    if (!lead) {
       return NextResponse.json(
-        { error: "Application not found" },
+        { error: "Corporate lead not found" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(application);
+    return NextResponse.json(lead);
   } catch (error) {
-    console.error("Error fetching career application:", error);
+    console.error("Error fetching corporate lead:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -75,7 +75,7 @@ export async function PUT(
     const updateData: any = {};
     
     if (status !== undefined) {
-      const validStatuses = ["NEW", "REVIEWED", "SHORTLISTED", "REJECTED", "ON_HOLD"];
+      const validStatuses = ["NEW", "CONTACTED", "PROPOSAL_SENT", "WON", "LOST"];
       if (!validStatuses.includes(status)) {
         return NextResponse.json(
           { error: "Invalid status" },
@@ -96,14 +96,14 @@ export async function PUT(
       );
     }
 
-    const application = await prisma.careerApplication.update({
+    const lead = await prisma.corporateLead.update({
       where: { id: params.id },
       data: updateData,
     });
 
-    return NextResponse.json(application);
+    return NextResponse.json(lead);
   } catch (error) {
-    console.error("Error updating career application:", error);
+    console.error("Error updating corporate lead:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
