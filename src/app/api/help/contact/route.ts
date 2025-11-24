@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { sendUserEmail } from "@/lib/email";
+import { prisma } from "@/lib/prisma";
+import { sendEmail } from "@/lib/email";
 export const dynamic = "force-dynamic";
-
 
 const contactSchema = z.object({
   email: z.string().email(),
-  subject: z.string().min(3),
-  message: z.string().min(10),
+  subject: z.string().min(1),
+  message: z.string().min(1),
 });
 
 export async function POST(req: Request) {
@@ -15,10 +15,27 @@ export async function POST(req: Request) {
     const body = await req.json();
     const data = contactSchema.parse(body);
 
+    // Validate required fields
+    if (!data.email || !data.subject || !data.message) {
+      return NextResponse.json(
+        { success: false, error: "Email, subject, and message are required" },
+        { status: 400 }
+      );
+    }
+
+    // Save to database
+    await prisma.contactMessage.create({
+      data: {
+        email: data.email,
+        subject: data.subject,
+        message: data.message,
+      },
+    });
+
     // Send email notification to admin inbox
     const adminEmailHtml = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1>New Contact Form Submission</h1>
+        <h1>New Help/Support Message</h1>
         <p><strong>From:</strong> ${data.email}</p>
         <p><strong>Subject:</strong> ${data.subject}</p>
         <p><strong>Message:</strong></p>
@@ -29,48 +46,24 @@ export async function POST(req: Request) {
       </div>
     `;
 
-    await sendUserEmail({
-      to: "dummy@example.com", // Will be overridden by forceAdmin
-      forceAdmin: true, // Route to info@travunited.com
-      subject: `Contact Form: ${data.subject}`,
+    await sendEmail({
+      to: "info@travunited.com",
+      subject: `New Help/Support Message: ${data.subject}`,
       html: adminEmailHtml,
     });
 
-    // Send confirmation email to customer
-    const customerEmailHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1>Thank You for Contacting Us</h1>
-        <p>We've received your message and will get back to you soon.</p>
-        <p><strong>Your message:</strong></p>
-        <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0;">
-          ${data.message.replace(/\n/g, "<br>")}
-        </div>
-        <p>Best regards,<br>The Travunited Team</p>
-      </div>
-    `;
-
-    await sendUserEmail({
-      to: data.email,
-      role: "CUSTOMER", // Customer emails go to their own inbox
-      subject: "We've received your message",
-      html: customerEmailHtml,
-    });
-
-    return NextResponse.json(
-      { message: "Message sent successfully" },
-      { status: 200 }
-    );
+    return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Invalid input", details: error.errors },
+        { success: false, error: "Invalid input. Please check your email, subject, and message." },
         { status: 400 }
       );
     }
 
     console.error("Error submitting contact form:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }

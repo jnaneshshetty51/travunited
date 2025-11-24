@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { HelpCircle, Mail, Phone, MessageCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { HelpCircle, Mail, Phone, MessageCircle, ChevronDown, ChevronUp, CheckCircle, AlertCircle } from "lucide-react";
 
 const faqCategories = {
   visas: [
@@ -78,6 +78,9 @@ const faqCategories = {
 export default function HelpPage() {
   const [activeCategory, setActiveCategory] = useState<keyof typeof faqCategories>("visas");
   const [openFaqs, setOpenFaqs] = useState<Record<string, boolean>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const toggleFaq = (category: string, index: number) => {
     const key = `${category}-${index}`;
@@ -216,29 +219,45 @@ export default function HelpPage() {
                 Can&rsquo;t find what you&rsquo;re looking for? Send us a message and we&rsquo;ll get back to you as soon as possible.
               </p>
               <form
-                action="/api/help/contact"
-                method="POST"
                 className="space-y-4"
                 onSubmit={async (e) => {
                   e.preventDefault();
+                  setSubmitError("");
+                  setSubmitting(true);
+                  
                   const formData = new FormData(e.currentTarget);
-                  const data = Object.fromEntries(formData);
+                  const email = formData.get("email") as string;
+                  const subject = formData.get("subject") as string;
+                  const message = formData.get("message") as string;
                   
                   try {
                     const response = await fetch("/api/help/contact", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(data),
+                      body: JSON.stringify({
+                        email,
+                        subject,
+                        message,
+                      }),
                     });
                     
-                    if (response.ok) {
-                      alert("Message sent successfully! We'll get back to you soon.");
+                    const result = await response.json();
+                    
+                    if (response.ok && result.success) {
+                      setSubmitSuccess(true);
                       e.currentTarget.reset();
+                      // Hide success message after 5 seconds
+                      setTimeout(() => {
+                        setSubmitSuccess(false);
+                      }, 5000);
                     } else {
-                      alert("Failed to send message. Please try again.");
+                      setSubmitError(result.error || "Failed to send message. Please try again.");
                     }
                   } catch (error) {
-                    alert("An error occurred. Please contact us directly at info@travunited.com");
+                    console.error("Error submitting form:", error);
+                    setSubmitError("Unable to send message right now. Please try again in a few minutes.");
+                  } finally {
+                    setSubmitting(false);
                   }
                 }}
               >
@@ -278,11 +297,29 @@ export default function HelpPage() {
                     placeholder="Tell us more about your question..."
                   />
                 </div>
+                {submitSuccess && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start space-x-2">
+                    <CheckCircle className="text-green-600 mt-0.5" size={20} />
+                    <div>
+                      <p className="text-green-800 font-medium">Thank you! Your message has been sent.</p>
+                      <p className="text-green-700 text-sm mt-1">We&rsquo;ll get back to you soon.</p>
+                    </div>
+                  </div>
+                )}
+
+                {submitError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-2">
+                    <AlertCircle className="text-red-600 mt-0.5" size={20} />
+                    <p className="text-red-800 text-sm">{submitError}</p>
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  className="bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors"
+                  disabled={submitting}
+                  className="bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Send Message
+                  {submitting ? "Sending..." : "Send Message"}
                 </button>
               </form>
             </div>
