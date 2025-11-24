@@ -254,15 +254,34 @@ export default function AdminCareerApplicationDetailPage() {
             {/* Resume */}
             <div className="bg-white rounded-2xl shadow-medium p-6 border border-neutral-200">
               <h2 className="text-xl font-bold text-neutral-900 mb-4">Resume</h2>
-              <a
-                href={resumeDownloadUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center space-x-2 bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors"
-              >
-                <Download size={20} />
-                <span>Download Resume</span>
-              </a>
+              {application.resumeUrl ? (
+                <a
+                  href={resumeDownloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center space-x-2 bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors"
+                  onClick={async (e) => {
+                    // Check if file exists before navigating
+                    try {
+                      const response = await fetch(resumeDownloadUrl, { method: "HEAD" });
+                      if (!response.ok) {
+                        e.preventDefault();
+                        alert("Resume file not available. The file may have been deleted or moved.");
+                      }
+                    } catch (error) {
+                      e.preventDefault();
+                      alert("Unable to access resume file. Please contact support if this issue persists.");
+                    }
+                  }}
+                >
+                  <Download size={20} />
+                  <span>Download Resume</span>
+                </a>
+              ) : (
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">Resume not available for this application.</p>
+                </div>
+              )}
             </div>
           </div>
 

@@ -37,7 +37,11 @@ export default function EditApplicationPage() {
         }
         
         // Redirect to application form with edit mode
-        if (data.country && data.visaType) {
+        // Check if visa data is available
+        if (data.visa?.country?.code && data.visa?.slug) {
+          router.push(`/apply/visa/${data.visa.country.code.toLowerCase()}/${data.visa.slug}?edit=${params.id}&applicationId=${params.id}`);
+        } else if (data.country && data.visaType) {
+          // Fallback to old format if visa relation is not loaded
           router.push(`/apply/visa/${data.country}/${data.visaType}?edit=${params.id}&applicationId=${params.id}`);
         } else {
           setError("Unable to load application data. Please try again.");

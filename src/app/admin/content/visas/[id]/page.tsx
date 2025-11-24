@@ -328,6 +328,9 @@ const handleFaqChange = (
         ...formData,
         sampleVisaImageUrl: formData.sampleVisaImageUrl ? formData.sampleVisaImageUrl : null,
         priceInInr: Number(formData.priceInInr),
+        // Ensure SEO fields are always included, even if empty
+        metaTitle: formData.metaTitle?.trim() || null,
+        metaDescription: formData.metaDescription?.trim() || null,
         requirements: requirements.map((req, index) => ({
           name: req.name,
           scope: req.scope,

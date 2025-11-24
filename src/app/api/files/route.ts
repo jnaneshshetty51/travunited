@@ -64,11 +64,35 @@ export async function GET(req: Request) {
       }
     }
 
+    // Check for career application resume
     if (!ownerId) {
-      return NextResponse.json(
-        { error: "File not found" },
-        { status: 404 }
-      );
+      const careerApp = await prisma.careerApplication.findFirst({
+        where: { resumeUrl: key },
+        select: { id: true, resumeUrl: true },
+      });
+
+      if (careerApp) {
+        // Career resumes are accessible to admins only
+        if (!isAdmin) {
+          return NextResponse.json(
+            { error: "Forbidden" },
+            { status: 403 }
+          );
+        }
+        // Admin can access, continue to generate signed URL
+        // Check if resumeUrl is valid
+        if (!careerApp.resumeUrl || careerApp.resumeUrl.trim() === "") {
+          return NextResponse.json(
+            { error: "Resume not available" },
+            { status: 404 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { error: "File not found" },
+          { status: 404 }
+        );
+      }
     }
 
     if (!isAdmin && ownerId !== session.user.id) {
@@ -78,8 +102,29 @@ export async function GET(req: Request) {
       );
     }
 
-    const signedUrl = await getSignedDocumentUrl(key, 60);
-    return NextResponse.redirect(signedUrl);
+    try {
+      const signedUrl = await getSignedDocumentUrl(key, 60);
+      return NextResponse.redirect(signedUrl);
+    } catch (error) {
+      console.error("Error generating signed URL for file:", key, error);
+      // Check if it's a career application and provide a better error message
+      const careerApp = await prisma.careerApplication.findFirst({
+        where: { resumeUrl: key },
+        select: { id: true },
+      });
+      
+      if (careerApp) {
+        return NextResponse.json(
+          { error: "Resume file not available. The file may have been deleted or moved." },
+          { status: 404 }
+        );
+      }
+      
+      return NextResponse.json(
+        { error: "File not found or unavailable" },
+        { status: 404 }
+      );
+    }
   } catch (error) {
     console.error("Error generating signed URL:", error);
     return NextResponse.json(
