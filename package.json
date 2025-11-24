@@ -13,6 +13,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.654.0",
     "@aws-sdk/s3-request-presigner": "^3.654.0",
+    "@e965/xlsx": "^0.20.3",
     "@prisma/client": "^6.19.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tiptap/extension-image": "^3.10.7",
@@ -23,6 +24,7 @@
     "@tiptap/starter-kit": "^3.10.7",
     "@types/papaparse": "^5.5.0",
     "@types/pdfkit": "^0.17.3",
+    "autoprefixer": "^10.4.19",
     "bcryptjs": "^2.4.3",
     "date-fns": "^3.6.0",
     "framer-motion": "^11.3.19",
@@ -31,15 +33,13 @@
     "next-auth": "^4.24.13",
     "papaparse": "^5.5.3",
     "pdfkit": "^0.17.2",
+    "postcss": "^8.4.40",
     "razorpay": "^2.9.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "resend": "^2.0.0",
-    "@e965/xlsx": "^0.20.3",
-    "zod": "^3.23.8",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.40",
-    "tailwindcss": "^3.4.7"
+    "tailwindcss": "^3.4.7",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@prisma/config": "^6.19.0",
@@ -47,7 +47,7 @@
     "@types/node": "^20.14.12",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "eslint": "^8.57.0",
+    "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.5",
     "prisma": "^6.19.0",
     "typescript": "^5.5.4"
