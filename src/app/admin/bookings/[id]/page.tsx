@@ -684,8 +684,8 @@ export default function AdminBookingDetailPage() {
                     const profile = t.traveller;
                     const displayFirstName = t.firstName || profile.firstName;
                     const displayLastName = t.lastName || profile.lastName;
-                    const passportNumber = t.passportNumber || profile.passportNumber;
-                    const passportExpiry = t.passportExpiry || profile.passportExpiry;
+                    const passportNumber = t.passportNumber || null;
+                    const passportExpiry = t.passportExpiry || null;
                     return (
                       <div key={profile.id} className="border border-neutral-200 rounded-lg p-4">
                         <h3 className="font-semibold mb-3">
