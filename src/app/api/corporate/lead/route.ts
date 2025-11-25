@@ -4,6 +4,10 @@ import { AuditAction, AuditEntityType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { logAuditEvent } from "@/lib/audit";
 import { notify, notifyMultiple } from "@/lib/notifications";
+import {
+  sendCorporateLeadAdminEmail,
+  sendCorporateLeadConfirmationEmail,
+} from "@/lib/email";
 export const dynamic = "force-dynamic";
 
 
@@ -70,9 +74,36 @@ export async function POST(req: Request) {
             contactName: lead.contactName,
             email: lead.email,
           },
-          sendEmail: true,
+          sendEmail: false, // We'll send email separately via Resend
         }
       );
+    }
+
+    // Send admin email notification to info@travunited.com
+    try {
+      await sendCorporateLeadAdminEmail({
+        companyName: lead.companyName,
+        contactName: lead.contactName,
+        email: lead.email,
+        phone: lead.phone,
+        message: lead.message,
+        createdAt: lead.createdAt,
+      });
+    } catch (emailError) {
+      console.error("Error sending admin email for corporate lead:", emailError);
+      // Don't fail the request if email fails - lead is already saved
+    }
+
+    // Send confirmation email to user
+    try {
+      await sendCorporateLeadConfirmationEmail(
+        lead.email,
+        lead.companyName,
+        lead.contactName
+      );
+    } catch (emailError) {
+      console.error("Error sending confirmation email for corporate lead:", emailError);
+      // Don't fail the request if email fails - lead is already saved
     }
 
     return NextResponse.json(

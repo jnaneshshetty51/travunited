@@ -64,12 +64,18 @@ export async function POST(req: Request) {
     if (bookingId) {
       const booking = await prisma.booking.findUnique({
         where: { id: bookingId },
-        select: { userId: true },
+        select: { userId: true, policyAccepted: true, policyAcceptedAt: true },
       });
       if (!booking || booking.userId !== session.user.id) {
         return NextResponse.json(
           { error: "Booking not found" },
           { status: 404 }
+        );
+      }
+      if (!booking.policyAccepted) {
+        return NextResponse.json(
+          { error: "Refund & cancellation policy must be accepted before payment." },
+          { status: 400 }
         );
       }
     }

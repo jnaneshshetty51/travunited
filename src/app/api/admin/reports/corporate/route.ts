@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
     const status = searchParams.get("status");
+    const search = searchParams.get("q") || searchParams.get("search"); // Support both 'q' and 'search'
     const format = searchParams.get("format");
 
     // Build filters
@@ -46,8 +47,18 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    if (status && status !== "all") {
+    if (status && status !== "all" && status !== "ALL") {
       where.status = status;
+    }
+
+    // Search filter - search across company name, contact name, email, phone
+    if (search) {
+      where.OR = [
+        { companyName: { contains: search, mode: "insensitive" } },
+        { contactName: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { phone: { contains: search, mode: "insensitive" } },
+      ];
     }
 
     // Get corporate leads

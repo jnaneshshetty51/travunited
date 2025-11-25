@@ -233,7 +233,9 @@ export default function HelpPage() {
                   try {
                     const response = await fetch("/api/help/contact", {
                       method: "POST",
-                      headers: { "Content-Type": "application/json" },
+                      headers: { 
+                        "Content-Type": "application/json",
+                      },
                       body: JSON.stringify({
                         email,
                         subject,
@@ -243,19 +245,26 @@ export default function HelpPage() {
                     
                     const result = await response.json();
                     
-                    if (response.ok && result.success) {
+                    if (response.ok && result.ok) {
                       setSubmitSuccess(true);
+                      setSubmitError("");
                       e.currentTarget.reset();
                       // Hide success message after 5 seconds
                       setTimeout(() => {
                         setSubmitSuccess(false);
                       }, 5000);
                     } else {
+                      // Display the backend error message
                       setSubmitError(result.error || "Failed to send message. Please try again.");
                     }
                   } catch (error) {
                     console.error("Error submitting form:", error);
-                    setSubmitError("Unable to send message right now. Please try again in a few minutes.");
+                    // Show specific error if available
+                    if (error instanceof Error) {
+                      setSubmitError(error.message || "Unable to send message right now. Please try again in a few minutes.");
+                    } else {
+                      setSubmitError("Unable to send message right now. Please try again in a few minutes.");
+                    }
                   } finally {
                     setSubmitting(false);
                   }

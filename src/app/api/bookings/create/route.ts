@@ -5,33 +5,57 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 export const dynamic = "force-dynamic";
 
-
+const travellerSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  age: z.string().optional().nullable(),
+  dateOfBirth: z.string().optional().nullable(),
+  gender: z.string().nullable().optional(),
+  nationality: z.string().nullable().optional(),
+  passportNumber: z.string().nullable().optional(),
+  passportExpiry: z.string().nullable().optional(),
+  passportIssuingCountry: z.string().nullable().optional(),
+  passportFileKey: z.string().nullable().optional(),
+  passportFileName: z.string().nullable().optional(),
+});
 
 const bookingSchema = z.object({
   tourId: z.string(),
   tourName: z.string(),
-  tourPrice: z.number(),
-  advancePercentage: z.number().nullable().optional(), // Accept null, undefined, or number
   travelDate: z.string(),
   numberOfAdults: z.number().int().min(1, "At least one adult is required"),
-  numberOfChildren: z.number().int().min(0).nullable().optional(), // Accept null or number
+  numberOfChildren: z.number().int().min(0).nullable().optional(),
+  paymentType: z.enum(["full", "advance"]),
+  tourPrice: z.number().nonnegative(),
+  advancePercentage: z.number().nullable().optional(),
   primaryContact: z.object({
     name: z.string().min(1, "Primary contact name is required"),
     email: z.string().email("Invalid email address"),
-    phone: z.string().nullable().optional(), // Accept null, undefined, or string
+    phone: z.string().nullable().optional(),
   }),
-  travellers: z.array(
+  travellers: z.array(travellerSchema).min(1, "At least one traveller is required"),
+  selectedAddOns: z.array(
     z.object({
-      firstName: z.string().min(1, "First name is required"),
-      lastName: z.string().min(1, "Last name is required"),
-      age: z.string().min(1, "Age is required"),
-      gender: z.string().nullable().optional(), // Accept null, undefined, or string
+      addOnId: z.string(),
+      quantity: z.number().int().min(1).optional(),
     })
-  ).min(1, "At least one traveller is required"),
-  paymentType: z.enum(["full", "advance"]),
-  customizations: z.record(z.boolean()).nullable().optional(), // Accept null or object
-  hotelCategory: z.string().nullable().optional(), // Accept null, undefined, or string
+  ).optional(),
+  preferences: z.object({
+    foodPreference: z.string().max(100).nullable().optional(),
+    foodPreferenceNotes: z.string().max(500).nullable().optional(),
+    languagePreference: z.string().max(100).nullable().optional(),
+    languagePreferenceOther: z.string().max(100).nullable().optional(),
+    driverPreference: z.string().max(200).nullable().optional(),
+    specialRequests: z.string().max(1000).nullable().optional(),
+  }).optional(),
+  policyAccepted: z.boolean(),
+  policyVersion: z.string().nullable().optional(),
+  customizations: z.record(z.boolean()).nullable().optional(),
+  hotelCategory: z.string().nullable().optional(),
 });
+
+const startOfDayUTC = (value: Date) =>
+  new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
 
 export async function POST(req: Request) {
   try {
@@ -48,6 +72,8 @@ export async function POST(req: Request) {
       paymentType: body.paymentType,
       hasCustomizations: !!body.customizations,
       hasHotelCategory: !!body.hotelCategory,
+      addOnsCount: body.selectedAddOns?.length ?? 0,
+      policyAccepted: body.policyAccepted,
     });
 
     // Validate request body with detailed error messages
@@ -88,15 +114,22 @@ export async function POST(req: Request) {
       throw validationError;
     }
 
+    if (!data.policyAccepted) {
+      return NextResponse.json(
+        { error: "You must accept the refund & cancellation policy before continuing." },
+        { status: 400 }
+      );
+    }
+
     const tourRecord = await prisma.tour.findFirst({
       where: {
         OR: [{ id: data.tourId }, { slug: data.tourId }],
       },
-      select: {
-        id: true,
-        name: true,
-        price: true,
-        advancePercentage: true,
+      include: {
+        addOns: {
+          where: { isActive: true },
+          orderBy: { sortOrder: "asc" },
+        },
       },
     });
 
@@ -119,21 +152,10 @@ export async function POST(req: Request) {
 
     const userId = session.user.id;
 
-    // Use the provided tourPrice (which already includes customizations)
-    // If not provided or invalid, calculate from base price
     const totalTravellers = data.numberOfAdults + (data.numberOfChildren || 0);
-    let totalAmount = 0;
-    
-    if (typeof data.tourPrice === "number" && data.tourPrice > 0) {
-      // Use the final amount from frontend (includes customizations)
-      totalAmount = data.tourPrice;
-    } else {
-      // Fallback: calculate from base price
-      const basePrice = tourRecord.price || 0;
-      totalAmount = basePrice * totalTravellers;
-    }
+    const baseUnitPrice = tourRecord.basePriceInInr ?? tourRecord.price ?? 0;
+    let baseAmount = baseUnitPrice * totalTravellers;
 
-    // Ensure we have at least one traveller
     if (totalTravellers < 1) {
       return NextResponse.json(
         { error: "At least one traveller is required" },
@@ -141,7 +163,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validate travellers array matches count
     if (data.travellers.length !== totalTravellers) {
       return NextResponse.json(
         { error: "Number of travellers does not match traveller details provided" },
@@ -149,10 +170,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validate travel date is not in past
-    const travelDate = new Date(data.travelDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const travelDate = startOfDayUTC(new Date(data.travelDate));
+    const today = startOfDayUTC(new Date());
     if (travelDate < today) {
       return NextResponse.json(
         { error: "Travel date cannot be in the past" },
@@ -160,62 +179,309 @@ export async function POST(req: Request) {
       );
     }
 
-    // Create booking
-    const booking = await prisma.booking.create({
-      data: {
-        userId,
-        tourId: tourRecord.id,
-        tourName: data.tourName || tourRecord.name,
-        status: "DRAFT",
-        totalAmount: Math.round(totalAmount), // Store full amount (will be updated after payment)
-        currency: "INR",
-        travelDate: travelDate,
-      },
-    });
+    const requiresPassport =
+      tourRecord.requiresPassport ||
+      (tourRecord.tourType?.toLowerCase() === "international");
 
-    // Create travellers (simplified - no passport details for tours)
-    for (const travellerData of data.travellers) {
-      // Validate required fields
-      if (!travellerData.firstName || !travellerData.lastName || !travellerData.age) {
-        return NextResponse.json(
-          { error: "All traveller details (first name, last name, age) are required" },
-          { status: 400 }
-        );
+    const travellerValidationErrors: Array<{ field: string; message: string }> = [];
+
+    data.travellers.forEach((traveller, index) => {
+      if (!traveller.firstName || !traveller.lastName) {
+        travellerValidationErrors.push({
+          field: `travellers[${index}].name`,
+          message: `Traveller ${index + 1}: First and last name are required.`,
+        });
       }
 
-      // For tours, we can create simple traveller records or store in booking directly
-      // For now, we'll create a basic traveller record
-      let traveller = await prisma.traveller.findFirst({
-        where: {
+      if (!traveller.dateOfBirth) {
+        travellerValidationErrors.push({
+          field: `travellers[${index}].dateOfBirth`,
+          message: `Traveller ${index + 1}: Date of birth is required.`,
+        });
+      } else {
+        const dob = startOfDayUTC(new Date(traveller.dateOfBirth));
+        if (dob >= today) {
+          travellerValidationErrors.push({
+            field: `travellers[${index}].dateOfBirth`,
+            message: `Traveller ${index + 1}: Date of birth must be in the past.`,
+          });
+        }
+      }
+
+      if (requiresPassport) {
+        const passportNumberMissing = !traveller.passportNumber;
+        const passportExpiryMissing = !traveller.passportExpiry;
+        const passportCountryMissing = !traveller.passportIssuingCountry;
+
+        if (passportNumberMissing) {
+          travellerValidationErrors.push({
+            field: `travellers[${index}].passportNumber`,
+            message: `Traveller ${index + 1}: Passport number is required.`,
+          });
+        }
+
+        if (passportCountryMissing) {
+          travellerValidationErrors.push({
+            field: `travellers[${index}].passportIssuingCountry`,
+            message: `Traveller ${index + 1}: Passport issuing country is required.`,
+          });
+        }
+
+        if (passportExpiryMissing) {
+          travellerValidationErrors.push({
+            field: `travellers[${index}].passportExpiry`,
+            message: `Traveller ${index + 1}: Passport expiry date is required.`,
+          });
+        } else {
+          const expiryDate = startOfDayUTC(new Date(traveller.passportExpiry));
+          if (expiryDate <= today) {
+            travellerValidationErrors.push({
+              field: `travellers[${index}].passportExpiry`,
+              message: `Traveller ${index + 1}: Passport already expired.`,
+            });
+          }
+          const minValidDate = new Date(travelDate);
+          minValidDate.setUTCMonth(minValidDate.getUTCMonth() + 6);
+          if (expiryDate < minValidDate) {
+            travellerValidationErrors.push({
+              field: `travellers[${index}].passportExpiry`,
+              message: `Traveller ${index + 1}: Passport must be valid for at least 6 months from travel date.`,
+            });
+          }
+        }
+
+        if (!traveller.passportFileKey) {
+          travellerValidationErrors.push({
+            field: `travellers[${index}].passportFileKey`,
+            message: `Traveller ${index + 1}: Passport copy upload is required.`,
+          });
+        }
+      } else if (traveller.passportExpiry) {
+        const expiryDate = startOfDayUTC(new Date(traveller.passportExpiry));
+        if (expiryDate <= today) {
+          travellerValidationErrors.push({
+            field: `travellers[${index}].passportExpiry`,
+            message: `Traveller ${index + 1}: Passport already expired.`,
+          });
+        }
+      }
+    });
+
+    if (travellerValidationErrors.length > 0) {
+      return NextResponse.json(
+        {
+          error: "Traveller validation failed",
+          details: travellerValidationErrors,
+        },
+        { status: 400 }
+      );
+    }
+
+    const tourAddOns = tourRecord.addOns ?? [];
+    const requestedAddOns = new Map<string, number>();
+    (data.selectedAddOns || []).forEach((selection) => {
+      const current = requestedAddOns.get(selection.addOnId) ?? 0;
+      requestedAddOns.set(selection.addOnId, current + (selection.quantity ?? 1));
+    });
+
+    const addOnById = new Map(tourAddOns.map((addOn) => [addOn.id, addOn]));
+    const addOnErrors: string[] = [];
+    const bookingAddOnPayload: Array<{
+      addOnId: string;
+      name: string;
+      pricingType: string;
+      quantity: number;
+      unitPrice: number;
+      totalPrice: number;
+      metadata: Record<string, unknown>;
+    }> = [];
+
+    let addOnsTotal = 0;
+    const perPersonQty = Math.max(totalTravellers, 1);
+
+    const includeAddOn = (
+      addOnId: string,
+      requestedQuantity: number | undefined,
+      reason: "selected" | "required"
+    ) => {
+      const addOn = addOnById.get(addOnId);
+      if (!addOn) {
+        addOnErrors.push(`Invalid add-on selected (${addOnId}).`);
+        return;
+      }
+      const unitPrice = addOn.price ?? 0;
+      const quantity =
+        addOn.pricingType === "PER_PERSON"
+          ? perPersonQty
+          : Math.max(1, requestedQuantity ?? 1);
+      const totalPrice = unitPrice * quantity;
+      addOnsTotal += totalPrice;
+      bookingAddOnPayload.push({
+        addOnId: addOn.id,
+        name: addOn.name,
+        pricingType: addOn.pricingType,
+        quantity,
+        unitPrice,
+        totalPrice,
+        metadata: {
+          reason,
+        },
+      });
+    };
+
+    requestedAddOns.forEach((quantity, addOnId) => {
+      includeAddOn(addOnId, quantity, "selected");
+    });
+
+    tourAddOns
+      .filter((addOn) => addOn.isRequired)
+      .forEach((addOn) => includeAddOn(addOn.id, 1, "required"));
+
+    if (addOnErrors.length > 0) {
+      return NextResponse.json(
+        { error: "Invalid add-ons provided", details: addOnErrors },
+        { status: 400 }
+      );
+    }
+
+    const totalAmount = Math.round(baseAmount + addOnsTotal);
+    const preferences = data.preferences || {};
+    const consentTimestamp = new Date();
+    const ipAddress =
+      req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      req.headers.get("x-real-ip") ||
+      null;
+    const userAgent = req.headers.get("user-agent") || null;
+
+    const booking = await prisma.$transaction(async (tx) => {
+      const bookingRecord = await tx.booking.create({
+        data: {
           userId,
-          firstName: travellerData.firstName,
-          lastName: travellerData.lastName,
+          tourId: tourRecord.id,
+          tourName: data.tourName || tourRecord.name,
+          status: "DRAFT",
+          totalAmount,
+          currency: "INR",
+          travelDate,
+          foodPreference: preferences.foodPreference || null,
+          foodPreferenceNotes: preferences.foodPreferenceNotes || null,
+          languagePreference: preferences.languagePreference || null,
+          languagePreferenceOther: preferences.languagePreferenceOther || null,
+          driverPreference: preferences.driverPreference || null,
+          specialRequests: preferences.specialRequests || null,
+          policyAccepted: true,
+          policyAcceptedAt: consentTimestamp,
+          policyAcceptedByUserId: userId,
+          policyVersion: data.policyVersion || null,
+          policyAcceptedIp: ipAddress,
+          policyAcceptedUserAgent: userAgent,
         },
       });
 
-      if (!traveller) {
-        traveller = await prisma.traveller.create({
+      if (bookingAddOnPayload.length > 0) {
+        for (const payload of bookingAddOnPayload) {
+          await tx.bookingAddOn.create({
+            data: {
+              bookingId: bookingRecord.id,
+              ...payload,
+            },
+          });
+        }
+      }
+
+      for (const travellerData of data.travellers) {
+        let traveller = null;
+        if (travellerData.passportNumber) {
+          traveller = await tx.traveller.findFirst({
+            where: {
+              userId,
+              passportNumber: travellerData.passportNumber,
+            },
+          });
+        }
+
+        if (!traveller) {
+          traveller = await tx.traveller.findFirst({
+            where: {
+              userId,
+              firstName: travellerData.firstName,
+              lastName: travellerData.lastName,
+            },
+          });
+        }
+
+        if (traveller) {
+          await tx.traveller.update({
+            where: { id: traveller.id },
+            data: {
+              email: data.primaryContact.email,
+              phone: data.primaryContact.phone || null,
+              dateOfBirth: travellerData.dateOfBirth
+                ? new Date(travellerData.dateOfBirth)
+                : traveller.dateOfBirth,
+              gender: travellerData.gender || traveller.gender,
+              nationality: travellerData.nationality || traveller.nationality,
+              passportNumber: travellerData.passportNumber || traveller.passportNumber,
+              passportExpiry: travellerData.passportExpiry
+                ? new Date(travellerData.passportExpiry)
+                : traveller.passportExpiry,
+              passportIssuingCountry:
+                travellerData.passportIssuingCountry || traveller.passportIssuingCountry,
+              passportFileKey: travellerData.passportFileKey || traveller.passportFileKey,
+            },
+          });
+        } else {
+          traveller = await tx.traveller.create({
+            data: {
+              userId,
+              firstName: travellerData.firstName.trim(),
+              lastName: travellerData.lastName.trim(),
+              email: data.primaryContact.email,
+              phone: data.primaryContact.phone || null,
+              dateOfBirth: travellerData.dateOfBirth
+                ? new Date(travellerData.dateOfBirth)
+                : null,
+              gender: travellerData.gender || null,
+              nationality: travellerData.nationality || null,
+              passportNumber: travellerData.passportNumber || null,
+              passportExpiry: travellerData.passportExpiry
+                ? new Date(travellerData.passportExpiry)
+                : null,
+              passportIssuingCountry: travellerData.passportIssuingCountry || null,
+              passportFileKey: travellerData.passportFileKey || null,
+            },
+          });
+        }
+
+        await tx.bookingTraveller.create({
           data: {
-            userId,
+            bookingId: bookingRecord.id,
+            travellerId: traveller.id,
             firstName: travellerData.firstName.trim(),
             lastName: travellerData.lastName.trim(),
-            email: data.primaryContact.email,
-            phone: data.primaryContact.phone || null,
+            dateOfBirth: travellerData.dateOfBirth
+              ? new Date(travellerData.dateOfBirth)
+              : null,
+            gender: travellerData.gender || null,
+            nationality: travellerData.nationality || null,
+            passportNumber: travellerData.passportNumber || null,
+            passportExpiry: travellerData.passportExpiry
+              ? new Date(travellerData.passportExpiry)
+              : null,
+            passportIssuingCountry: travellerData.passportIssuingCountry || null,
+            passportFileKey: travellerData.passportFileKey || null,
+            passportFileName: travellerData.passportFileName || null,
+            isPassportRequired: requiresPassport,
           },
         });
       }
 
-      // Link traveller to booking
-      await prisma.bookingTraveller.create({
-        data: {
-          bookingId: booking.id,
-          travellerId: traveller.id,
-        },
-      });
-    }
+      return bookingRecord;
+    });
 
     return NextResponse.json({
       bookingId: booking.id,
+      totalAmount,
       message: "Booking created successfully",
     });
   } catch (error: any) {

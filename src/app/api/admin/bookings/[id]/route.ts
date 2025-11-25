@@ -71,6 +71,9 @@ export async function GET(
             },
           },
         },
+        addOns: {
+          orderBy: { createdAt: "asc" },
+        },
       },
     });
 

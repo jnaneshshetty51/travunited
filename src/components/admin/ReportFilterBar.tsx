@@ -20,6 +20,7 @@ export interface ReportFilters {
   status?: string;
   paymentStatus?: string;
   type?: string;
+  search?: string;
 }
 
 const DATE_PRESETS = [
@@ -215,10 +216,11 @@ export function ReportFilterBar({
               className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
             >
               <option value="">All Statuses</option>
-              <option value="SUBMITTED">Submitted</option>
-              <option value="IN_PROCESS">In Process</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
+              <option value="NEW">New</option>
+              <option value="CONTACTED">Contacted</option>
+              <option value="PROPOSAL_SENT">Proposal Sent</option>
+              <option value="WON">Won</option>
+              <option value="LOST">Lost</option>
             </select>
           </div>
         )}

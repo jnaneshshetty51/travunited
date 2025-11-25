@@ -62,6 +62,16 @@ interface Booking {
   };
   travellers: Array<{
     traveller: Traveller;
+    firstName?: string | null;
+    lastName?: string | null;
+    dateOfBirth?: string | null;
+    gender?: string | null;
+    nationality?: string | null;
+    passportNumber?: string | null;
+    passportExpiry?: string | null;
+    passportIssuingCountry?: string | null;
+    passportFileKey?: string | null;
+    passportFileName?: string | null;
   }>;
   payments?: Payment[];
   processedBy?: {
@@ -85,6 +95,25 @@ interface Booking {
   timeline?: TimelineEvent[];
   amountPaid?: number;
   pendingBalance?: number;
+  foodPreference?: string | null;
+  foodPreferenceNotes?: string | null;
+  languagePreference?: string | null;
+  languagePreferenceOther?: string | null;
+  driverPreference?: string | null;
+  specialRequests?: string | null;
+  policyAccepted?: boolean;
+  policyAcceptedAt?: string | null;
+  policyAcceptedIp?: string | null;
+  policyAcceptedUserAgent?: string | null;
+  addOns?: Array<{
+    id: string;
+    addOnId?: string | null;
+    name: string;
+    pricingType: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice: number;
+  }>;
 }
 
 export default function AdminBookingDetailPage() {
@@ -511,6 +540,19 @@ export default function AdminBookingDetailPage() {
                   <div className="text-sm text-neutral-600 mb-1">Last Updated</div>
                   <div className="font-medium text-neutral-900">{formatDate(booking.updatedAt)}</div>
                 </div>
+                <div>
+                  <div className="text-sm text-neutral-600 mb-1">Policy Acceptance</div>
+                  {booking.policyAccepted ? (
+                    <div className="font-medium text-green-700">
+                      Accepted {booking.policyAcceptedAt ? `on ${formatDate(booking.policyAcceptedAt)}` : ""}
+                      {booking.policyAcceptedIp && (
+                        <span className="block text-xs text-neutral-500">IP: {booking.policyAcceptedIp}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="font-medium text-red-600">Not accepted</div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -535,48 +577,186 @@ export default function AdminBookingDetailPage() {
               </div>
             </div>
 
+            {(booking.foodPreference ||
+              booking.foodPreferenceNotes ||
+              booking.languagePreference ||
+              booking.languagePreferenceOther ||
+              booking.driverPreference ||
+              booking.specialRequests) && (
+              <div className="bg-white rounded-2xl shadow-medium p-6 border border-neutral-200">
+                <h2 className="text-xl font-bold text-neutral-900 mb-4">Guest Preferences</h2>
+                <div className="grid md:grid-cols-2 gap-4 text-sm text-neutral-700">
+                  {booking.foodPreference && (
+                    <div>
+                      <span className="text-neutral-500 block mb-1">Food Preference</span>
+                      <span className="font-medium text-neutral-900">{booking.foodPreference}</span>
+                    </div>
+                  )}
+                  {booking.foodPreferenceNotes && (
+                    <div>
+                      <span className="text-neutral-500 block mb-1">Food Notes</span>
+                      <span className="font-medium text-neutral-900">{booking.foodPreferenceNotes}</span>
+                    </div>
+                  )}
+                  {booking.languagePreference && (
+                    <div>
+                      <span className="text-neutral-500 block mb-1">Language Preference</span>
+                      <span className="font-medium text-neutral-900">
+                        {booking.languagePreference === "other"
+                          ? booking.languagePreferenceOther || "Other"
+                          : booking.languagePreference}
+                      </span>
+                    </div>
+                  )}
+                  {booking.driverPreference && (
+                    <div>
+                      <span className="text-neutral-500 block mb-1">Driver Preference</span>
+                      <span className="font-medium text-neutral-900">{booking.driverPreference}</span>
+                    </div>
+                  )}
+                  {booking.specialRequests && (
+                    <div className="md:col-span-2">
+                      <span className="text-neutral-500 block mb-1">Special Requests</span>
+                      <span className="font-medium text-neutral-900 whitespace-pre-line">
+                        {booking.specialRequests}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Travellers List */}
             {booking.travellers.length > 0 && (
               <div className="bg-white rounded-2xl shadow-medium p-6 border border-neutral-200">
                 <h2 className="text-xl font-bold text-neutral-900 mb-4">Travellers</h2>
                 <div className="space-y-4">
-                  {booking.travellers.map((t, index) => (
-                    <div key={t.traveller.id} className="border border-neutral-200 rounded-lg p-4">
-                      <h3 className="font-semibold mb-3">
-                        {index === 0 ? "Primary Traveller" : `Traveller ${index + 1}`}
-                      </h3>
-                      <div className="grid md:grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <span className="text-neutral-600">Name:</span>{" "}
-                          <span className="font-medium">{t.traveller.firstName} {t.traveller.lastName}</span>
+                  {booking.travellers.map((t, index) => {
+                    const profile = t.traveller;
+                    const displayFirstName = t.firstName || profile.firstName;
+                    const displayLastName = t.lastName || profile.lastName;
+                    const passportNumber = t.passportNumber || profile.passportNumber;
+                    const passportExpiry = t.passportExpiry || profile.passportExpiry;
+                    return (
+                      <div key={profile.id} className="border border-neutral-200 rounded-lg p-4">
+                        <h3 className="font-semibold mb-3">
+                          {index === 0 ? "Primary Traveller" : `Traveller ${index + 1}`}
+                        </h3>
+                        <div className="grid md:grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-neutral-600">Name:</span>{" "}
+                            <span className="font-medium">
+                              {displayFirstName} {displayLastName}
+                            </span>
+                          </div>
+                          {(t.dateOfBirth || profile.dateOfBirth) && (
+                            <div>
+                              <span className="text-neutral-600">Date of Birth:</span>{" "}
+                              <span className="font-medium">
+                                {formatDate(t.dateOfBirth || profile.dateOfBirth!)}
+                              </span>
+                            </div>
+                          )}
+                          {(t.gender || profile.gender) && (
+                            <div>
+                              <span className="text-neutral-600">Gender:</span>{" "}
+                              <span className="font-medium">{t.gender || profile.gender}</span>
+                            </div>
+                          )}
+                          {(profile.email || profile.phone) && (
+                            <>
+                              {profile.email && (
+                                <div>
+                                  <span className="text-neutral-600">Email:</span>{" "}
+                                  <span className="font-medium">{profile.email}</span>
+                                </div>
+                              )}
+                              {profile.phone && (
+                                <div>
+                                  <span className="text-neutral-600">Phone:</span>{" "}
+                                  <span className="font-medium">{profile.phone}</span>
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
-                        {t.traveller.dateOfBirth && (
-                          <div>
-                            <span className="text-neutral-600">Date of Birth:</span>{" "}
-                            <span className="font-medium">{formatDate(t.traveller.dateOfBirth)}</span>
+                        {(t.nationality || passportNumber || passportExpiry || t.passportFileKey) && (
+                          <div className="grid md:grid-cols-2 gap-3 text-sm text-neutral-700 mt-4">
+                            {t.nationality && (
+                              <div>
+                                <span className="text-neutral-500">Nationality:</span>{" "}
+                                <span className="font-medium text-neutral-900">{t.nationality}</span>
+                              </div>
+                            )}
+                            {passportNumber && (
+                              <div>
+                                <span className="text-neutral-500">Passport #:</span>{" "}
+                                <span className="font-medium text-neutral-900 font-mono">{passportNumber}</span>
+                              </div>
+                            )}
+                            {t.passportIssuingCountry && (
+                              <div>
+                                <span className="text-neutral-500">Issuing Country:</span>{" "}
+                                <span className="font-medium text-neutral-900">{t.passportIssuingCountry}</span>
+                              </div>
+                            )}
+                            {passportExpiry && (
+                              <div>
+                                <span className="text-neutral-500">Passport Expiry:</span>{" "}
+                                <span className="font-medium text-neutral-900">{formatDate(passportExpiry)}</span>
+                              </div>
+                            )}
                           </div>
                         )}
-                        {t.traveller.gender && (
-                          <div>
-                            <span className="text-neutral-600">Gender:</span>{" "}
-                            <span className="font-medium">{t.traveller.gender}</span>
-                          </div>
-                        )}
-                        {t.traveller.email && (
-                          <div>
-                            <span className="text-neutral-600">Email:</span>{" "}
-                            <span className="font-medium">{t.traveller.email}</span>
-                          </div>
-                        )}
-                        {t.traveller.phone && (
-                          <div>
-                            <span className="text-neutral-600">Phone:</span>{" "}
-                            <span className="font-medium">{t.traveller.phone}</span>
-                          </div>
+                        {t.passportFileKey && (
+                          <a
+                            href={`/api/files?key=${encodeURIComponent(t.passportFileKey)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 mt-3"
+                          >
+                            <Download size={16} />
+                            Download Passport Copy
+                          </a>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Add-ons */}
+            {booking.addOns && booking.addOns.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-medium p-6 border border-neutral-200">
+                <h2 className="text-xl font-bold text-neutral-900 mb-4">Add-ons & Upgrades</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead>
+                      <tr className="bg-neutral-50 text-neutral-600 uppercase text-xs tracking-wide">
+                        <th className="px-4 py-2 font-medium">Add-on</th>
+                        <th className="px-4 py-2 font-medium">Pricing Type</th>
+                        <th className="px-4 py-2 font-medium">Quantity</th>
+                        <th className="px-4 py-2 font-medium">Unit Price</th>
+                        <th className="px-4 py-2 font-medium">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {booking.addOns.map((addOn) => (
+                        <tr key={addOn.id} className="border-b border-neutral-100">
+                          <td className="px-4 py-3 font-medium text-neutral-900">{addOn.name}</td>
+                          <td className="px-4 py-3 capitalize text-neutral-600">
+                            {addOn.pricingType.replace("_", " ").toLowerCase()}
+                          </td>
+                          <td className="px-4 py-3">{addOn.quantity}</td>
+                          <td className="px-4 py-3">₹{addOn.unitPrice.toLocaleString()}</td>
+                          <td className="px-4 py-3 font-semibold text-neutral-900">
+                            ₹{addOn.totalPrice.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}

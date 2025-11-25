@@ -1,10 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, ArrowLeft, CheckCircle, Calendar, User, CreditCard, Users } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowLeft,
+  CheckCircle,
+  Calendar,
+  User,
+  CreditCard,
+  Users,
+  ShieldCheck,
+  AlertTriangle,
+  Upload,
+  Plus,
+  Minus,
+} from "lucide-react";
 import Link from "next/link";
 import { loadRazorpayScript } from "@/lib/razorpay-client";
 import { formatDate } from "@/lib/dateFormat";
@@ -17,6 +30,36 @@ const steps = [
   { id: 5, name: "Payment", icon: CreditCard },
 ];
 
+const generateUID = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
+
+type TravellerForm = {
+  uid: string;
+  firstName: string;
+  lastName: string;
+  age: string;
+  dateOfBirth: string;
+  gender?: string;
+  nationality: string;
+  passportNumber: string;
+  passportExpiry: string;
+  passportIssuingCountry: string;
+  passportFileKey?: string | null;
+  passportFileName?: string | null;
+};
+
+type AddOnSelectionState = Record<string, { selected: boolean; quantity: number }>;
+type PreferencesForm = {
+  foodPreference: string;
+  foodPreferenceNotes: string;
+  languagePreference: string;
+  languagePreferenceOther: string;
+  driverPreference: string;
+  specialRequests: string;
+};
+
 export default function TourBookingPage({ params }: { params: { id: string } }) {
   const { data: session } = useSession();
   const router = useRouter();
@@ -25,7 +68,10 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [tour, setTour] = useState<any>(null);
   const [tourLoading, setTourLoading] = useState(true);
-  const [selectedCustomizations, setSelectedCustomizations] = useState<Record<string, boolean>>({});
+  const [addOnSelections, setAddOnSelections] = useState<AddOnSelectionState>({});
+  const [passportUploadStatus, setPassportUploadStatus] = useState<Record<string, { uploading: boolean; error: string | null }>>({});
+  const [policyError, setPolicyError] = useState<string | null>(null);
+  const [bookingCreationError, setBookingCreationError] = useState<string | null>(null);
   const [selectedHotelCategory, setSelectedHotelCategory] = useState<string>("");
 
   const [formData, setFormData] = useState({
@@ -37,14 +83,76 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
       email: "",
       phone: "",
     },
-    travellers: [] as Array<{
-      firstName: string;
-      lastName: string;
-      age: string;
-      gender?: string;
-    }>,
+    preferences: {
+      foodPreference: "",
+      foodPreferenceNotes: "",
+      languagePreference: "",
+      languagePreferenceOther: "",
+      driverPreference: "",
+      specialRequests: "",
+    },
+    policyAccepted: false,
+    travellers: [] as TravellerForm[],
     paymentType: "full" as "full" | "advance",
   });
+
+  const createTravellerEntry = useCallback((): TravellerForm => ({
+    uid: generateUID(),
+    firstName: "",
+    lastName: "",
+    age: "",
+    dateOfBirth: "",
+    gender: "",
+    nationality: "",
+    passportNumber: "",
+    passportExpiry: "",
+    passportIssuingCountry: "",
+    passportFileKey: null,
+    passportFileName: null,
+  }), []);
+
+  const updateTraveller = (index: number, field: keyof TravellerForm, value: string | null) => {
+    setFormData((prev) => {
+      const travellers = [...prev.travellers];
+      travellers[index] = { ...travellers[index], [field]: value ?? "" };
+      return { ...prev, travellers };
+    });
+  };
+
+  const updatePreference = (field: keyof PreferencesForm, value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      preferences: {
+        ...prev.preferences,
+        [field]: value,
+      },
+    }));
+  };
+
+  const toggleAddOnSelection = (addOnId: string, selected: boolean) => {
+    setAddOnSelections((prev) => {
+      const next = { ...prev };
+      if (!selected) {
+        delete next[addOnId];
+      } else {
+        next[addOnId] = {
+          selected: true,
+          quantity: Math.max(1, next[addOnId]?.quantity || 1),
+        };
+      }
+      return next;
+    });
+  };
+
+  const updateAddOnQuantity = (addOnId: string, quantity: number) => {
+    setAddOnSelections((prev) => ({
+      ...prev,
+      [addOnId]: {
+        selected: true,
+        quantity: Math.max(1, quantity),
+      },
+    }));
+  };
 
   // Fetch tour data
   useEffect(() => {
@@ -71,9 +179,122 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
     fetchTour();
   }, [params.id, router]);
 
-  // Calculate pricing with seasonal pricing and customizations
+  const requiresPassport = useMemo(() => {
+    if (!tour) return false;
+    return tour.requiresPassport || (tour.tourType?.toLowerCase() === "international");
+  }, [tour]);
+
+  const travellerCount = formData.numberOfAdults + formData.numberOfChildren;
+  const travellersLength = formData.travellers.length;
+
+  const handlePassportFileChange = async (travellerIndex: number, file: File | null) => {
+    if (!file) return;
+    const traveller = formData.travellers[travellerIndex];
+    if (!traveller) return;
+    const travellerKey = traveller.uid;
+    setPassportUploadStatus((prev) => ({
+      ...prev,
+      [travellerKey]: { uploading: true, error: null },
+    }));
+    try {
+      const uploadForm = new FormData();
+      uploadForm.append("file", file);
+      uploadForm.append(
+        "travellerName",
+        `${traveller.firstName} ${traveller.lastName}`.trim() || `traveller-${travellerIndex + 1}`
+      );
+      const response = await fetch("/api/bookings/passport-upload", {
+        method: "POST",
+        body: uploadForm,
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || "Failed to upload passport copy.");
+      }
+      const result = await response.json();
+      updateTraveller(travellerIndex, "passportFileKey", result.key);
+      updateTraveller(travellerIndex, "passportFileName", file.name);
+      setPassportUploadStatus((prev) => ({
+        ...prev,
+        [travellerKey]: { uploading: false, error: null },
+      }));
+    } catch (error: any) {
+      const message = error?.message || "Failed to upload passport copy.";
+      setPassportUploadStatus((prev) => ({
+        ...prev,
+        [travellerKey]: { uploading: false, error: message },
+      }));
+      alert(message);
+    }
+  };
+
+  const getPassportExpiryError = useCallback(
+    (traveller: TravellerForm) => {
+      if (!traveller.passportExpiry) {
+        return requiresPassport ? "Passport expiry date is required." : null;
+      }
+      const expiryDate = new Date(traveller.passportExpiry);
+      expiryDate.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (expiryDate <= today) {
+        return "Passport already expired.";
+      }
+      if (requiresPassport && formData.travelDate) {
+        const travelDate = new Date(formData.travelDate);
+        travelDate.setHours(0, 0, 0, 0);
+        const minValid = new Date(travelDate);
+        minValid.setMonth(minValid.getMonth() + 6);
+        if (expiryDate < minValid) {
+          return "Passport must be valid for at least 6 months from your travel date.";
+        }
+      }
+      return null;
+    },
+    [formData.travelDate, requiresPassport]
+  );
+
+  const getSelectedAddOnDetails = useCallback(
+    (normalizedTravellerCount?: number) => {
+      if (!tour?.addOns || tour.addOns.length === 0) return [];
+      const travellerTotal = normalizedTravellerCount ?? Math.max(travellerCount, 1);
+      return tour.addOns
+        .filter((addOn: any) => addOn.isRequired || addOnSelections[addOn.id]?.selected)
+        .map((addOn: any) => {
+          const isPerPerson = addOn.pricingType === "PER_PERSON";
+          const state = addOnSelections[addOn.id];
+          const quantity = isPerPerson
+            ? travellerTotal
+            : addOn.isRequired
+            ? 1
+            : Math.max(1, state?.quantity || 1);
+          const unitPrice = addOn.price || 0;
+          return {
+            id: addOn.id,
+            name: addOn.name,
+            description: addOn.description,
+            pricingType: addOn.pricingType,
+            isRequired: addOn.isRequired,
+            quantity,
+            unitPrice,
+            totalPrice: unitPrice * quantity,
+          };
+        });
+    },
+    [tour?.addOns, addOnSelections, travellerCount]
+  );
+
+  // Calculate pricing with seasonal pricing and add-ons
   const calculatePrice = () => {
-    if (!tour) return { baseAmount: 0, finalAmount: 0, advanceAmount: 0, remainingAmount: 0 };
+    if (!tour) {
+      return {
+        baseAmount: 0,
+        addOnTotal: 0,
+        finalAmount: 0,
+        advanceAmount: 0,
+        remainingAmount: 0,
+      };
+    }
 
     const travellerCount = formData.numberOfAdults + formData.numberOfChildren;
     const normalizedTravellerCount = Math.max(travellerCount, 1);
@@ -97,34 +318,23 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
     // Calculate base amount
     let baseAmount = basePrice * normalizedTravellerCount;
 
-    // Add customization options
-    let customizationTotal = 0;
-    if (tour.customizationOptions) {
-      for (const [key, value] of Object.entries(tour.customizationOptions as Record<string, any>)) {
-        if (selectedCustomizations[key] && value.price) {
-          if (value.type === "per_person") {
-            customizationTotal += value.price * normalizedTravellerCount;
-          } else {
-            customizationTotal += value.price;
-          }
-        }
-      }
-    }
+    const selectedAddOnDetails = getSelectedAddOnDetails(normalizedTravellerCount);
+    const addOnTotal = selectedAddOnDetails.reduce((sum, detail) => sum + detail.totalPrice, 0);
 
-    const finalAmount = baseAmount + customizationTotal;
+    const finalAmount = baseAmount + addOnTotal;
     const advancePercentage = tour.advancePercentage ?? 0;
     const advanceAmount = formData.paymentType === "advance" && tour.allowAdvance
       ? Math.round(finalAmount * (advancePercentage / 100))
       : finalAmount;
     const remainingAmount = Math.max(finalAmount - advanceAmount, 0);
-
-    return { baseAmount, finalAmount, advanceAmount, remainingAmount };
+    return { baseAmount, addOnTotal, finalAmount, advanceAmount, remainingAmount };
   };
 
-  const { baseAmount, finalAmount, advanceAmount, remainingAmount } = calculatePrice();
-
-  const travellerCount = formData.numberOfAdults + formData.numberOfChildren;
-  const travellersLength = formData.travellers.length;
+  const { baseAmount, addOnTotal, finalAmount, advanceAmount, remainingAmount } = calculatePrice();
+  const selectedAddOnDetails = useMemo(
+    () => getSelectedAddOnDetails(),
+    [getSelectedAddOnDetails]
+  );
   // Auto-fill for logged-in users
   useEffect(() => {
     if (session?.user) {
@@ -146,12 +356,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
     
     if (totalTravellers > currentCount) {
       // Add new travellers
-      const newTravellers = Array.from({ length: totalTravellers - currentCount }, () => ({
-        firstName: "",
-        lastName: "",
-        age: "",
-        gender: "",
-      }));
+      const newTravellers = Array.from({ length: totalTravellers - currentCount }, () => createTravellerEntry());
       setFormData((prev) => ({
         ...prev,
         travellers: [...prev.travellers, ...newTravellers],
@@ -163,7 +368,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
         travellers: prev.travellers.slice(0, totalTravellers),
       }));
     }
-  }, [travellerCount, travellersLength]);
+  }, [travellerCount, travellersLength, createTravellerEntry]);
 
   // Validate availability and constraints
   const validateStep1 = (): string | null => {
@@ -236,9 +441,37 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
         alert("Please add traveller information");
         return;
       }
-      for (const traveller of formData.travellers) {
-        if (!traveller.firstName || !traveller.lastName || !traveller.age) {
-          alert("Please fill in all required fields for all travellers");
+      for (let index = 0; index < formData.travellers.length; index += 1) {
+        const traveller = formData.travellers[index];
+        if (!traveller.firstName || !traveller.lastName) {
+          alert(`Traveller ${index + 1}: Please fill in first and last name.`);
+          return;
+        }
+        if (!traveller.dateOfBirth) {
+          alert(`Traveller ${index + 1}: Date of birth is required.`);
+          return;
+        }
+        if (requiresPassport) {
+          if (!traveller.nationality) {
+            alert(`Traveller ${index + 1}: Nationality is required.`);
+            return;
+          }
+          if (!traveller.passportNumber) {
+            alert(`Traveller ${index + 1}: Passport number is required.`);
+            return;
+          }
+          if (!traveller.passportIssuingCountry) {
+            alert(`Traveller ${index + 1}: Passport issuing country is required.`);
+            return;
+          }
+          if (!traveller.passportFileKey) {
+            alert(`Traveller ${index + 1}: Please upload a passport copy.`);
+            return;
+          }
+        }
+        const expiryIssue = getPassportExpiryError(traveller);
+        if (expiryIssue) {
+          alert(`Traveller ${index + 1}: ${expiryIssue}`);
           return;
         }
       }
@@ -255,128 +488,152 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
     }
   };
 
-  const handleConfirmAndPay = async () => {
-    // Validate required fields
+  const handleConfirmAndPay = async (): Promise<string | null> => {
+    if (bookingId) return bookingId;
+    if (!tour) return null;
+
     if (!formData.travelDate) {
       alert("Please select a travel date");
-      return;
+      return null;
     }
 
     if (!formData.primaryContact.name || !formData.primaryContact.email) {
       alert("Please fill in all required contact information");
-      return;
+      return null;
     }
 
     if (formData.travellers.length === 0) {
       alert("Please add at least one traveller");
-      return;
+      return null;
     }
 
-    // Validate all travellers have required fields
-    const invalidTraveller = formData.travellers.find(
-      (t) => !t.firstName || !t.lastName || !t.age
-    );
-    if (invalidTraveller) {
-      alert("Please fill in all required fields for all travellers");
-      return;
+    for (let index = 0; index < formData.travellers.length; index += 1) {
+      const traveller = formData.travellers[index];
+      if (!traveller.firstName || !traveller.lastName) {
+        alert(`Traveller ${index + 1}: Please provide full name.`);
+        return null;
+      }
+      if (!traveller.dateOfBirth) {
+        alert(`Traveller ${index + 1}: Date of birth is required.`);
+        return null;
+      }
+      if (requiresPassport) {
+        if (!traveller.nationality || !traveller.passportNumber || !traveller.passportIssuingCountry) {
+          alert(`Traveller ${index + 1}: Complete passport details are required.`);
+          return null;
+        }
+        if (!traveller.passportFileKey) {
+          alert(`Traveller ${index + 1}: Please upload the passport copy.`);
+          return null;
+        }
+      }
+      const expiryIssue = getPassportExpiryError(traveller);
+      if (expiryIssue) {
+        alert(`Traveller ${index + 1}: ${expiryIssue}`);
+        return null;
+      }
     }
 
-    // Check if user is logged in
     if (!session) {
-      router.push(`/signup?email=${encodeURIComponent(formData.primaryContact.email || "")}&redirect=/book/tour/${params.id}`);
-      return;
+      router.push(
+        `/signup?email=${encodeURIComponent(formData.primaryContact.email || "")}&redirect=/book/tour/${params.id}`
+      );
+      return null;
+    }
+
+    if (!formData.policyAccepted) {
+      setPolicyError("Please agree to the refund & cancellation policy before continuing.");
+      return null;
     }
 
     setLoading(true);
+    setBookingCreationError(null);
     try {
-      // Create booking
+      const selectedAddOnsPayload =
+        tour.addOns
+          ?.filter((addOn: any) => !addOn.isRequired && addOnSelections[addOn.id]?.selected)
+          .map((addOn: any) => ({
+            addOnId: addOn.id,
+            quantity:
+              addOn.pricingType === "PER_PERSON"
+                ? Math.max(travellerCount, 1)
+                : Math.max(1, addOnSelections[addOn.id]?.quantity || 1),
+          })) ?? [];
+
       const response = await fetch("/api/bookings/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tourId: tour.id,
           tourName: tour.name,
-          tourPrice: finalAmount, // Final amount includes customizations
-          advancePercentage: tour.advancePercentage ?? null, // Explicitly send null if undefined
+          tourPrice: finalAmount,
+          advancePercentage: tour.advancePercentage ?? null,
           travelDate: formData.travelDate,
           numberOfAdults: formData.numberOfAdults,
-          numberOfChildren: formData.numberOfChildren ?? null, // Explicitly send null if undefined
+          numberOfChildren: formData.numberOfChildren ?? 0,
+          paymentType: formData.paymentType,
           primaryContact: {
             name: formData.primaryContact.name,
             email: formData.primaryContact.email,
-            phone: formData.primaryContact.phone || null, // Explicitly send null if empty string
+            phone: formData.primaryContact.phone || null,
           },
-          travellers: formData.travellers.map(t => ({
+          travellers: formData.travellers.map((t) => ({
             firstName: t.firstName,
             lastName: t.lastName,
-            age: t.age,
-            gender: t.gender || null, // Explicitly send null if empty
+            age: t.age || "",
+            dateOfBirth: t.dateOfBirth,
+            gender: t.gender || null,
+            nationality: t.nationality || null,
+            passportNumber: t.passportNumber || null,
+            passportExpiry: t.passportExpiry || null,
+            passportIssuingCountry: t.passportIssuingCountry || null,
+            passportFileKey: t.passportFileKey || null,
+            passportFileName: t.passportFileName || null,
           })),
-          paymentType: formData.paymentType,
-          customizations: Object.keys(selectedCustomizations).length > 0 ? selectedCustomizations : null,
-          hotelCategory: selectedHotelCategory || null, // Explicitly send null if empty
+          selectedAddOns: selectedAddOnsPayload,
+          preferences: formData.preferences,
+          policyAccepted: formData.policyAccepted,
+          policyVersion: tour.updatedAt || null,
+          hotelCategory: selectedHotelCategory || null,
         }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setBookingId(data.bookingId);
-        setCurrentStep(5);
-      } else {
-        // Try to parse error response
+      if (!response.ok) {
         let errorMessage = "Failed to create booking. Please try again.";
-        let errorDetails = null;
-        
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
-          
-          // Build detailed error message from validation details if available
-          if (errorData.details && Array.isArray(errorData.details) && errorData.details.length > 0) {
-            const detailMessages = errorData.details.map((d: any) => {
-              const fieldName = d.field ? d.field.replace(/_/g, " ").replace(/([A-Z])/g, " $1").trim() : "Field";
-              return `${fieldName}: ${d.message}`;
-            });
-            errorDetails = detailMessages.join("\n");
+          if (errorData.details && Array.isArray(errorData.details)) {
+            const detailMessages = errorData.details.map(
+              (detail: { field?: string; message?: string }) =>
+                detail.message || detail.field || "Invalid input"
+            );
+            errorMessage = `${errorMessage}\n${detailMessages.join("\n")}`;
           }
-          
-          // Log error details for debugging
-          console.error("Booking creation error:", {
-            status: response.status,
-            error: errorData.error,
-            details: errorData.details,
-            fullResponse: errorData,
-          });
-        } catch (parseError) {
-          // If response is not JSON, try to get text
-          try {
-            const text = await response.text();
-            console.error("Non-JSON error response:", text);
-            errorMessage = text || errorMessage;
-          } catch (textError) {
-            console.error("Could not parse error response:", textError);
-          }
+        } catch {
+          const text = await response.text().catch(() => "");
+          if (text) errorMessage = text;
         }
-        
-        // Show error to user
-        const finalMessage = errorDetails ? `${errorMessage}\n\n${errorDetails}` : errorMessage;
-        alert(finalMessage);
+        setBookingCreationError(errorMessage);
+        return null;
       }
+
+      const data = await response.json();
+      setBookingId(data.bookingId);
+      return data.bookingId;
     } catch (error: any) {
-      console.error("Error creating booking:", {
-        error: error.message,
-        stack: error.stack,
-        name: error.name,
-      });
-      alert(error?.message || "An error occurred. Please check your internet connection and try again.");
+      const message = error?.message || "An error occurred while creating the booking.";
+      setBookingCreationError(message);
+      console.error("Error creating booking:", error);
+      return null;
     } finally {
       setLoading(false);
     }
   };
 
   const handlePayment = async () => {
-    if (!bookingId) {
-      alert("Booking ID not found. Please go back and try again.");
+    if (!formData.policyAccepted) {
+      setPolicyError("Please accept the refund & cancellation policy before paying.");
       return;
     }
 
@@ -386,11 +643,16 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
       return;
     }
 
+    setPolicyError(null);
+
+    const ensuredBookingId = bookingId || (await handleConfirmAndPay());
+    if (!ensuredBookingId) {
+      return;
+    }
+
     setLoading(true);
     try {
-      const amount = formData.paymentType === "full"
-        ? finalAmount
-        : advanceAmount;
+      const amount = formData.paymentType === "full" ? finalAmount : advanceAmount;
 
       if (amount <= 0) {
         throw new Error("Invalid payment amount");
@@ -400,8 +662,8 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: Math.round(amount), // Ensure amount is rounded
-          bookingId,
+          amount: Math.round(amount),
+          bookingId: ensuredBookingId,
           paymentType: formData.paymentType,
         }),
       });
@@ -430,14 +692,11 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
           contact: formData.primaryContact.phone || "",
         },
         notes: {
-          bookingId,
+          bookingId: ensuredBookingId,
           paymentType: formData.paymentType,
         },
         handler: async (response: any) => {
           try {
-            console.log("Payment response:", response);
-            
-            // Verify payment on server
             const verifyResponse = await fetch("/api/payments/verify", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -445,13 +704,13 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
-                bookingId,
+                bookingId: ensuredBookingId,
               }),
             });
 
             if (verifyResponse.ok) {
               setLoading(false);
-              router.push(`/bookings/thank-you?bookingId=${bookingId}`);
+              router.push(`/bookings/thank-you?bookingId=${ensuredBookingId}`);
             } else {
               const errorData = await verifyResponse.json();
               throw new Error(errorData.error || "Payment verification failed");
@@ -460,8 +719,6 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
             console.error("Payment verification error:", error);
             setLoading(false);
             alert(error?.message || "Payment verification failed. Please contact support if payment was deducted.");
-            setLoading(false);
-            alert(`Payment verification failed: ${error.message || "Please contact support"}`);
           }
         },
         modal: {
@@ -477,7 +734,8 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
       razorpay.on("payment.failed", (response: any) => {
         console.error("Payment failed:", response);
         setLoading(false);
-        const errorMessage = response.error?.description || response.error?.reason || "Payment failed. Please try again.";
+        const errorMessage =
+          response.error?.description || response.error?.reason || "Payment failed. Please try again.";
         alert(errorMessage);
       });
 
@@ -485,8 +743,13 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
     } catch (error) {
       console.error(error);
       setLoading(false);
-      alert("Unable to process payment. Please try again.");
+      alert(error?.message || "Unable to process payment. Please try again.");
     }
+  };
+
+  const handleProceedToPaymentStep = () => {
+    setPolicyError(null);
+    setCurrentStep(5);
   };
 
   const renderStepContent = () => {
@@ -641,43 +904,84 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                 </div>
               )}
 
-              {/* Customization Options */}
-              {tour.customizationOptions && Object.keys(tour.customizationOptions).length > 0 && (
+              {/* Add-ons & Customization */}
+              {tour.addOns && tour.addOns.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
                 <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Customization Options
+                      <label className="block text-sm font-medium text-neutral-700 mb-1">
+                        Customise this package
                   </label>
-                  <div className="space-y-2">
-                    {Object.entries(tour.customizationOptions as Record<string, any>).map(([key, value]: [string, any]) => (
-                      <label
-                        key={key}
-                        className="flex items-start gap-3 p-3 border border-neutral-200 rounded-lg hover:bg-neutral-50 cursor-pointer"
-                      >
+                      <p className="text-sm text-neutral-600">
+                        Choose from optional upgrades and add-ons. Required items are pre-selected.
+                      </p>
+                    </div>
+                    <ShieldCheck size={18} className="text-primary-600" />
+                  </div>
+                  <div className="space-y-3">
+                    {tour.addOns.map((addOn: any) => {
+                      const isPerPerson = addOn.pricingType === "PER_PERSON";
+                      const state = addOnSelections[addOn.id];
+                      const isSelected = addOn.isRequired || state?.selected;
+                      const quantity = isPerPerson
+                        ? travellerCount || 1
+                        : state?.quantity || 1;
+                      return (
+                        <div
+                          key={addOn.id}
+                          className="border border-neutral-200 rounded-lg p-4 bg-white shadow-sm"
+                        >
+                          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div>
+                              <p className="font-semibold text-neutral-900">{addOn.name}</p>
+                              {addOn.description && (
+                                <p className="text-sm text-neutral-600 mt-1">{addOn.description}</p>
+                              )}
+                              <p className="text-sm text-primary-600 mt-2">
+                                ₹{(addOn.price || 0).toLocaleString()}{" "}
+                                {isPerPerson ? "per traveller" : "per booking"}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {addOn.isRequired ? (
+                                <span className="text-xs font-semibold text-primary-600 uppercase tracking-wide">
+                                  Required
+                                </span>
+                              ) : (
+                                <label className="inline-flex items-center gap-2 text-sm text-neutral-700">
                         <input
                           type="checkbox"
-                          checked={selectedCustomizations[key] || false}
-                          onChange={(e) =>
-                            setSelectedCustomizations({
-                              ...selectedCustomizations,
-                              [key]: e.target.checked,
-                            })
-                          }
-                          className="mt-1 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium text-neutral-900">{key}</div>
-                          {typeof value === "object" && value.description && (
-                            <div className="text-sm text-neutral-600">{value.description}</div>
-                          )}
-                          {typeof value === "object" && value.price && (
-                            <div className="text-sm text-primary-600 mt-1">
-                              +₹{value.price.toLocaleString()}
-                              {value.type === "per_person" && " per person"}
+                                    checked={isSelected}
+                                    onChange={(e) => toggleAddOnSelection(addOn.id, e.target.checked)}
+                                    className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                                  />
+                                  Add
+                                </label>
+                              )}
+                              {!isPerPerson && isSelected && (
+                                <div className="flex items-center border border-neutral-300 rounded-lg">
+                                  <button
+                                    type="button"
+                                    className="px-2 py-1 text-neutral-600 hover:text-neutral-900"
+                                    onClick={() => updateAddOnQuantity(addOn.id, Math.max(1, quantity - 1))}
+                                  >
+                                    <Minus size={16} />
+                                  </button>
+                                  <span className="px-3 text-sm font-medium text-neutral-900">{quantity}</span>
+                                  <button
+                                    type="button"
+                                    className="px-2 py-1 text-neutral-600 hover:text-neutral-900"
+                                    onClick={() => updateAddOnQuantity(addOn.id, quantity + 1)}
+                                  >
+                                    <Plus size={16} />
+                                  </button>
                             </div>
                           )}
                         </div>
-                      </label>
-                    ))}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -693,12 +997,10 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                     <span className="text-neutral-700">Base price:</span>
                     <span className="font-medium">₹{baseAmount.toLocaleString()}</span>
                   </div>
-                  {Object.keys(selectedCustomizations).some(key => selectedCustomizations[key]) && (
+                  {addOnTotal > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-neutral-700">Customizations:</span>
-                      <span className="font-medium">
-                        +₹{(finalAmount - baseAmount).toLocaleString()}
-                      </span>
+                      <span className="text-neutral-700">Add-ons:</span>
+                      <span className="font-medium">+₹{addOnTotal.toLocaleString()}</span>
                     </div>
                   )}
                   <div className="border-t border-blue-300 pt-2 mt-2">
@@ -777,6 +1079,96 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                 />
               </div>
             </div>
+            <div className="border border-neutral-200 rounded-lg p-4 bg-neutral-50">
+              <h3 className="text-lg font-semibold text-neutral-900 mb-2">Preferences (Optional)</h3>
+              <p className="text-sm text-neutral-600 mb-4">
+                Share dietary, language, or driver preferences so we can personalize your trip.
+              </p>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Food Preference
+                  </label>
+                  <select
+                    value={formData.preferences.foodPreference}
+                    onChange={(e) => updatePreference("foodPreference", e.target.value)}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
+                  >
+                    <option value="">No preference</option>
+                    <option value="vegetarian">Vegetarian</option>
+                    <option value="non-vegetarian">Non-vegetarian</option>
+                    <option value="jain">Jain</option>
+                    <option value="vegan">Vegan</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Food Notes
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.preferences.foodPreferenceNotes}
+                    onChange={(e) => updatePreference("foodPreferenceNotes", e.target.value)}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
+                    placeholder="Allergies, spice level, etc."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Language Preference
+                  </label>
+                  <select
+                    value={formData.preferences.languagePreference}
+                    onChange={(e) => updatePreference("languagePreference", e.target.value)}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
+                  >
+                    <option value="">No preference</option>
+                    <option value="english">English</option>
+                    <option value="hindi">Hindi</option>
+                    <option value="kannada">Kannada</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                {formData.preferences.languagePreference === "other" && (
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
+                      Preferred Language
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.preferences.languagePreferenceOther}
+                      onChange={(e) => updatePreference("languagePreferenceOther", e.target.value)}
+                      className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
+                      placeholder="Specify language"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Driver Preference
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.preferences.driverPreference}
+                    onChange={(e) => updatePreference("driverPreference", e.target.value)}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
+                    placeholder="Driver who speaks..."
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Any other requests
+                  </label>
+                  <textarea
+                    value={formData.preferences.specialRequests}
+                    onChange={(e) => updatePreference("specialRequests", e.target.value)}
+                    className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
+                    rows={3}
+                    placeholder="Share any other notes or requirements."
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         );
 
@@ -785,12 +1177,27 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-neutral-900 mb-4">Traveller Information</h2>
             <p className="text-neutral-600 mb-6">
-              Add details for all travellers. Passport details are not required for tour bookings.
+              Provide traveller details exactly as they appear on the passport.
+              {requiresPassport
+                ? " Passport fields and document uploads are required for this tour."
+                : " Passport details are optional for this tour but recommended for faster processing."}
             </p>
             <div className="space-y-4">
-              {formData.travellers.map((traveller, index) => (
-                <div key={index} className="border border-neutral-200 rounded-lg p-4">
-                  <h3 className="font-semibold mb-4">Traveller {index + 1}</h3>
+              {formData.travellers.map((traveller, index) => {
+                const travellerKey = traveller.uid || `traveller-${index}`;
+                const expiryIssue = getPassportExpiryError(traveller);
+                const uploadState = passportUploadStatus[travellerKey];
+                return (
+                  <div key={travellerKey} className="border border-neutral-200 rounded-lg p-4 space-y-6">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-neutral-900">Traveller {index + 1}</h3>
+                      {requiresPassport && (
+                        <span className="text-xs font-medium text-primary-600 flex items-center gap-1">
+                          <ShieldCheck size={14} />
+                          Passport mandatory
+                        </span>
+                      )}
+                    </div>
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-neutral-700 mb-2">
@@ -800,11 +1207,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                         type="text"
                         required
                         value={traveller.firstName}
-                        onChange={(e) => {
-                          const newTravellers = [...formData.travellers];
-                          newTravellers[index].firstName = e.target.value;
-                          setFormData({ ...formData, travellers: newTravellers });
-                        }}
+                          onChange={(e) => updateTraveller(index, "firstName", e.target.value)}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
                       />
                     </div>
@@ -816,43 +1219,42 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                         type="text"
                         required
                         value={traveller.lastName}
-                        onChange={(e) => {
-                          const newTravellers = [...formData.travellers];
-                          newTravellers[index].lastName = e.target.value;
-                          setFormData({ ...formData, travellers: newTravellers });
-                        }}
+                          onChange={(e) => updateTraveller(index, "lastName", e.target.value)}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-neutral-700 mb-2">
-                        Age *
+                          Date of Birth *
                       </label>
                       <input
-                        type="number"
-                        min="1"
-                        max="120"
+                          type="date"
+                          value={traveller.dateOfBirth}
+                          onChange={(e) => updateTraveller(index, "dateOfBirth", e.target.value)}
+                          className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
                         required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-neutral-700 mb-2">
+                          Age (optional)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
                         value={traveller.age}
-                        onChange={(e) => {
-                          const newTravellers = [...formData.travellers];
-                          newTravellers[index].age = e.target.value;
-                          setFormData({ ...formData, travellers: newTravellers });
-                        }}
+                          onChange={(e) => updateTraveller(index, "age", e.target.value)}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
+                          placeholder="Enter age if DOB unknown"
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-neutral-700 mb-2">
-                        Gender (Optional)
+                          Gender
                       </label>
                       <select
                         value={traveller.gender || ""}
-                        onChange={(e) => {
-                          const newTravellers = [...formData.travellers];
-                          newTravellers[index].gender = e.target.value;
-                          setFormData({ ...formData, travellers: newTravellers });
-                        }}
+                          onChange={(e) => updateTraveller(index, "gender", e.target.value)}
                         className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
                       >
                         <option value="">Select</option>
@@ -861,9 +1263,102 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                         <option value="other">Other</option>
                       </select>
                     </div>
+                      <div>
+                        <label className="block text-sm font-medium text-neutral-700 mb-2">
+                          Nationality {requiresPassport && "*"}
+                        </label>
+                        <input
+                          type="text"
+                          value={traveller.nationality}
+                          onChange={(e) => updateTraveller(index, "nationality", e.target.value)}
+                          className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
+                          placeholder="Indian"
+                        />
                   </div>
                 </div>
-              ))}
+
+                    <div className="border border-dashed border-neutral-200 rounded-lg p-4 bg-neutral-50">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h4 className="font-medium text-neutral-900">Passport details</h4>
+                          <p className="text-sm text-neutral-600">
+                            {requiresPassport
+                              ? "All fields below are required for international tours."
+                              : "Optional now, but required before visa processing."}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 mb-2">
+                            Passport Number {requiresPassport && "*"}
+                          </label>
+                          <input
+                            type="text"
+                            value={traveller.passportNumber}
+                            onChange={(e) => updateTraveller(index, "passportNumber", e.target.value.toUpperCase())}
+                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg uppercase"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 mb-2">
+                            Issuing Country {requiresPassport && "*"}
+                          </label>
+                          <input
+                            type="text"
+                            value={traveller.passportIssuingCountry}
+                            onChange={(e) => updateTraveller(index, "passportIssuingCountry", e.target.value)}
+                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
+                            placeholder="India"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 mb-2">
+                            Passport Expiry {requiresPassport && "*"}
+                          </label>
+                          <input
+                            type="date"
+                            value={traveller.passportExpiry}
+                            onChange={(e) => updateTraveller(index, "passportExpiry", e.target.value)}
+                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
+                          />
+                          {expiryIssue && (
+                            <p className="text-sm text-red-600 mt-1">{expiryIssue}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 mb-2">
+                            Passport Copy {requiresPassport && "*"}
+                          </label>
+                          <input
+                            type="file"
+                            accept=".pdf,image/*"
+                            onChange={(e) => handlePassportFileChange(index, e.target.files?.[0] || null)}
+                            className="w-full text-sm text-neutral-600"
+                          />
+                          <div className="text-xs mt-1 text-neutral-500">
+                            Accepted: PDF, JPG, PNG up to 10MB
+                          </div>
+                          {uploadState?.uploading && (
+                            <p className="text-sm text-primary-600 mt-1 flex items-center gap-1">
+                              <Upload size={14} className="animate-spin" />
+                              Uploading...
+                            </p>
+                          )}
+                          {traveller.passportFileName && !uploadState?.uploading && (
+                            <p className="text-sm text-green-600 mt-1">
+                              Uploaded: {traveller.passportFileName}
+                            </p>
+                          )}
+                          {uploadState?.error && (
+                            <p className="text-sm text-red-600 mt-1">{uploadState.error}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
@@ -875,6 +1370,11 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
             <p className="text-neutral-600 mb-6">
               Please review all information carefully. You can go back to edit any section.
             </p>
+            {bookingCreationError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                {bookingCreationError}
+              </div>
+            )}
 
             <div className="space-y-4">
               {/* Tour Details */}
@@ -904,10 +1404,58 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                 <h3 className="font-semibold mb-2">Travellers</h3>
                 {formData.travellers.map((t, i) => (
                   <p key={i} className="text-sm">
-                    {i + 1}. {t.firstName} {t.lastName} (Age: {t.age})
+                    {i + 1}. {t.firstName} {t.lastName} {t.age && `(Age: ${t.age})`}
                   </p>
                 ))}
               </div>
+
+              {/* Selected Add-ons */}
+              {selectedAddOnDetails.length > 0 && (
+                <div className="bg-neutral-50 rounded-lg p-4">
+                  <h3 className="font-semibold mb-2">Add-ons & Upgrades</h3>
+                  <ul className="space-y-1 text-sm text-neutral-700">
+                    {selectedAddOnDetails.map((item) => (
+                      <li key={item.id} className="flex justify-between">
+                        <span>
+                          {item.name}
+                          {item.quantity > 1 && ` × ${item.quantity}`}
+                          {item.isRequired && <span className="ml-2 text-xs text-primary-600">(Required)</span>}
+                        </span>
+                        <span className="font-medium">₹{item.totalPrice.toLocaleString()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Preferences */}
+              {Object.values(formData.preferences).some((value) => Boolean(value)) && (
+                <div className="bg-neutral-50 rounded-lg p-4">
+                  <h3 className="font-semibold mb-2">Preferences</h3>
+                  <div className="text-sm text-neutral-700 space-y-1">
+                    {formData.preferences.foodPreference && (
+                      <p>Food: {formData.preferences.foodPreference}</p>
+                    )}
+                    {formData.preferences.foodPreferenceNotes && (
+                      <p>Food notes: {formData.preferences.foodPreferenceNotes}</p>
+                    )}
+                    {formData.preferences.languagePreference && (
+                      <p>
+                        Language:{" "}
+                        {formData.preferences.languagePreference === "other"
+                          ? formData.preferences.languagePreferenceOther || "Other"
+                          : formData.preferences.languagePreference}
+                      </p>
+                    )}
+                    {formData.preferences.driverPreference && (
+                      <p>Driver: {formData.preferences.driverPreference}</p>
+                    )}
+                    {formData.preferences.specialRequests && (
+                      <p>Other requests: {formData.preferences.specialRequests}</p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Payment Option */}
               <div className="bg-neutral-50 rounded-lg p-4">
@@ -954,12 +1502,25 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                   </label>
                 </div>
               </div>
+
+              {/* Policy Reminder */}
+              <div className="bg-neutral-50 rounded-lg p-4">
+                <h3 className="font-semibold mb-2">Refund & Cancellation Policy</h3>
+                <p className="text-sm text-neutral-700 whitespace-pre-line max-h-32 overflow-y-auto">
+                  {tour.bookingPolicies
+                    ? tour.bookingPolicies
+                    : "Please review the tour's refund & cancellation policy on the previous step."}
+                </p>
+                <p className="text-xs text-neutral-500 mt-2">
+                  You will need to accept the policy before completing your payment.
+                </p>
+              </div>
             </div>
           </div>
         );
 
       case 5:
-        const paymentFinalAmount = formData.paymentType === "full" ? baseAmount : advanceAmount;
+        const paymentFinalAmount = formData.paymentType === "full" ? finalAmount : advanceAmount;
         
         return (
           <div className="space-y-6">
@@ -992,6 +1553,11 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                     Logged in as: {session.user?.email}
                   </p>
                 </div>
+                {bookingCreationError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+                    {bookingCreationError}
+                  </div>
+                )}
                 <div className="bg-neutral-50 rounded-lg p-6">
                   <div className="flex justify-between items-center mb-4">
                     <span className="text-lg font-semibold">
@@ -1003,15 +1569,43 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                   </div>
                   {formData.paymentType === "advance" && (
                     <p className="text-sm text-neutral-600 mb-4">
-                      Remaining balance of ₹{Math.max(baseAmount - paymentFinalAmount, 0).toLocaleString()} due before departure.
+                      Remaining balance of ₹{Math.max(finalAmount - paymentFinalAmount, 0).toLocaleString()} due before departure.
                     </p>
                   )}
                   <p className="text-sm text-neutral-600 mb-6">
                     Secure payment via Razorpay. All major cards, UPI, and net banking accepted.
                   </p>
+                  <div className="border border-neutral-200 rounded-lg p-4 bg-white mb-6">
+                    <h4 className="font-semibold text-neutral-900 mb-2">Refund & Cancellation Policy</h4>
+                    <div className="space-y-2 text-sm text-neutral-700 max-h-32 overflow-y-auto">
+                      {tour.bookingPolicies ? (
+                        <p className="whitespace-pre-line">{tour.bookingPolicies}</p>
+                      ) : (
+                        <p>Please review the refund and cancellation policy before continuing.</p>
+                      )}
+                      {tour.cancellationTerms && (
+                        <p className="whitespace-pre-line text-neutral-600">{tour.cancellationTerms}</p>
+                      )}
+                    </div>
+                    <label className="flex items-start gap-2 text-sm text-neutral-800 mt-4">
+                      <input
+                        type="checkbox"
+                        checked={formData.policyAccepted}
+                        onChange={(e) => {
+                          setFormData((prev) => ({ ...prev, policyAccepted: e.target.checked }));
+                          setPolicyError(null);
+                        }}
+                        className="mt-1 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      <span>
+                        I agree to the refund & cancellation policy and understand the terms mentioned above.
+                      </span>
+                    </label>
+                    {policyError && <p className="text-sm text-red-600 mt-2">{policyError}</p>}
+                  </div>
                   <button
                     onClick={handlePayment}
-                    disabled={loading || !bookingId}
+                    disabled={loading || !formData.policyAccepted}
                     className="w-full bg-primary-600 text-white px-6 py-4 rounded-lg font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? "Processing..." : "Proceed to Payment"}
@@ -1120,11 +1714,10 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
           )}
           {currentStep === 4 && (
             <button
-              onClick={handleConfirmAndPay}
-              disabled={loading}
+            onClick={handleProceedToPaymentStep}
               className="px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
-              <span>{loading ? "Saving..." : "Confirm & Continue to Payment"}</span>
+            <span>Continue to Payment</span>
               <ArrowRight size={20} />
             </button>
           )}
@@ -1133,3 +1726,4 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
     </div>
   );
 }
+

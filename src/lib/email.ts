@@ -7,6 +7,7 @@ export interface EmailOptions {
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string | string[];
 }
 
 const resendApiKey = process.env.RESEND_API_KEY;
@@ -57,6 +58,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
         subject: options.subject,
         html: options.html,
         text: options.text || stripHtml(options.html),
+        replyTo: options.replyTo,
       });
       return true;
     } catch (error) {
@@ -69,6 +71,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   console.log("📧 Email would be sent:", {
     to: options.to,
     subject: options.subject,
+    replyTo: options.replyTo,
   });
   return true;
 }
@@ -385,5 +388,116 @@ export async function sendEmailVerificationEmail(
   `;
   
   return sendUserEmail({ to: email, role, subject, html });
+}
+
+/**
+ * Send admin notification email for new corporate lead
+ */
+export async function sendCorporateLeadAdminEmail(
+  leadData: {
+    companyName: string;
+    contactName: string;
+    email: string;
+    phone: string | null;
+    message: string | null;
+    createdAt: Date;
+  }
+) {
+  const subject = `New Corporate Lead - ${leadData.companyName}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="color: #0066cc;">New Corporate Lead</h1>
+      <p>A new corporate lead has been submitted through the corporate page.</p>
+      
+      <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
+        <h2 style="margin-top: 0; color: #333;">Lead Details</h2>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; width: 150px;">Company Name:</td>
+            <td style="padding: 8px 0;">${leadData.companyName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold;">Contact Person:</td>
+            <td style="padding: 8px 0;">${leadData.contactName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold;">Email:</td>
+            <td style="padding: 8px 0;"><a href="mailto:${leadData.email}">${leadData.email}</a></td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold;">Phone:</td>
+            <td style="padding: 8px 0;">${leadData.phone || "Not provided"}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold;">Submitted:</td>
+            <td style="padding: 8px 0;">${formatDate(leadData.createdAt.toString())}</td>
+          </tr>
+        </table>
+        
+        ${leadData.message ? `
+          <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+            <strong>Requirement/Message:</strong>
+            <div style="background-color: white; padding: 10px; border-radius: 3px; margin-top: 8px; white-space: pre-wrap;">${leadData.message.replace(/\n/g, "<br>")}</div>
+          </div>
+        ` : ""}
+      </div>
+      
+      <p style="margin-top: 20px;">
+        <a href="${process.env.NEXTAUTH_URL}/admin/corporate-leads" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View in Admin Panel</a>
+      </p>
+      
+      <p style="color: #666; font-size: 12px; margin-top: 30px;">
+        This is an automated notification from Travunited.
+      </p>
+    </div>
+  `;
+
+  // Send directly to admin inbox, not routed through sendUserEmail
+  return sendEmail({
+    to: "info@travunited.com",
+    subject,
+    html,
+  });
+}
+
+/**
+ * Send confirmation email to user after corporate lead submission
+ */
+export async function sendCorporateLeadConfirmationEmail(
+  userEmail: string,
+  companyName: string,
+  contactName: string
+) {
+  const subject = "We received your corporate request";
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="color: #0066cc;">Thank You for Your Interest!</h1>
+      
+      <p>Dear ${contactName},</p>
+      
+      <p>We have received your corporate travel inquiry for <strong>${companyName}</strong>. Our corporate travel team is reviewing your requirements and will get back to you within 24 hours.</p>
+      
+      <p>In the meantime, if you have any urgent questions, feel free to contact us directly:</p>
+      <ul>
+        <li><strong>Email:</strong> <a href="mailto:corporate@travunited.com">corporate@travunited.com</a></li>
+        <li><strong>Phone:</strong> <a href="tel:+916360392398">+91 63603 92398</a></li>
+      </ul>
+      
+      <p>We look forward to helping your organization with its travel needs!</p>
+      
+      <p>Best regards,<br>The Travunited Corporate Team</p>
+      
+      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px;">
+        <p>This is an automated confirmation email. Please do not reply to this message.</p>
+      </div>
+    </div>
+  `;
+
+  // Send directly to user's email
+  return sendEmail({
+    to: userEmail,
+    subject,
+    html,
+  });
 }
 

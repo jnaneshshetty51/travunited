@@ -29,6 +29,8 @@ function AdminApplicationsPageContent() {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [sortField, setSortField] = useState<"createdAt" | "totalAmount" | "status">("createdAt");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>(searchParams.get("status") || "ALL");
@@ -120,7 +122,7 @@ function AdminApplicationsPageContent() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedRows(new Set(applications.map(app => app.id)));
+      setSelectedRows(new Set(sortedApplications.map(app => app.id)));
       setShowBulkActions(true);
     } else {
       setSelectedRows(new Set());
@@ -196,20 +198,32 @@ function AdminApplicationsPageContent() {
             setBulkActionLoading(false);
             return;
           }
-          // TODO: Implement bulk delete
-          await fetch("/api/admin/applications/bulk/delete", {
+          const deleteResponse = await fetch("/api/admin/applications/bulk/delete", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              applicationIds: Array.from(selectedRows),
+              ids: Array.from(selectedRows), // Use 'ids' as expected by API
             }),
           });
+          if (!deleteResponse.ok) {
+            const errorData = await deleteResponse.json().catch(() => ({}));
+            throw new Error(errorData.error || "Failed to delete applications");
+          }
+          const deleteData = await deleteResponse.json();
+          // Don't show alert here, will show after fetchApplications
           break;
+        default:
+          throw new Error("Unknown action");
       }
       await fetchApplications();
       setSelectedRows(new Set());
       setShowBulkActions(false);
-      alert("Bulk action completed");
+      // Only show generic alert for non-delete actions
+      if (action !== "delete") {
+        alert("Bulk action completed");
+      } else {
+        alert("Applications deleted successfully");
+      }
     } catch (error) {
       console.error("Error performing bulk action:", error);
       alert("Failed to perform bulk action");
@@ -231,7 +245,51 @@ function AdminApplicationsPageContent() {
   };
 
   const uniqueCountries = Array.from(new Set(applications.map(app => app.country).filter(Boolean)));
-  const uniqueVisaTypes = Array.from(new Set(applications.map(app => app.visaType).filter(Boolean)));
+
+  const stats = useMemo(() => {
+    const totalValue = applications.reduce((sum, app) => sum + (app.totalAmount || 0), 0);
+    const awaitingPayment = applications.filter(app => app.status === "PAYMENT_PENDING").length;
+    const approved = applications.filter(app => app.status === "APPROVED").length;
+    const unassigned = applications.filter(app => !app.processedBy).length;
+    return {
+      totalApplications: applications.length,
+      totalValue,
+      awaitingPayment,
+      approved,
+      unassigned,
+    };
+  }, [applications]);
+
+  const sortedApplications = useMemo(() => {
+    const cloned = [...applications];
+    return cloned.sort((a, b) => {
+      let comparison = 0;
+      if (sortField === "createdAt") {
+        comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      } else if (sortField === "totalAmount") {
+        comparison = (a.totalAmount || 0) - (b.totalAmount || 0);
+      } else if (sortField === "status") {
+        comparison = a.status.localeCompare(b.status);
+      }
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [applications, sortField, sortDirection]);
+
+  const handleSortChange = (field: typeof sortField) => {
+    if (field === sortField) {
+      setSortDirection(prev => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection(field === "totalAmount" ? "desc" : "asc");
+    }
+  };
+
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(amount);
 
   if (loading) {
     return (
@@ -249,8 +307,123 @@ function AdminApplicationsPageContent() {
   return (
     <AdminLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-neutral-900">Visa Applications</h1>
+        <div className="mb-8 space-y-6">
+          <div className="flex flex-col gap-3">
+            <h1 className="text-3xl font-bold text-neutral-900">Visa Applications</h1>
+            <p className="text-neutral-500 text-sm md:text-base">
+              Monitor pipeline health, triage unassigned requests, and keep approvals moving with quicker bulk actions.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              {
+                label: "Total Applications",
+                value: stats.totalApplications.toString(),
+                accent: "bg-primary-50 text-primary-700 border border-primary-100",
+              },
+              {
+                label: "Pipeline Value",
+                value: stats.totalValue ? formatCurrency(stats.totalValue) : "₹0",
+                accent: "bg-emerald-50 text-emerald-700 border border-emerald-100",
+              },
+              {
+                label: "Awaiting Payment",
+                value: stats.awaitingPayment.toString(),
+                accent: "bg-amber-50 text-amber-700 border border-amber-100",
+              },
+              {
+                label: "Unassigned Cases",
+                value: stats.unassigned.toString(),
+                accent: "bg-rose-50 text-rose-700 border border-rose-100",
+              },
+            ].map((card, idx) => (
+              <motion.div
+                key={card.label}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className={`rounded-2xl px-5 py-4 backdrop-blur shadow-sm ${card.accent}`}
+              >
+                <p className="text-sm font-medium uppercase tracking-wide text-neutral-500">{card.label}</p>
+                <p className="text-2xl font-semibold mt-1">{card.value}</p>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {[
+              {
+                label: "All",
+                action: () => {
+                  setStatusFilter("ALL");
+                  setAssignedFilter("ALL");
+                },
+                active: statusFilter === "ALL" && assignedFilter === "ALL",
+              },
+              {
+                label: "Awaiting Payment",
+                action: () => {
+                  setStatusFilter("PAYMENT_PENDING");
+                  setAssignedFilter("ALL");
+                },
+                active: statusFilter === "PAYMENT_PENDING",
+              },
+              {
+                label: "In Process",
+                action: () => {
+                  setStatusFilter("IN_PROCESS");
+                  setAssignedFilter("ALL");
+                },
+                active: statusFilter === "IN_PROCESS",
+              },
+              {
+                label: "Approved",
+                action: () => {
+                  setStatusFilter("APPROVED");
+                  setAssignedFilter("ALL");
+                },
+                active: statusFilter === "APPROVED",
+              },
+              {
+                label: "Rejected",
+                action: () => {
+                  setStatusFilter("REJECTED");
+                  setAssignedFilter("ALL");
+                },
+                active: statusFilter === "REJECTED",
+              },
+              {
+                label: "Unassigned",
+                action: () => setAssignedFilter("UNASSIGNED"),
+                active: assignedFilter === "UNASSIGNED",
+              },
+            ].map((chip) => (
+              <button
+                key={chip.label}
+                onClick={chip.action}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                  chip.active ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                }`}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+          {uniqueCountries.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-500">
+              <span className="font-medium">Popular countries:</span>
+              {uniqueCountries.slice(0, 6).map((country) => (
+                <button
+                  key={country}
+                  onClick={() => setCountryFilter(country)}
+                  className="rounded-full border border-neutral-200 px-3 py-1 text-neutral-600 hover:border-neutral-400"
+                >
+                  {country}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Filters */}
@@ -415,8 +588,39 @@ function AdminApplicationsPageContent() {
         )}
 
         {/* Applications Table */}
-        {applications.length > 0 ? (
+        {sortedApplications.length > 0 ? (
           <div className="bg-white rounded-lg shadow-medium border border-neutral-200 overflow-hidden">
+            <div className="flex flex-col gap-3 px-6 pt-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm text-neutral-500">
+                  Showing <span className="font-semibold text-neutral-800">{sortedApplications.length}</span> record(s)
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    { label: "Date", field: "createdAt" as const },
+                    { label: "Amount", field: "totalAmount" as const },
+                    { label: "Status", field: "status" as const },
+                  ].map((option) => (
+                    <button
+                      key={option.field}
+                      onClick={() => handleSortChange(option.field)}
+                      className={`inline-flex items-center gap-1 rounded-full border px-4 py-1.5 text-sm transition-colors ${
+                        sortField === option.field
+                          ? "border-neutral-900 bg-neutral-900 text-white"
+                          : "border-neutral-200 text-neutral-600 hover:border-neutral-400"
+                      }`}
+                    >
+                      <ArrowUpDown size={14} />
+                      {option.label}
+                      {sortField === option.field && (
+                        <span className="text-xs">{sortDirection === "asc" ? "↑" : "↓"}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="h-px bg-neutral-100" />
+            </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-neutral-200">
                 <thead className="bg-neutral-50">
@@ -424,7 +628,7 @@ function AdminApplicationsPageContent() {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
                       <input
                         type="checkbox"
-                        checked={selectedRows.size === applications.length && applications.length > 0}
+                        checked={selectedRows.size === sortedApplications.length && sortedApplications.length > 0}
                         onChange={(e) => handleSelectAll(e.target.checked)}
                         className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                       />
@@ -456,7 +660,7 @@ function AdminApplicationsPageContent() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-neutral-200">
-                  {applications.map((app) => (
+                  {sortedApplications.map((app) => (
                     <tr 
                       key={app.id} 
                       className="hover:bg-neutral-50 cursor-pointer"
@@ -496,7 +700,7 @@ function AdminApplicationsPageContent() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">
-                        ₹{app.totalAmount.toLocaleString()}
+                        {formatCurrency(app.totalAmount || 0)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         {app.processedBy ? (
@@ -530,9 +734,26 @@ function AdminApplicationsPageContent() {
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-lg border border-neutral-200 p-12 text-center">
-            <FileText size={48} className="text-neutral-300 mx-auto mb-4" />
-            <p className="text-neutral-600">No applications found</p>
+          <div className="bg-white rounded-lg border border-neutral-200 p-12 text-center space-y-4">
+            <FileText size={48} className="text-neutral-300 mx-auto" />
+            <div>
+              <p className="text-lg font-semibold text-neutral-900">No applications match your filters</p>
+              <p className="text-neutral-500 text-sm">Try clearing filters or adjusting the quick chips above.</p>
+            </div>
+            <button
+              onClick={() => {
+                setStatusFilter("ALL");
+                setCountryFilter("");
+                setVisaTypeFilter("");
+                setAssignedFilter("ALL");
+                setDateFrom("");
+                setDateTo("");
+                setAssignedAdminFilter("");
+              }}
+              className="inline-flex items-center gap-2 rounded-full border border-neutral-300 px-5 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            >
+              Reset filters
+            </button>
           </div>
         )}
       </div>

@@ -104,7 +104,7 @@ const SETTINGS_MENU_ITEMS = [
     roles: ["STAFF_ADMIN", "SUPER_ADMIN"],
   },
   {
-    label: "Admin Management",
+    label: "Team Members",
     href: "/admin/settings/admins",
     icon: Shield,
     roles: ["SUPER_ADMIN"],

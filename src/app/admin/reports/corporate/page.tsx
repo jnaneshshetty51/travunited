@@ -31,6 +31,7 @@ export default function CorporateLeadsPage() {
     dateFrom: "",
     dateTo: "",
     datePreset: "last30",
+    search: "",
   });
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -39,6 +40,7 @@ export default function CorporateLeadsPage() {
   const dateFrom = filters.dateFrom;
   const dateTo = filters.dateTo;
   const filterStatus = filters.status;
+  const searchQuery = filters.search || "";
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
@@ -47,6 +49,7 @@ export default function CorporateLeadsPage() {
       if (dateFrom) params.append("dateFrom", dateFrom);
       if (dateTo) params.append("dateTo", dateTo);
       if (filterStatus) params.append("status", filterStatus);
+      if (searchQuery) params.append("q", searchQuery);
       params.append("page", page.toString());
       params.append("limit", "50");
 
@@ -62,8 +65,9 @@ export default function CorporateLeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, filterStatus, page]);
+  }, [dateFrom, dateTo, filterStatus, searchQuery, page]);
 
+  // Separate effect for auth check
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
@@ -75,9 +79,15 @@ export default function CorporateLeadsPage() {
         router.push("/admin");
         return;
       }
+    }
+  }, [session?.user?.role, status, router]);
+
+  // Separate effect for fetching data when filters change
+  useEffect(() => {
+    if (status === "authenticated" && session?.user?.role === "SUPER_ADMIN") {
       fetchReport();
     }
-  }, [session?.user?.role, status, router, fetchReport]);
+  }, [fetchReport, status, session?.user?.role]);
 
   const handleExport = async (format: "xlsx" | "csv" | "pdf") => {
     try {

@@ -80,6 +80,10 @@ export default async function TourDetailPage({
     include: {
       country: true,
       days: { orderBy: { dayIndex: "asc" } },
+      addOns: {
+        where: { isActive: true },
+        orderBy: { sortOrder: "asc" },
+      },
     },
   });
 
@@ -415,6 +419,32 @@ export default async function TourDetailPage({
                           )}
                         </div>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            )}
+            {tour.addOns && tour.addOns.length > 0 && (
+              <Section title="Customise This Package">
+                <p className="text-sm text-neutral-600 mb-4">
+                  Enhance your itinerary with optional add-ons. You can confirm selections during checkout.
+                </p>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {tour.addOns.map((addOn) => (
+                    <div key={addOn.id} className="p-4 border border-neutral-200 rounded-xl bg-white">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-semibold text-neutral-900">{addOn.name}</h4>
+                        {addOn.isRequired && (
+                          <span className="text-xs font-semibold text-primary-600 uppercase">Required</span>
+                        )}
+                      </div>
+                      {addOn.description && (
+                        <p className="text-sm text-neutral-600 mb-2">{addOn.description}</p>
+                      )}
+                      <p className="text-sm text-primary-600 font-medium">
+                        ₹{(addOn.price || 0).toLocaleString()}{" "}
+                        {addOn.pricingType === "PER_PERSON" ? "per traveller" : "per booking"}
+                      </p>
                     </div>
                   ))}
                 </div>
