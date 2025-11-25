@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import * as XLSX from "@e965/xlsx";
 import { generatePDF } from "@/lib/pdf-export";
 
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
     const format = searchParams.get("format");
 
     // Build filters
-    const where: any = {};
+    const where: Prisma.CorporateLeadWhereInput = {};
 
     if (dateFrom || dateTo) {
       where.createdAt = {};

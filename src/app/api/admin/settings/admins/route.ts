@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { notifyMultiple } from "@/lib/notifications";
+import { sendAdminWelcomeEmail } from "@/lib/email";
 export const dynamic = "force-dynamic";
 
 
@@ -20,57 +21,86 @@ export async function GET(req: Request) {
       );
     }
 
-    if (session.user.role !== "SUPER_ADMIN") {
+    // Allow both STAFF_ADMIN and SUPER_ADMIN to fetch admin list
+    // STAFF_ADMIN needs this for bulk assignment features
+    const isAdmin = session.user.role === "STAFF_ADMIN" || session.user.role === "SUPER_ADMIN";
+    if (!isAdmin) {
       return NextResponse.json(
-        { error: "Forbidden - Super Admin access required" },
+        { error: "Forbidden - Admin access required" },
         { status: 403 }
       );
     }
 
-    const admins = await prisma.user.findMany({
-      where: {
-        role: {
-          in: ["STAFF_ADMIN", "SUPER_ADMIN"],
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-        _count: {
-          select: {
-            processedApplications: true,
-            processedBookings: true,
+    const isSuperAdmin = session.user.role === "SUPER_ADMIN";
+
+    // For SUPER_ADMIN, fetch with stats; for STAFF_ADMIN, fetch basic info only
+    if (isSuperAdmin) {
+      const admins = await prisma.user.findMany({
+        where: {
+          role: {
+            in: ["STAFF_ADMIN", "SUPER_ADMIN"],
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          _count: {
+            select: {
+              processedApplications: true,
+              processedBookings: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
 
-    // Get last login times (would need a LastLogin model or track in session)
-    // For now, use updatedAt as a proxy
-    const adminsWithStats = admins.map((admin) => ({
-      id: admin.id,
-      name: admin.name,
-      email: admin.email,
-      role: admin.role,
-      isActive: admin.isActive,
-      createdAt: admin.createdAt,
-      lastLogin: admin.updatedAt, // Proxy for last login
-      stats: {
-        applicationsHandled: admin._count.processedApplications,
-        bookingsHandled: admin._count.processedBookings,
-        lastActive: admin.updatedAt,
-      },
-    }));
+      const adminsWithStats = admins.map((admin) => ({
+        id: admin.id,
+        name: admin.name,
+        email: admin.email,
+        role: admin.role,
+        isActive: admin.isActive,
+        createdAt: admin.createdAt,
+        lastLogin: admin.updatedAt, // Proxy for last login
+        stats: {
+          applicationsHandled: admin._count.processedApplications,
+          bookingsHandled: admin._count.processedBookings,
+          lastActive: admin.updatedAt,
+        },
+      }));
 
-    return NextResponse.json(adminsWithStats);
+      return NextResponse.json(adminsWithStats);
+    } else {
+      // For STAFF_ADMIN, return basic info only (for assignment dropdown)
+      // Only return active admins for assignment purposes
+      const admins = await prisma.user.findMany({
+        where: {
+          role: {
+            in: ["STAFF_ADMIN", "SUPER_ADMIN"],
+          },
+          isActive: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          isActive: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      return NextResponse.json(admins);
+    }
   } catch (error) {
     console.error("Error fetching admins:", error);
     return NextResponse.json(
@@ -171,8 +201,22 @@ export async function POST(req: Request) {
       );
     }
 
-    // TODO: Send welcome email with password or reset link
-    // For now, return the temp password (in production, send via email)
+    // Send welcome email with credentials
+    const loginUrl = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/login`;
+    try {
+      await sendAdminWelcomeEmail(
+        admin.email,
+        admin.name || "Admin",
+        admin.role,
+        generatePassword ? tempPassword : null,
+        loginUrl
+      );
+    } catch (emailError) {
+      console.error("Error sending welcome email to admin:", emailError);
+      // Don't fail the request if email fails, but log it
+    }
+
+    // Don't return temp password in response for security
     return NextResponse.json({
       admin: {
         id: admin.id,
@@ -180,10 +224,9 @@ export async function POST(req: Request) {
         email: admin.email,
         role: admin.role,
       },
-      tempPassword: generatePassword ? tempPassword : null,
-      message: generatePassword 
-        ? "Admin created. Temporary password generated. Please send via email."
-        : "Admin created successfully",
+      message: generatePassword
+        ? "Admin created successfully. Welcome email with temporary password has been sent."
+        : "Admin created successfully. Welcome email has been sent.",
     });
   } catch (error) {
     console.error("Error creating admin:", error);

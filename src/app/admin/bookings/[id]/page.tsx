@@ -135,6 +135,7 @@ export default function AdminBookingDetailPage() {
   const [resendingEmail, setResendingEmail] = useState<string | null>(null);
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
   const [removingInvoice, setRemovingInvoice] = useState(false);
+  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const fetchBooking = useCallback(async () => {
     try {
@@ -195,12 +196,16 @@ export default function AdminBookingDetailPage() {
 
       if (response.ok) {
         await fetchBooking();
-        alert("Status updated successfully");
+        setActionMessage({ type: "success", text: "Status updated successfully" });
+        setTimeout(() => setActionMessage(null), 5000);
       } else {
-        alert("Failed to update status");
+        const errorData = await response.json().catch(() => ({}));
+        setActionMessage({ type: "error", text: errorData.error || "Failed to update status" });
+        setTimeout(() => setActionMessage(null), 5000);
       }
     } catch (error) {
-      alert("An error occurred");
+      setActionMessage({ type: "error", text: "An error occurred while updating status" });
+      setTimeout(() => setActionMessage(null), 5000);
     } finally {
       setUpdating(false);
     }
@@ -208,11 +213,13 @@ export default function AdminBookingDetailPage() {
 
   const handleAssignAdmin = async (adminId: string) => {
     if (!adminId) {
-      alert("Please select an admin");
+      setActionMessage({ type: "error", text: "Please select an admin" });
+      setTimeout(() => setActionMessage(null), 5000);
       return;
     }
 
     setAssigningAdmin(true);
+    setActionMessage(null);
     try {
       const response = await fetch(`/api/admin/bookings/${params.id}/assign`, {
         method: "PUT",
@@ -223,14 +230,17 @@ export default function AdminBookingDetailPage() {
       if (response.ok) {
         await fetchBooking();
         setShowAssignDropdown(false);
-        alert("Booking assigned successfully");
+        setActionMessage({ type: "success", text: "Booking assigned successfully" });
+        setTimeout(() => setActionMessage(null), 5000);
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to assign booking");
+        setActionMessage({ type: "error", text: error.error || "Failed to assign booking" });
+        setTimeout(() => setActionMessage(null), 5000);
       }
     } catch (error) {
       console.error("Error assigning admin:", error);
-      alert("An error occurred");
+      setActionMessage({ type: "error", text: "An error occurred while assigning admin" });
+      setTimeout(() => setActionMessage(null), 5000);
     } finally {
       setAssigningAdmin(false);
     }
@@ -252,12 +262,16 @@ export default function AdminBookingDetailPage() {
       if (response.ok) {
         await fetchBooking();
         setVoucherFile(null);
-        alert("Voucher uploaded successfully");
+        setActionMessage({ type: "success", text: "Voucher uploaded successfully" });
+        setTimeout(() => setActionMessage(null), 5000);
       } else {
-        alert("Failed to upload voucher");
+        const errorData = await response.json().catch(() => ({}));
+        setActionMessage({ type: "error", text: errorData.error || "Failed to upload voucher" });
+        setTimeout(() => setActionMessage(null), 5000);
       }
     } catch (error) {
-      alert("An error occurred");
+      setActionMessage({ type: "error", text: "An error occurred while uploading voucher" });
+      setTimeout(() => setActionMessage(null), 5000);
     } finally {
       setUpdating(false);
     }
@@ -265,11 +279,13 @@ export default function AdminBookingDetailPage() {
 
   const handleAddNote = async () => {
     if (!newNote.trim()) {
-      alert("Please enter a note");
+      setActionMessage({ type: "error", text: "Please enter a note" });
+      setTimeout(() => setActionMessage(null), 5000);
       return;
     }
 
     setAddingNote(true);
+    setActionMessage(null);
     try {
       // Append to existing notes
       const updatedNotes = notes ? `${notes}\n\n[${new Date().toLocaleString()}] ${newNote}` : `[${new Date().toLocaleString()}] ${newNote}`;
@@ -283,13 +299,17 @@ export default function AdminBookingDetailPage() {
       if (response.ok) {
         await fetchBooking();
         setNewNote("");
-        alert("Note added successfully");
+        setActionMessage({ type: "success", text: "Note added successfully" });
+        setTimeout(() => setActionMessage(null), 5000);
       } else {
-        alert("Failed to add note");
+        const errorData = await response.json().catch(() => ({}));
+        setActionMessage({ type: "error", text: errorData.error || "Failed to add note" });
+        setTimeout(() => setActionMessage(null), 5000);
       }
     } catch (error) {
       console.error("Error adding note:", error);
-      alert("An error occurred");
+      setActionMessage({ type: "error", text: "An error occurred while adding note" });
+      setTimeout(() => setActionMessage(null), 5000);
     } finally {
       setAddingNote(false);
     }
@@ -307,12 +327,16 @@ export default function AdminBookingDetailPage() {
       });
 
       if (response.ok) {
-        alert("Email sent successfully");
+        setActionMessage({ type: "success", text: "Email sent successfully" });
+        setTimeout(() => setActionMessage(null), 5000);
       } else {
-        alert("Failed to send email");
+        const errorData = await response.json().catch(() => ({}));
+        setActionMessage({ type: "error", text: errorData.error || "Failed to send email" });
+        setTimeout(() => setActionMessage(null), 5000);
       }
     } catch (error) {
-      alert("An error occurred");
+      setActionMessage({ type: "error", text: "An error occurred while sending email" });
+      setTimeout(() => setActionMessage(null), 5000);
     } finally {
       setResendingEmail(null);
     }
@@ -374,6 +398,30 @@ export default function AdminBookingDetailPage() {
   return (
     <AdminLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Action Messages */}
+        {actionMessage && (
+          <div
+            className={`mb-6 rounded-lg p-4 flex items-center space-x-2 ${
+              actionMessage.type === "success"
+                ? "bg-green-50 border border-green-200 text-green-700"
+                : "bg-red-50 border border-red-200 text-red-700"
+            }`}
+          >
+            {actionMessage.type === "success" ? (
+              <CheckCircle size={20} className="flex-shrink-0" />
+            ) : (
+              <AlertCircle size={20} className="flex-shrink-0" />
+            )}
+            <span className="text-sm font-medium">{actionMessage.text}</span>
+            <button
+              onClick={() => setActionMessage(null)}
+              className="ml-auto text-current opacity-70 hover:opacity-100"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {/* Header Bar */}
         <div className="mb-8">
           <Link
@@ -479,7 +527,8 @@ export default function AdminBookingDetailPage() {
                         document.body.removeChild(a);
                       } catch (error) {
                         console.error("Error downloading invoice:", error);
-                        alert(`Failed to download invoice: ${error instanceof Error ? error.message : "Unknown error"}`);
+                        setActionMessage({ type: "error", text: `Failed to download invoice: ${error instanceof Error ? error.message : "Unknown error"}` });
+                        setTimeout(() => setActionMessage(null), 5000);
                       }
                     }}
                     className="inline-flex items-center gap-2 px-4 py-2 border border-neutral-300 rounded-lg text-sm font-medium text-neutral-700 hover:bg-neutral-50"
@@ -1012,12 +1061,16 @@ export default function AdminBookingDetailPage() {
                             
                             if (response.ok) {
                               await fetchBooking();
+                              setActionMessage({ type: "success", text: "Invoice uploaded successfully" });
+                              setTimeout(() => setActionMessage(null), 5000);
                             } else {
                               const error = await response.json();
-                              alert(error.error || "Failed to upload invoice");
+                              setActionMessage({ type: "error", text: error.error || "Failed to upload invoice" });
+                              setTimeout(() => setActionMessage(null), 5000);
                             }
                           } catch (error) {
-                            alert("An error occurred while uploading invoice");
+                            setActionMessage({ type: "error", text: "An error occurred while uploading invoice" });
+                            setTimeout(() => setActionMessage(null), 5000);
                           } finally {
                             setUploadingInvoice(false);
                             if (e.target) e.target.value = "";
@@ -1041,11 +1094,16 @@ export default function AdminBookingDetailPage() {
                           
                           if (response.ok) {
                             await fetchBooking();
+                            setActionMessage({ type: "success", text: "Invoice removed successfully" });
+                            setTimeout(() => setActionMessage(null), 5000);
                           } else {
-                            alert("Failed to remove invoice");
+                            const errorData = await response.json().catch(() => ({}));
+                            setActionMessage({ type: "error", text: errorData.error || "Failed to remove invoice" });
+                            setTimeout(() => setActionMessage(null), 5000);
                           }
                         } catch (error) {
-                          alert("An error occurred");
+                          setActionMessage({ type: "error", text: "An error occurred while removing invoice" });
+                          setTimeout(() => setActionMessage(null), 5000);
                         } finally {
                           setRemovingInvoice(false);
                         }
@@ -1083,12 +1141,16 @@ export default function AdminBookingDetailPage() {
                             
                             if (response.ok) {
                               await fetchBooking();
+                              setActionMessage({ type: "success", text: "Invoice uploaded successfully" });
+                              setTimeout(() => setActionMessage(null), 5000);
                             } else {
                               const error = await response.json();
-                              alert(error.error || "Failed to upload invoice");
+                              setActionMessage({ type: "error", text: error.error || "Failed to upload invoice" });
+                              setTimeout(() => setActionMessage(null), 5000);
                             }
                           } catch (error) {
-                            alert("An error occurred while uploading invoice");
+                            setActionMessage({ type: "error", text: "An error occurred while uploading invoice" });
+                            setTimeout(() => setActionMessage(null), 5000);
                           } finally {
                             setUploadingInvoice(false);
                             if (e.target) e.target.value = "";

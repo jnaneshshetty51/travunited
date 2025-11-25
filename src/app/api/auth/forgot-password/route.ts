@@ -54,7 +54,7 @@ export async function POST(req: Request) {
         console.error("Check RESEND_API_KEY and EMAIL_FROM environment variables");
         // Still return success to user (security best practice - don't reveal if email exists)
       } else {
-        console.log("Password reset email sent successfully to", user.email);
+        // Password reset email sent successfully (logging removed for production)
       }
     } catch (emailError) {
       console.error("Error sending password reset email:", emailError);

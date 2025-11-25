@@ -17,11 +17,8 @@ export async function POST(req: Request) {
     const signature = req.headers.get("x-razorpay-signature");
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
-    console.log("Webhook received:", {
-      hasSignature: !!signature,
-      hasSecret: !!webhookSecret,
-      bodyLength: rawBody.length,
-    });
+    // Webhook received (logging removed for production - uncomment for debugging)
+    // console.log("Webhook received:", { hasSignature: !!signature, hasSecret: !!webhookSecret, bodyLength: rawBody.length });
 
     if (!signature || !webhookSecret) {
       console.error("Webhook configuration missing");
@@ -47,10 +44,7 @@ export async function POST(req: Request) {
     const body = JSON.parse(rawBody);
     const { event, payload } = body;
 
-    console.log("Webhook event:", event, {
-      order_id: payload?.payment?.entity?.order_id,
-      payment_id: payload?.payment?.entity?.payment_id,
-    });
+    // Webhook event (logging removed for production - uncomment for debugging if needed)
 
     if (event === "payment.captured") {
       const { payment_id, order_id } = payload.payment.entity;
@@ -87,7 +81,7 @@ export async function POST(req: Request) {
 
       // Idempotency check: if payment is already completed, skip processing
       if (payment.status === "COMPLETED") {
-        console.log(`Payment ${payment.id} already completed, skipping webhook processing`);
+        // Payment already processed (logging removed for production)
         return NextResponse.json({ received: true, message: "Payment already processed" });
       }
 
@@ -212,7 +206,7 @@ export async function POST(req: Request) {
 
     if (event === "payment.failed") {
       const { order_id, payment_id } = payload.payment.entity;
-      console.log("Payment failed webhook:", { order_id, payment_id });
+      // Payment failed webhook (logging removed for production - uncomment for debugging if needed)
 
       // Only update if not already completed (idempotency)
       const updated = await prisma.payment.updateMany({
@@ -223,7 +217,7 @@ export async function POST(req: Request) {
         data: { status: "FAILED" },
       });
 
-      console.log(`Updated ${updated.count} payment(s) to FAILED status`);
+      // Updated payments to FAILED status (logging removed for production)
 
       const failedPayments = await prisma.payment.findMany({
         where: { razorpayOrderId: order_id },

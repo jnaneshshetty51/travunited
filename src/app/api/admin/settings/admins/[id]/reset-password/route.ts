@@ -78,7 +78,7 @@ export async function POST(
           { status: 500 }
         );
       }
-      console.log("Password reset email sent successfully to", admin.email);
+      // Password reset email sent successfully (logging removed for production)
     } catch (emailError) {
       console.error("Error sending password reset email:", emailError);
       console.error("Admin email:", admin.email);

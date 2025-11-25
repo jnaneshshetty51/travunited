@@ -31,6 +31,8 @@ function AdminApplicationsPageContent() {
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [sortField, setSortField] = useState<"createdAt" | "totalAmount" | "status">("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [bulkActionMessage, setBulkActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [admins, setAdmins] = useState<Array<{ id: string; name: string; email: string }>>([]);
 
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>(searchParams.get("status") || "ALL");
@@ -83,6 +85,22 @@ function AdminApplicationsPageContent() {
     searchParamsKey,
   ]);
 
+  const fetchAdmins = useCallback(async () => {
+    try {
+      const response = await fetch("/api/admin/settings/admins");
+      if (response.ok) {
+        const data = await response.json();
+        setAdmins(data.map((admin: { id: string; name: string; email: string }) => ({
+          id: admin.id,
+          name: admin.name,
+          email: admin.email,
+        })));
+      }
+    } catch (error) {
+      console.error("Error fetching admins:", error);
+    }
+  }, []);
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
@@ -97,9 +115,10 @@ function AdminApplicationsPageContent() {
           setStatusFilter(urlStatus);
         }
         fetchApplications();
+        fetchAdmins();
       }
     }
-  }, [session, status, router, fetchApplications]);
+  }, [session, status, router, fetchApplications, fetchAdmins]);
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -145,16 +164,16 @@ function AdminApplicationsPageContent() {
     if (selectedRows.size === 0) return;
 
     setBulkActionLoading(true);
+    setBulkActionMessage(null);
     try {
       switch (action) {
         case "assign":
           if (!value) {
-            alert("Please select an admin to assign");
+            setBulkActionMessage({ type: "error", text: "Please select an admin to assign" });
             setBulkActionLoading(false);
             return;
           }
-          // TODO: Implement bulk assign
-          await fetch("/api/admin/applications/bulk/assign", {
+          const assignResponse = await fetch("/api/admin/applications/bulk/assign", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -162,15 +181,19 @@ function AdminApplicationsPageContent() {
               adminId: value,
             }),
           });
+          if (!assignResponse.ok) {
+            const errorData = await assignResponse.json().catch(() => ({}));
+            throw new Error(errorData.error || "Failed to assign applications");
+          }
+          setBulkActionMessage({ type: "success", text: `Successfully assigned ${selectedRows.size} application(s)` });
           break;
         case "status":
           if (!value) {
-            alert("Please select a status");
+            setBulkActionMessage({ type: "error", text: "Please select a status" });
             setBulkActionLoading(false);
             return;
           }
-          // TODO: Implement bulk status change
-          await fetch("/api/admin/applications/bulk/status", {
+          const statusResponse = await fetch("/api/admin/applications/bulk/status", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -178,20 +201,45 @@ function AdminApplicationsPageContent() {
               status: value,
             }),
           });
+          if (!statusResponse.ok) {
+            const errorData = await statusResponse.json().catch(() => ({}));
+            throw new Error(errorData.error || "Failed to update status");
+          }
+          setBulkActionMessage({ type: "success", text: `Successfully updated status for ${selectedRows.size} application(s)` });
           break;
         case "export":
-          // TODO: Implement CSV/Excel export
-          window.location.href = `/api/admin/applications/export?ids=${Array.from(selectedRows).join(",")}`;
-          break;
+          const exportResponse = await fetch(`/api/admin/applications/export?ids=${Array.from(selectedRows).join(",")}`);
+          if (!exportResponse.ok) {
+            const errorData = await exportResponse.json().catch(() => ({}));
+            throw new Error(errorData.error || "Failed to export applications");
+          }
+          // Create blob from response and trigger download
+          const blob = await exportResponse.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `applications-${new Date().toISOString().split("T")[0]}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+          setBulkActionMessage({ type: "success", text: `Successfully exported ${selectedRows.size} application(s)` });
+          setBulkActionLoading(false);
+          setTimeout(() => setBulkActionMessage(null), 5000);
+          return; // Don't refresh table for export
         case "resend":
-          // TODO: Implement bulk resend emails
-          await fetch("/api/admin/applications/bulk/resend-email", {
+          const resendResponse = await fetch("/api/admin/applications/bulk/resend-email", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               applicationIds: Array.from(selectedRows),
             }),
           });
+          if (!resendResponse.ok) {
+            const errorData = await resendResponse.json().catch(() => ({}));
+            throw new Error(errorData.error || "Failed to resend emails");
+          }
+          setBulkActionMessage({ type: "success", text: `Successfully resent emails for ${selectedRows.size} application(s)` });
           break;
         case "delete":
           if (!confirm("Are you absolutely sure? This action cannot be undone.")) {
@@ -202,15 +250,14 @@ function AdminApplicationsPageContent() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              ids: Array.from(selectedRows), // Use 'ids' as expected by API
+              ids: Array.from(selectedRows),
             }),
           });
           if (!deleteResponse.ok) {
             const errorData = await deleteResponse.json().catch(() => ({}));
             throw new Error(errorData.error || "Failed to delete applications");
           }
-          const deleteData = await deleteResponse.json();
-          // Don't show alert here, will show after fetchApplications
+          setBulkActionMessage({ type: "success", text: `Successfully deleted ${selectedRows.size} application(s)` });
           break;
         default:
           throw new Error("Unknown action");
@@ -218,15 +265,15 @@ function AdminApplicationsPageContent() {
       await fetchApplications();
       setSelectedRows(new Set());
       setShowBulkActions(false);
-      // Only show generic alert for non-delete actions
-      if (action !== "delete") {
-        alert("Bulk action completed");
-      } else {
-        alert("Applications deleted successfully");
+      // Auto-hide success message after 5 seconds
+      if (action !== "export") {
+        setTimeout(() => setBulkActionMessage(null), 5000);
       }
     } catch (error) {
       console.error("Error performing bulk action:", error);
-      alert("Failed to perform bulk action");
+      const errorMessage = error instanceof Error ? error.message : "Failed to perform bulk action";
+      setBulkActionMessage({ type: "error", text: errorMessage });
+      setTimeout(() => setBulkActionMessage(null), 5000);
     } finally {
       setBulkActionLoading(false);
     }
@@ -512,6 +559,30 @@ function AdminApplicationsPageContent() {
           </div>
         </div>
 
+        {/* Bulk Action Messages */}
+        {bulkActionMessage && (
+          <div
+            className={`mb-6 rounded-lg p-4 flex items-center space-x-2 ${
+              bulkActionMessage.type === "success"
+                ? "bg-green-50 border border-green-200 text-green-700"
+                : "bg-red-50 border border-red-200 text-red-700"
+            }`}
+          >
+            {bulkActionMessage.type === "success" ? (
+              <CheckCircle size={20} className="flex-shrink-0" />
+            ) : (
+              <AlertCircle size={20} className="flex-shrink-0" />
+            )}
+            <span className="text-sm font-medium">{bulkActionMessage.text}</span>
+            <button
+              onClick={() => setBulkActionMessage(null)}
+              className="ml-auto text-current opacity-70 hover:opacity-100"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {/* Bulk Actions */}
         {showBulkActions && (
           <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6 flex items-center justify-between">
@@ -531,8 +602,12 @@ function AdminApplicationsPageContent() {
                   disabled={bulkActionLoading}
                 >
                   <option value="">Bulk Assign To...</option>
-                  {/* TODO: Load admin list */}
                   <option value="current">Assign to Me</option>
+                  {admins.map((admin) => (
+                    <option key={admin.id} value={admin.id}>
+                      {admin.name || admin.email}
+                    </option>
+                  ))}
                 </select>
                 <select
                   onChange={(e) => {

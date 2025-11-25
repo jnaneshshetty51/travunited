@@ -39,8 +39,7 @@ export async function GET(
     return NextResponse.json({ error: "Invalid media path" }, { status: 400 });
   }
 
-  // Log the incoming key for debugging
-  console.log("Media proxy request:", { key: keyPath, bucket: process.env.MINIO_BUCKET });
+  // Media proxy request (logging removed for production)
 
   try {
     const object = await getDocumentObject(keyPath);

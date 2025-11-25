@@ -59,22 +59,7 @@ const startOfDayUTC = (value: Date) =>
 
 export async function POST(req: Request) {
   try {
-    // Log the incoming request for debugging
     const body = await req.json();
-    console.log("Booking creation request received:", {
-      tourId: body.tourId,
-      tourName: body.tourName,
-      travelDate: body.travelDate,
-      numberOfAdults: body.numberOfAdults,
-      numberOfChildren: body.numberOfChildren,
-      travellersCount: body.travellers?.length,
-      primaryContactEmail: body.primaryContact?.email,
-      paymentType: body.paymentType,
-      hasCustomizations: !!body.customizations,
-      hasHotelCategory: !!body.hotelCategory,
-      addOnsCount: body.selectedAddOns?.length ?? 0,
-      policyAccepted: body.policyAccepted,
-    });
 
     // Validate request body with detailed error messages
     let data;

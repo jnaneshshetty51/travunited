@@ -501,3 +501,105 @@ export async function sendCorporateLeadConfirmationEmail(
   });
 }
 
+/**
+ * Send welcome email to newly created admin user
+ * Includes temporary password or password reset link
+ */
+export async function sendAdminWelcomeEmail(
+  email: string,
+  name: string,
+  role: string,
+  tempPassword: string | null,
+  loginUrl: string
+) {
+  const subject = "Welcome to Travunited Admin Panel";
+  const resetPasswordUrl = `${loginUrl}?reset=true`;
+  
+  const passwordSection = tempPassword
+    ? `
+      <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 15px; margin: 20px 0;">
+        <h3 style="margin-top: 0; color: #856404;">Your Temporary Password</h3>
+        <p style="font-size: 18px; font-weight: bold; color: #856404; font-family: monospace; letter-spacing: 2px; margin: 10px 0;">
+          ${tempPassword}
+        </p>
+        <p style="margin-bottom: 0; color: #856404;">
+          <strong>Please change this password immediately after your first login.</strong>
+        </p>
+      </div>
+    `
+    : `
+      <div style="background-color: #d1ecf1; border: 1px solid #0c5460; border-radius: 5px; padding: 15px; margin: 20px 0;">
+        <p style="margin: 0; color: #0c5460;">
+          Please use the password provided by your administrator or request a password reset.
+        </p>
+      </div>
+    `;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1 style="color: #0066cc;">Welcome to Travunited Admin Panel!</h1>
+      
+      <p>Dear ${name},</p>
+      
+      <p>Your admin account has been successfully created for the Travunited platform.</p>
+      
+      <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <h3 style="margin-top: 0; color: #333;">Account Details</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold; width: 120px;">Email:</td>
+            <td style="padding: 8px 0;">${email}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px 0; font-weight: bold;">Role:</td>
+            <td style="padding: 8px 0;">${role === "SUPER_ADMIN" ? "Super Admin" : "Staff Admin"}</td>
+          </tr>
+        </table>
+      </div>
+      
+      ${passwordSection}
+      
+      <div style="margin: 30px 0;">
+        <p><strong>Getting Started:</strong></p>
+        <ol style="line-height: 1.8;">
+          <li>Log in to the admin panel using your email and ${tempPassword ? "the temporary password above" : "your password"}</li>
+          <li>Once logged in, navigate to your account settings</li>
+          <li>Change your password to something secure and memorable</li>
+        </ol>
+      </div>
+      
+      <p style="margin-top: 30px; text-align: center;">
+        <a href="${loginUrl}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">
+          Log In to Admin Panel
+        </a>
+      </p>
+      
+      <p style="margin-top: 20px;">
+        <a href="${resetPasswordUrl}" style="color: #0066cc; text-decoration: underline;">
+          Or reset your password here
+        </a>
+      </p>
+      
+      <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px;">
+        <p><strong>Security Reminder:</strong></p>
+        <ul style="margin: 10px 0; padding-left: 20px;">
+          <li>Never share your login credentials with anyone</li>
+          <li>Use a strong, unique password</li>
+          <li>Log out when finished, especially on shared devices</li>
+          <li>Contact support immediately if you notice any suspicious activity</li>
+        </ul>
+        <p style="margin-top: 15px;">
+          If you did not expect this email, please contact <a href="mailto:info@travunited.com">info@travunited.com</a> immediately.
+        </p>
+      </div>
+    </div>
+  `;
+
+  // Send directly to admin's email (not routed through admin inbox)
+  return sendEmail({
+    to: email,
+    subject,
+    html,
+  });
+}
+
