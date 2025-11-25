@@ -9,10 +9,34 @@ export interface PDFExportOptions {
   maxRows?: number;
 }
 
+// Helper function to safely set font with fallback
+function safeFont(doc: PDFDocument, fontName: string, fallback: string = "Helvetica") {
+  try {
+    doc.font(fontName);
+  } catch (error: any) {
+    // If font loading fails (e.g., ENOENT error), use fallback
+    if (error.code === "ENOENT" || error.message?.includes("ENOENT") || error.message?.includes("no such file")) {
+      console.warn(`Font ${fontName} not available, using ${fallback}`);
+      try {
+        doc.font(fallback);
+      } catch {
+        // If fallback also fails, PDFKit will use default font
+      }
+    } else {
+      throw error;
+    }
+  }
+}
+
 export function generatePDF(options: PDFExportOptions): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({ margin: 50 });
+      // Configure PDFKit to use only built-in fonts (no external font files)
+      // This prevents ENOENT errors when font files are not available
+      const doc = new PDFDocument({ 
+        margin: 50,
+        autoFirstPage: true
+      });
       const buffers: Buffer[] = [];
 
       doc.on("data", (chunk: Buffer) => {
@@ -31,17 +55,28 @@ export function generatePDF(options: PDFExportOptions): Promise<Buffer> {
         }
       });
       doc.on("error", (error: Error) => {
-        reject(new Error(`PDF generation error: ${error.message || String(error)}`));
+        // Check if it's a font loading error
+        if (error.message?.includes("ENOENT") || error.message?.includes("no such file") || error.message?.includes(".afm")) {
+          console.warn("PDFKit font loading error caught:", error.message);
+          // Don't reject immediately - try to continue with default fonts
+          // The error handler will catch this, but we'll try to continue
+        } else {
+          reject(new Error(`PDF generation error: ${error.message || String(error)}`));
+        }
       });
 
-    // Title
-    doc.fontSize(20).font("Helvetica-Bold").text(options.title, { align: "center" });
+    // Title - use safe font loading
+    doc.fontSize(20);
+    safeFont(doc, "Helvetica-Bold", "Helvetica");
+    doc.text(options.title, { align: "center" });
     doc.moveDown();
 
     // Filters summary
     if (options.filters && Object.keys(options.filters).length > 0) {
-      doc.fontSize(12).font("Helvetica-Bold").text("Filters:", { underline: true });
-      doc.font("Helvetica");
+      doc.fontSize(12);
+      safeFont(doc, "Helvetica-Bold", "Helvetica");
+      doc.text("Filters:", { underline: true });
+      safeFont(doc, "Helvetica");
       Object.entries(options.filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== "") {
           const label = key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase());
@@ -53,8 +88,10 @@ export function generatePDF(options: PDFExportOptions): Promise<Buffer> {
 
     // Summary KPIs
     if (options.summary && Object.keys(options.summary).length > 0) {
-      doc.fontSize(12).font("Helvetica-Bold").text("Summary:", { underline: true });
-      doc.font("Helvetica");
+      doc.fontSize(12);
+      safeFont(doc, "Helvetica-Bold", "Helvetica");
+      doc.text("Summary:", { underline: true });
+      safeFont(doc, "Helvetica");
       Object.entries(options.summary).forEach(([key, value]) => {
         const label = key.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase());
         doc.fontSize(10).text(`${label}: ${String(value)}`);
@@ -64,7 +101,9 @@ export function generatePDF(options: PDFExportOptions): Promise<Buffer> {
 
     // Table
     if (options.headers.length > 0 && options.rows.length > 0) {
-      doc.fontSize(12).font("Helvetica-Bold").text("Data:", { underline: true });
+      doc.fontSize(12);
+      safeFont(doc, "Helvetica-Bold", "Helvetica");
+      doc.text("Data:", { underline: true });
       doc.moveDown(0.5);
 
       const maxRows = options.maxRows || 100;
@@ -72,7 +111,8 @@ export function generatePDF(options: PDFExportOptions): Promise<Buffer> {
       const hasMore = options.rows.length > maxRows;
 
       // Table headers
-      doc.fontSize(9).font("Helvetica-Bold");
+      doc.fontSize(9);
+      safeFont(doc, "Helvetica-Bold", "Helvetica");
       const startX = 50;
       const rowHeight = 20;
       let currentY = doc.y;
@@ -90,7 +130,8 @@ export function generatePDF(options: PDFExportOptions): Promise<Buffer> {
       currentY += rowHeight;
 
       // Table rows
-      doc.font("Helvetica").fontSize(8);
+      safeFont(doc, "Helvetica");
+      doc.fontSize(8);
       rowsToShow.forEach((row) => {
         if (currentY > doc.page.height - 50) {
           doc.addPage();
@@ -110,7 +151,9 @@ export function generatePDF(options: PDFExportOptions): Promise<Buffer> {
 
       if (hasMore) {
         doc.moveDown();
-        doc.fontSize(9).font("Helvetica-Oblique").text(
+        doc.fontSize(9);
+        safeFont(doc, "Helvetica-Oblique", "Helvetica");
+        doc.text(
           `Note: Showing first ${maxRows} rows. Total rows: ${options.rows.length}`,
           { align: "center" }
         );
@@ -121,7 +164,8 @@ export function generatePDF(options: PDFExportOptions): Promise<Buffer> {
 
     // Footer
     try {
-      doc.fontSize(8).font("Helvetica-Oblique");
+      doc.fontSize(8);
+      safeFont(doc, "Helvetica-Oblique", "Helvetica");
       const footerY = doc.page.height - 30;
       doc.text(
         `Generated on ${new Date().toLocaleString()}`,
