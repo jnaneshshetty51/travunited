@@ -35,59 +35,88 @@ export async function POST(req: Request) {
       );
     }
 
+    // First, verify that all booking IDs exist
+    const existingBookings = await prisma.booking.findMany({
+      where: {
+        id: { in: bookingIds },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const existingBookingIds = existingBookings.map(b => b.id);
+    const missingIds = bookingIds.filter(id => !existingBookingIds.includes(id));
+
+    if (missingIds.length > 0 && missingIds.length === bookingIds.length) {
+      return NextResponse.json(
+        { error: "None of the provided booking IDs exist" },
+        { status: 404 }
+      );
+    }
+
     // Delete related records first (travellers, addOns, reviews, payments, audit logs) to avoid foreign key constraints
     // Then delete the bookings
     const deleteResult = await prisma.$transaction(async (tx) => {
       // Delete AuditLog records that reference these bookings
-      await tx.auditLog.deleteMany({
-        where: {
-          entityType: "BOOKING",
-          entityId: { in: bookingIds },
-        },
-      });
+      // Note: entityId is nullable, but when using 'in' with an array, Prisma will only match non-null values
+      if (existingBookingIds.length > 0) {
+        await tx.auditLog.deleteMany({
+          where: {
+            entityType: "BOOKING",
+            entityId: { in: existingBookingIds },
+          },
+        });
+      }
 
       // Delete BookingTraveller records
       await tx.bookingTraveller.deleteMany({
         where: {
-          bookingId: { in: bookingIds },
+          bookingId: { in: existingBookingIds },
         },
       });
 
       // Delete BookingAddOn records
       await tx.bookingAddOn.deleteMany({
         where: {
-          bookingId: { in: bookingIds },
+          bookingId: { in: existingBookingIds },
         },
       });
 
       // Delete Review records (optional relation, but delete if exists)
       await tx.review.deleteMany({
         where: {
-          bookingId: { in: bookingIds },
+          bookingId: { in: existingBookingIds },
         },
       });
 
       // Delete Payment records (optional relation, but delete if exists)
       await tx.payment.deleteMany({
         where: {
-          bookingId: { in: bookingIds },
+          bookingId: { in: existingBookingIds },
         },
       });
 
       // Finally delete the bookings
       const result = await tx.booking.deleteMany({
         where: {
-          id: { in: bookingIds },
+          id: { in: existingBookingIds },
         },
       });
 
-      return result;
+      return { result, missingIds };
     });
 
-    return NextResponse.json({ 
-      message: `Successfully deleted ${deleteResult.count} booking(s)`,
-      deletedCount: deleteResult.count,
-    });
+    const response: any = {
+      message: `Successfully deleted ${deleteResult.result.count} booking(s)`,
+      deletedCount: deleteResult.result.count,
+    };
+
+    if (deleteResult.missingIds.length > 0) {
+      response.warning = `${deleteResult.missingIds.length} booking ID(s) not found: ${deleteResult.missingIds.join(", ")}`;
+    }
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error("Error bulk deleting bookings:", error);
     
