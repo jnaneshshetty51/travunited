@@ -11,7 +11,21 @@ The migration `20251125163000_booking_customizations` exists locally but hasn't 
 
 ## Solution Options
 
-### Option 1: Run Migration (Recommended)
+### Option 1: Quick Fix Script (Fastest) ⚡
+SSH into your VPS and run the automated fix script:
+
+```bash
+ssh user@your-vps-ip
+cd /var/www/travunited/travunitedlatest
+bash scripts/fix-requires-passport.sh
+```
+
+This script will:
+- ✅ Add the missing column to the database
+- ✅ Regenerate Prisma Client
+- ✅ Restart PM2
+
+### Option 2: Run Migration (Recommended for full sync)
 SSH into your VPS and run the migration:
 
 ```bash
@@ -31,7 +45,7 @@ npx prisma generate
 pm2 restart travunited --update-env
 ```
 
-### Option 2: Quick SQL Fix (If migration fails)
+### Option 3: Quick SQL Fix (If migration fails)
 If the migration fails for any reason, you can run the SQL directly:
 
 ```bash
@@ -51,7 +65,7 @@ npx prisma generate
 pm2 restart travunited --update-env
 ```
 
-### Option 3: Manual SQL Command
+### Option 4: Manual SQL Command
 Connect to your database and run:
 
 ```sql
