@@ -17,6 +17,8 @@ import {
   Upload,
   Plus,
   Minus,
+  X,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { loadRazorpayScript } from "@/lib/razorpay-client";
@@ -79,11 +81,19 @@ interface Tour {
   originalPrice?: number | null;
   requiresPassport?: boolean;
   tourType?: string | null;
+  packageType?: string | null;
   addOns?: TourAddOn[] | null;
   hotelCategories?: string[] | null;
   advancePercentage?: number | null;
   allowAdvance?: boolean | null;
   seasonalPricing?: Record<string, { from?: string; to?: string; price?: number }> | null;
+  bookingDeadline?: string | Date | null;
+  availableDates?: string[] | null;
+  minimumTravelers?: number | null;
+  maximumTravelers?: number | null;
+  updatedAt?: string | Date | null;
+  bookingPolicies?: string | null;
+  cancellationTerms?: string | null;
 }
 
 export default function TourBookingPage({ params }: { params: { id: string } }) {
@@ -99,6 +109,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
   const [policyError, setPolicyError] = useState<string | null>(null);
   const [bookingCreationError, setBookingCreationError] = useState<string | null>(null);
   const [selectedHotelCategory, setSelectedHotelCategory] = useState<string>("");
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     travelDate: "",
@@ -250,7 +261,8 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
         ...prev,
         [travellerKey]: { uploading: false, error: message },
       }));
-      alert(message);
+      setValidationError(message);
+      setTimeout(() => setValidationError(null), 5000);
     }
   };
 
@@ -446,58 +458,69 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
   };
 
   const nextStep = () => {
+    setValidationError(null);
     // Validation
     if (currentStep === 1) {
       const error = validateStep1();
       if (error) {
-        alert(error);
+        setValidationError(error);
+        setTimeout(() => setValidationError(null), 5000);
         return;
       }
     }
     
     if (currentStep === 2) {
       if (!formData.primaryContact.name || !formData.primaryContact.email) {
-        alert("Please fill in all required contact information");
+        setValidationError("Please fill in all required contact information");
+        setTimeout(() => setValidationError(null), 5000);
         return;
       }
     }
     
     if (currentStep === 3) {
       if (formData.travellers.length === 0) {
-        alert("Please add traveller information");
+        setValidationError("Please add traveller information");
+        setTimeout(() => setValidationError(null), 5000);
         return;
       }
       for (let index = 0; index < formData.travellers.length; index += 1) {
         const traveller = formData.travellers[index];
         if (!traveller.firstName || !traveller.lastName) {
-          alert(`Traveller ${index + 1}: Please fill in first and last name.`);
+          setValidationError(`Traveller ${index + 1}: Please fill in first and last name.`);
+          setTimeout(() => setValidationError(null), 5000);
           return;
         }
         if (!traveller.dateOfBirth) {
-          alert(`Traveller ${index + 1}: Date of birth is required.`);
+          setValidationError(`Traveller ${index + 1}: Date of birth is required.`);
+          setTimeout(() => setValidationError(null), 5000);
           return;
         }
         if (requiresPassport) {
           if (!traveller.nationality) {
-            alert(`Traveller ${index + 1}: Nationality is required.`);
+            setValidationError(`Traveller ${index + 1}: Nationality is required.`);
+            setTimeout(() => setValidationError(null), 5000);
             return;
           }
           if (!traveller.passportNumber) {
-            alert(`Traveller ${index + 1}: Passport number is required.`);
+            setValidationError(`Traveller ${index + 1}: Passport number is required.`);
+            setTimeout(() => setValidationError(null), 5000);
             return;
           }
           if (!traveller.passportIssuingCountry) {
-            alert(`Traveller ${index + 1}: Passport issuing country is required.`);
+            setValidationError(`Traveller ${index + 1}: Passport issuing country is required.`);
+            setTimeout(() => setValidationError(null), 5000);
             return;
           }
           if (!traveller.passportFileKey) {
-            alert(`Traveller ${index + 1}: Please upload a passport copy.`);
+            setValidationError(`Traveller ${index + 1}: Please upload a passport copy.`);
+            setTimeout(() => setValidationError(null), 5000);
             return;
           }
         }
         const expiryIssue = getPassportExpiryError(traveller);
         if (expiryIssue) {
-          alert(`Traveller ${index + 1}: ${expiryIssue}`);
+          setValidationError(`Traveller ${index + 1}: ${expiryIssue}`);
+          setTimeout(() => setValidationError(null), 5000);
           return;
         }
       }
@@ -515,47 +538,56 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
   };
 
   const handleConfirmAndPay = async (): Promise<string | null> => {
+    setValidationError(null);
     if (bookingId) return bookingId;
     if (!tour) return null;
 
     if (!formData.travelDate) {
-      alert("Please select a travel date");
+      setValidationError("Please select a travel date");
+      setTimeout(() => setValidationError(null), 5000);
       return null;
     }
 
     if (!formData.primaryContact.name || !formData.primaryContact.email) {
-      alert("Please fill in all required contact information");
+      setValidationError("Please fill in all required contact information");
+      setTimeout(() => setValidationError(null), 5000);
       return null;
     }
 
     if (formData.travellers.length === 0) {
-      alert("Please add at least one traveller");
+      setValidationError("Please add at least one traveller");
+      setTimeout(() => setValidationError(null), 5000);
       return null;
     }
 
     for (let index = 0; index < formData.travellers.length; index += 1) {
       const traveller = formData.travellers[index];
       if (!traveller.firstName || !traveller.lastName) {
-        alert(`Traveller ${index + 1}: Please provide full name.`);
+        setValidationError(`Traveller ${index + 1}: Please provide full name.`);
+        setTimeout(() => setValidationError(null), 5000);
         return null;
       }
       if (!traveller.dateOfBirth) {
-        alert(`Traveller ${index + 1}: Date of birth is required.`);
+        setValidationError(`Traveller ${index + 1}: Date of birth is required.`);
+        setTimeout(() => setValidationError(null), 5000);
         return null;
       }
       if (requiresPassport) {
         if (!traveller.nationality || !traveller.passportNumber || !traveller.passportIssuingCountry) {
-          alert(`Traveller ${index + 1}: Complete passport details are required.`);
+          setValidationError(`Traveller ${index + 1}: Complete passport details are required.`);
+          setTimeout(() => setValidationError(null), 5000);
           return null;
         }
         if (!traveller.passportFileKey) {
-          alert(`Traveller ${index + 1}: Please upload the passport copy.`);
+          setValidationError(`Traveller ${index + 1}: Please upload the passport copy.`);
+          setTimeout(() => setValidationError(null), 5000);
           return null;
         }
       }
       const expiryIssue = getPassportExpiryError(traveller);
       if (expiryIssue) {
-        alert(`Traveller ${index + 1}: ${expiryIssue}`);
+        setValidationError(`Traveller ${index + 1}: ${expiryIssue}`);
+        setTimeout(() => setValidationError(null), 5000);
         return null;
       }
     }
@@ -710,7 +742,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
         amount: orderAmount,
         currency,
         name: "Travunited",
-        description: `${tour.name}`,
+        description: `${tour?.name || "Tour booking"}`,
         order_id: orderId,
         prefill: {
           name: formData.primaryContact.name,
@@ -744,7 +776,8 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
           } catch (error: unknown) {
             console.error("Payment verification error:", error);
             setLoading(false);
-            alert(error instanceof Error ? error.message : "Payment verification failed. Please contact support if payment was deducted.");
+            setValidationError(error instanceof Error ? error.message : "Payment verification failed. Please contact support if payment was deducted.");
+            setTimeout(() => setValidationError(null), 5000);
           }
         },
         modal: {
@@ -762,14 +795,16 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
         setLoading(false);
         const errorMessage =
           response.error?.description || response.error?.reason || "Payment failed. Please try again.";
-        alert(errorMessage);
+        setValidationError(errorMessage);
+        setTimeout(() => setValidationError(null), 5000);
       });
 
       razorpay.open();
     } catch (error) {
       console.error(error);
       setLoading(false);
-      alert(error instanceof Error ? error.message : "Unable to process payment. Please try again.");
+      setValidationError(error instanceof Error ? error.message : "Unable to process payment. Please try again.");
+      setTimeout(() => setValidationError(null), 5000);
     }
   };
 
@@ -819,7 +854,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                         today.setHours(0, 0, 0, 0);
                         const isPast = date < today;
                         const isSelected = formData.travelDate === dateStr;
-                        const isPastDeadline = tour.bookingDeadline && date <= new Date(tour.bookingDeadline);
+                        const isPastDeadline = tour.bookingDeadline ? date <= new Date(tour.bookingDeadline) : false;
                         const isDisabled = isPast || isPastDeadline;
 
                         return (
@@ -1406,7 +1441,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
               {/* Tour Details */}
               <div className="bg-neutral-50 rounded-lg p-4">
                 <h3 className="font-semibold mb-2">Tour Details</h3>
-                <p>{tour.name}</p>
+                <p>{tour?.name || "Tour"}</p>
                 <p className="text-sm text-neutral-600">
                   Travel Date: {formatDate(formData.travelDate)}
                 </p>
@@ -1516,7 +1551,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                     <div className="flex-1">
                       <div className="font-medium text-neutral-900">Advance Payment</div>
                       <div className="text-sm text-neutral-600">
-                        Pay {tour.advancePercentage ?? 0}% now, remaining before departure
+                        Pay {tour?.advancePercentage ?? 0}% now, remaining before departure
                       </div>
                       <div className="text-lg font-bold text-primary-600 mt-1">
                         ₹{advanceAmount.toLocaleString()} now
@@ -1533,7 +1568,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
               <div className="bg-neutral-50 rounded-lg p-4">
                 <h3 className="font-semibold mb-2">Refund & Cancellation Policy</h3>
                 <p className="text-sm text-neutral-700 whitespace-pre-line max-h-32 overflow-y-auto">
-                  {tour.bookingPolicies
+                  {tour?.bookingPolicies
                     ? tour.bookingPolicies
                     : "Please review the tour's refund & cancellation policy on the previous step."}
                 </p>
@@ -1604,12 +1639,12 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                   <div className="border border-neutral-200 rounded-lg p-4 bg-white mb-6">
                     <h4 className="font-semibold text-neutral-900 mb-2">Refund & Cancellation Policy</h4>
                     <div className="space-y-2 text-sm text-neutral-700 max-h-32 overflow-y-auto">
-                      {tour.bookingPolicies ? (
+                      {tour?.bookingPolicies ? (
                         <p className="whitespace-pre-line">{tour.bookingPolicies}</p>
                       ) : (
                         <p>Please review the refund and cancellation policy before continuing.</p>
                       )}
-                      {tour.cancellationTerms && (
+                      {tour?.cancellationTerms && (
                         <p className="whitespace-pre-line text-neutral-600">{tour.cancellationTerms}</p>
                       )}
                     </div>
@@ -1661,6 +1696,23 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
       </div>
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Error Messages */}
+        {(validationError || bookingCreationError) && (
+          <div className="mb-6 rounded-lg p-4 flex items-center space-x-2 bg-red-50 border border-red-200 text-red-700">
+            <AlertCircle size={20} className="flex-shrink-0" />
+            <span className="text-sm font-medium flex-1">{validationError || bookingCreationError}</span>
+            <button
+              onClick={() => {
+                setValidationError(null);
+                setBookingCreationError(null);
+              }}
+              className="text-current opacity-70 hover:opacity-100"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {/* Progress Steps */}
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between flex-wrap gap-4 sm:gap-0">

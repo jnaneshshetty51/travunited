@@ -58,7 +58,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
         subject: options.subject,
         html: options.html,
         text: options.text || stripHtml(options.html),
-        replyTo: options.replyTo,
+        reply_to: options.replyTo,
       });
       return true;
     } catch (error) {

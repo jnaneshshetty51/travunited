@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Eye, CheckCircle, X, Upload, FileText, User, Mail, Phone, Calendar, Download, CreditCard, Send, Clock, MapPin, ArrowLeft, Globe, ChevronDown, ChevronRight, UserPlus, FileDown, MessageSquare, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { Eye, CheckCircle, X, Upload, FileText, User, Mail, Phone, Calendar, Download, CreditCard, Send, Clock, MapPin, ArrowLeft, Globe, ChevronDown, ChevronRight, UserPlus, FileDown, MessageSquare, CheckCircle2, XCircle, AlertCircle, Trash2 } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { formatDate } from "@/lib/dateFormat";
 import { getCountryFlagUrl } from "@/lib/flags";
@@ -148,6 +148,8 @@ export default function AdminApplicationDetailPage() {
   const [showAssignDropdown, setShowAssignDropdown] = useState(false);
   const [uploadingInvoice, setUploadingInvoice] = useState(false);
   const [removingInvoice, setRemovingInvoice] = useState(false);
+  const [deletingApplication, setDeletingApplication] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const fetchApplication = useCallback(async () => {
     try {
@@ -225,6 +227,35 @@ export default function AdminApplicationDetailPage() {
       alert("An error occurred");
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleDeleteApplication = async () => {
+    if (!application) return;
+    
+    if (!confirm("Are you absolutely sure you want to delete this application? This action cannot be undone and will permanently delete all related data (documents, travellers, payments).")) {
+      return;
+    }
+
+    setDeletingApplication(true);
+    setDeleteError(null);
+    try {
+      const response = await fetch(`/api/admin/applications/${params.id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        // Redirect to applications list after successful deletion
+        router.push("/admin/applications");
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to delete application");
+      }
+    } catch (error) {
+      console.error("Error deleting application:", error);
+      setDeleteError(error instanceof Error ? error.message : "Failed to delete application. Please try again.");
+    } finally {
+      setDeletingApplication(false);
     }
   };
 
@@ -421,6 +452,18 @@ export default function AdminApplicationDetailPage() {
             Back to Applications
           </Link>
           
+          {deleteError && (
+            <div className="bg-red-100 border border-red-200 text-red-700 p-4 rounded-lg mb-4 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <AlertCircle size={20} />
+                <span className="text-sm font-medium">{deleteError}</span>
+              </div>
+              <button onClick={() => setDeleteError(null)} className="text-current hover:opacity-75">
+                <X size={18} />
+              </button>
+            </div>
+          )}
+          
           <div className="bg-white rounded-2xl shadow-medium p-6 border border-neutral-200">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               {/* Left: Reference & Country Info */}
@@ -494,6 +537,16 @@ export default function AdminApplicationDetailPage() {
                     </div>
                   )}
                 </div>
+                
+                {/* Delete Button */}
+                <button
+                  onClick={handleDeleteApplication}
+                  disabled={deletingApplication}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg text-sm font-medium hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Trash2 size={16} />
+                  {deletingApplication ? "Deleting..." : "Delete"}
+                </button>
                 
                 {completedPayment && (
                   <button

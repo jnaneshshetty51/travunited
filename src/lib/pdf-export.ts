@@ -10,7 +10,7 @@ export interface PDFExportOptions {
 }
 
 // Helper function to safely set font with fallback
-function safeFont(doc: PDFDocument, fontName: string, fallback: string = "Helvetica") {
+function safeFont(doc: InstanceType<typeof PDFDocument>, fontName: string, fallback: string = "Helvetica") {
   try {
     doc.font(fontName);
   } catch (error: any) {

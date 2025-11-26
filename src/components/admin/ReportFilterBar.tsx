@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Calendar, Filter, X } from "lucide-react";
+import { Calendar, Filter, X, Search } from "lucide-react";
 
 interface ReportFilterBarProps {
   onFilterChange: (filters: ReportFilters) => void;
@@ -9,7 +9,11 @@ interface ReportFilterBarProps {
   showStatus?: boolean;
   showPaymentStatus?: boolean;
   showType?: boolean;
+  showSearch?: boolean;
+  onSearchChange?: (query: string) => void;
+  initialSearchQuery?: string;
   countries?: Array<{ id: string; name: string }>;
+  statusOptions?: Array<{ label: string; value: string }>;
 }
 
 export interface ReportFilters {
@@ -38,7 +42,18 @@ export function ReportFilterBar({
   showStatus = false,
   showPaymentStatus = false,
   showType = false,
+  showSearch = false,
+  onSearchChange,
+  initialSearchQuery = "",
   countries = [],
+  statusOptions = [
+    { label: "All Statuses", value: "" },
+    { label: "New", value: "NEW" },
+    { label: "Contacted", value: "CONTACTED" },
+    { label: "Proposal Sent", value: "PROPOSAL_SENT" },
+    { label: "Won", value: "WON" },
+    { label: "Lost", value: "LOST" },
+  ],
 }: ReportFilterBarProps) {
   const [datePreset, setDatePreset] = useState("last30");
   const [dateFrom, setDateFrom] = useState("");
@@ -47,6 +62,7 @@ export function ReportFilterBar({
   const [status, setStatus] = useState("");
   const [paymentStatus, setPaymentStatus] = useState("");
   const [type, setType] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
 
   useEffect(() => {
     // Set default dates based on preset
@@ -85,6 +101,13 @@ export function ReportFilterBar({
     }
   }, [datePreset]);
 
+  // Sync search query with parent if it changes externally
+  useEffect(() => {
+    if (initialSearchQuery !== undefined) {
+      setSearchQuery(initialSearchQuery);
+    }
+  }, [initialSearchQuery]);
+
   // Memoize the filter object to prevent unnecessary re-renders
   const filterObject = useMemo(() => ({
     dateFrom,
@@ -94,7 +117,8 @@ export function ReportFilterBar({
     status: status || undefined,
     paymentStatus: paymentStatus || undefined,
     type: type || undefined,
-  }), [dateFrom, dateTo, datePreset, selectedCountries, status, paymentStatus, type]);
+    search: searchQuery || undefined,
+  }), [dateFrom, dateTo, datePreset, selectedCountries, status, paymentStatus, type, searchQuery]);
 
   useEffect(() => {
     // Notify parent of filter changes
@@ -111,12 +135,24 @@ export function ReportFilterBar({
     }
   };
 
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    if (onSearchChange) {
+      onSearchChange(value);
+    }
+  };
+
   const clearFilters = () => {
     setDatePreset("last30");
     setSelectedCountries([]);
     setStatus("");
     setPaymentStatus("");
     setType("");
+    setSearchQuery("");
+    if (onSearchChange) {
+      onSearchChange("");
+    }
   };
 
   return (
@@ -124,7 +160,7 @@ export function ReportFilterBar({
       <div className="flex items-center gap-2 mb-4">
         <Filter size={20} className="text-neutral-600" />
         <h3 className="text-lg font-semibold text-neutral-900">Filters</h3>
-        {(selectedCountries.length > 0 || status || paymentStatus || type) && (
+        {(selectedCountries.length > 0 || status || paymentStatus || type || searchQuery) && (
           <button
             onClick={clearFilters}
             className="ml-auto inline-flex items-center gap-1 text-sm text-neutral-600 hover:text-neutral-900"
@@ -136,6 +172,23 @@ export function ReportFilterBar({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Search Input */}
+        {showSearch && (
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-2">Search</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" size={18} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                placeholder="Search..."
+                className="w-full pl-10 pr-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Date Preset */}
         <div>
           <label className="block text-sm font-medium text-neutral-700 mb-2">Date Range</label>
@@ -215,12 +268,11 @@ export function ReportFilterBar({
               onChange={(e) => setStatus(e.target.value)}
               className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
             >
-              <option value="">All Statuses</option>
-              <option value="NEW">New</option>
-              <option value="CONTACTED">Contacted</option>
-              <option value="PROPOSAL_SENT">Proposal Sent</option>
-              <option value="WON">Won</option>
-              <option value="LOST">Lost</option>
+              {statusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </div>
         )}

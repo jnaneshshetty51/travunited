@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 export const dynamic = "force-dynamic";
 
@@ -217,7 +218,7 @@ export async function POST(req: Request) {
             field: `travellers[${index}].passportExpiry`,
             message: `Traveller ${index + 1}: Passport expiry date is required.`,
           });
-        } else {
+        } else if (traveller.passportExpiry) {
           const expiryDate = startOfDayUTC(new Date(traveller.passportExpiry));
           if (expiryDate <= today) {
             travellerValidationErrors.push({
@@ -278,7 +279,7 @@ export async function POST(req: Request) {
       quantity: number;
       unitPrice: number;
       totalPrice: number;
-      metadata: Record<string, unknown>;
+      metadata: Prisma.InputJsonValue;
     }> = [];
 
     let addOnsTotal = 0;
@@ -310,7 +311,7 @@ export async function POST(req: Request) {
         totalPrice,
         metadata: {
           reason,
-        },
+        } as Prisma.InputJsonValue,
       });
     };
 
@@ -404,15 +405,10 @@ export async function POST(req: Request) {
               dateOfBirth: travellerData.dateOfBirth
                 ? new Date(travellerData.dateOfBirth)
                 : traveller.dateOfBirth,
-              gender: travellerData.gender || traveller.gender,
-              nationality: travellerData.nationality || traveller.nationality,
               passportNumber: travellerData.passportNumber || traveller.passportNumber,
               passportExpiry: travellerData.passportExpiry
                 ? new Date(travellerData.passportExpiry)
                 : traveller.passportExpiry,
-              passportIssuingCountry:
-                travellerData.passportIssuingCountry || traveller.passportIssuingCountry,
-              passportFileKey: travellerData.passportFileKey || traveller.passportFileKey,
             },
           });
         } else {
@@ -426,14 +422,10 @@ export async function POST(req: Request) {
               dateOfBirth: travellerData.dateOfBirth
                 ? new Date(travellerData.dateOfBirth)
                 : null,
-              gender: travellerData.gender || null,
-              nationality: travellerData.nationality || null,
               passportNumber: travellerData.passportNumber || null,
               passportExpiry: travellerData.passportExpiry
                 ? new Date(travellerData.passportExpiry)
                 : null,
-              passportIssuingCountry: travellerData.passportIssuingCountry || null,
-              passportFileKey: travellerData.passportFileKey || null,
             },
           });
         }
@@ -455,7 +447,6 @@ export async function POST(req: Request) {
               : null,
             passportIssuingCountry: travellerData.passportIssuingCountry || null,
             passportFileKey: travellerData.passportFileKey || null,
-            passportFileName: travellerData.passportFileName || null,
             isPassportRequired: requiresPassport,
           },
         });
@@ -469,7 +460,7 @@ export async function POST(req: Request) {
       totalAmount,
       message: "Booking created successfully",
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Handle Zod validation errors (should already be caught above, but as a fallback)
     if (error instanceof z.ZodError) {
       const errorMessages = error.errors.map((err) => {
@@ -494,18 +485,23 @@ export async function POST(req: Request) {
     }
 
     // Log full error details for debugging
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    const errorCode = error && typeof error === "object" && "code" in error ? error.code : undefined;
+    const errorMeta = error && typeof error === "object" && "meta" in error ? error.meta : undefined;
+
     console.error("Error creating booking:", {
-      message: error?.message,
-      stack: error?.stack,
-      code: error?.code,
-      meta: error?.meta,
+      message: errorMessage,
+      stack: errorStack,
+      code: errorCode,
+      meta: errorMeta,
     });
 
     // Return user-friendly error message
     return NextResponse.json(
       {
-        error: error?.message || "Failed to create booking. Please try again.",
-        details: process.env.NODE_ENV === "development" ? error?.stack : undefined,
+        error: errorMessage || "Failed to create booking. Please try again.",
+        details: process.env.NODE_ENV === "development" ? errorStack : undefined,
       },
       { status: 500 }
     );

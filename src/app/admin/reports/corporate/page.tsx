@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Download, FileDown, Users, FileText } from "lucide-react";
@@ -8,6 +8,7 @@ import { AdminLayout } from "@/components/admin/AdminLayout";
 import { ReportFilterBar, ReportFilters } from "@/components/admin/ReportFilterBar";
 import { buildExportUrl } from "@/lib/report-export";
 import { formatDate } from "@/lib/dateFormat";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface CorporateLead {
   id: string;
@@ -31,29 +32,41 @@ export default function CorporateLeadsPage() {
     dateFrom: "",
     dateTo: "",
     datePreset: "last30",
-    search: "",
   });
+  const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  
+  // Debounce search query to avoid excessive API calls
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  
+  // Use ref to track abort controller for canceling previous requests
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Memoize filter values to prevent infinite re-renders
   const dateFrom = filters.dateFrom;
   const dateTo = filters.dateTo;
   const filterStatus = filters.status;
-  const searchQuery = filters.search || "";
 
-  const fetchReport = useCallback(async () => {
+  const fetchReport = useCallback(async (abortSignal?: AbortSignal) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (dateFrom) params.append("dateFrom", dateFrom);
       if (dateTo) params.append("dateTo", dateTo);
-      if (filterStatus) params.append("status", filterStatus);
-      if (searchQuery) params.append("q", searchQuery);
+      if (filterStatus && filterStatus !== "ALL" && filterStatus !== "all") {
+        params.append("status", filterStatus);
+      }
+      if (debouncedSearchQuery) {
+        params.append("q", debouncedSearchQuery);
+      }
       params.append("page", page.toString());
       params.append("limit", "50");
 
-      const response = await fetch(`/api/admin/reports/corporate?${params.toString()}`);
+      const response = await fetch(`/api/admin/reports/corporate?${params.toString()}`, {
+        signal: abortSignal,
+      });
+      
       if (response.ok) {
         const data = await response.json();
         setSummary(data.summary);
@@ -61,11 +74,15 @@ export default function CorporateLeadsPage() {
         setTotalPages(data.pagination?.totalPages || 1);
       }
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        console.log("Fetch aborted");
+        return;
+      }
       console.error("Error fetching report:", error);
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, filterStatus, searchQuery, page]);
+  }, [dateFrom, dateTo, filterStatus, debouncedSearchQuery, page]);
 
   // Separate effect for auth check
   useEffect(() => {
@@ -85,7 +102,21 @@ export default function CorporateLeadsPage() {
   // Separate effect for fetching data when filters change
   useEffect(() => {
     if (status === "authenticated" && session?.user?.role === "SUPER_ADMIN") {
-      fetchReport();
+      // Cancel previous request if it exists
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Create new abort controller for this request
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+      
+      fetchReport(abortController.signal);
+      
+      // Cleanup: abort request if component unmounts or dependencies change
+      return () => {
+        abortController.abort();
+      };
     }
   }, [fetchReport, status, session?.user?.role]);
 
@@ -160,6 +191,17 @@ export default function CorporateLeadsPage() {
           showStatus={true}
           showPaymentStatus={false}
           showType={false}
+          showSearch={true}
+          onSearchChange={setSearchQuery}
+          initialSearchQuery={searchQuery}
+          statusOptions={[
+            { label: "All Statuses", value: "ALL" },
+            { label: "New", value: "NEW" },
+            { label: "Contacted", value: "CONTACTED" },
+            { label: "Proposal Sent", value: "PROPOSAL_SENT" },
+            { label: "Won", value: "WON" },
+            { label: "Lost", value: "LOST" },
+          ]}
         />
 
         {/* Export Buttons */}
