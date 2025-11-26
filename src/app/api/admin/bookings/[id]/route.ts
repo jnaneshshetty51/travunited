@@ -120,12 +120,41 @@ export async function GET(
       },
     });
 
+    // Parse customised package info from specialRequests if present
+    let customisedPackage = null;
+    if (booking.specialRequests && booking.specialRequests.includes("[CUSTOMISED PACKAGE REQUEST]")) {
+      const customMatch = booking.specialRequests.match(/\[CUSTOMISED PACKAGE REQUEST\]\n([^\n]+)/);
+      if (customMatch) {
+        customisedPackage = {
+          isCustomisedPackage: true,
+          customRequestNotes: customMatch[1] || null,
+          customBasePrice: null,
+          customAddOnsPrice: null,
+          customDiscount: null,
+        };
+        // Try to extract pricing info
+        const basePriceMatch = booking.specialRequests.match(/Custom Base Price: ₹([\d,]+)/);
+        const addOnsPriceMatch = booking.specialRequests.match(/Custom Add-ons Price: ₹([\d,]+)/);
+        const discountMatch = booking.specialRequests.match(/Discount: ₹([\d,]+)/);
+        if (basePriceMatch) {
+          customisedPackage.customBasePrice = parseInt(basePriceMatch[1].replace(/,/g, ""));
+        }
+        if (addOnsPriceMatch) {
+          customisedPackage.customAddOnsPrice = parseInt(addOnsPriceMatch[1].replace(/,/g, ""));
+        }
+        if (discountMatch) {
+          customisedPackage.customDiscount = parseInt(discountMatch[1].replace(/,/g, ""));
+        }
+      }
+    }
+
     // Format response with additional computed fields
     const response = {
       ...booking,
       referenceNumber,
       amountPaid,
       pendingBalance: pendingBalance > 0 ? pendingBalance : 0,
+      customisedPackage,
       timeline: activities.map((activity) => ({
         id: activity.id,
         time: activity.timestamp,
@@ -137,8 +166,18 @@ export async function GET(
     return NextResponse.json(response);
   } catch (error) {
     console.error("Error fetching booking:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("Full error details:", {
+      message: errorMessage,
+      stack: errorStack,
+      error,
+    });
     return NextResponse.json(
-      { error: "Internal server error" },
+      { 
+        error: "Internal server error",
+        message: process.env.NODE_ENV === "development" ? errorMessage : undefined
+      },
       { status: 500 }
     );
   }

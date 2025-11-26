@@ -35,9 +35,17 @@ export async function POST(req: Request) {
       );
     }
 
-    // Delete related records first (travellers, addOns, reviews, payments) to avoid foreign key constraints
+    // Delete related records first (travellers, addOns, reviews, payments, audit logs) to avoid foreign key constraints
     // Then delete the bookings
     const deleteResult = await prisma.$transaction(async (tx) => {
+      // Delete AuditLog records that reference these bookings
+      await tx.auditLog.deleteMany({
+        where: {
+          entityType: "BOOKING",
+          entityId: { in: bookingIds },
+        },
+      });
+
       // Delete BookingTraveller records
       await tx.bookingTraveller.deleteMany({
         where: {
