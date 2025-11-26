@@ -85,6 +85,9 @@ export async function GET(
         faqs: {
           orderBy: { sortOrder: "asc" },
         },
+        subTypes: {
+          orderBy: { sortOrder: "asc" },
+        },
       },
     });
 
@@ -215,6 +218,7 @@ export async function PUT(
     const visaSubTypeLabel = body.visaSubTypeLabel !== undefined ? body.visaSubTypeLabel : existingVisa.visaSubTypeLabel;
     const requirements = body.requirements !== undefined ? body.requirements : [];
     const faqs = body.faqs !== undefined ? body.faqs : [];
+    const subTypes = body.subTypes !== undefined ? body.subTypes : [];
 
     // Validate required fields
     // Only validate fields that are actually being updated (not just present in payload)
@@ -402,6 +406,31 @@ export async function PUT(
           ),
         });
       }
+
+      // Handle subTypes: delete all and recreate
+      await tx.visaSubType.deleteMany({
+        where: { visaId: params.id },
+      });
+      if (subTypes.length) {
+        await tx.visaSubType.createMany({
+          data: subTypes.map(
+            (
+              subtype: {
+                label: string;
+                code?: string;
+                sortOrder?: number;
+              },
+              index: number
+            ) => ({
+              visaId: params.id,
+              label: subtype.label,
+              code: subtype.code || null,
+              sortOrder:
+                typeof subtype.sortOrder === "number" ? subtype.sortOrder : index,
+            })
+          ),
+        });
+      }
     });
 
     const updated = await prisma.visa.findUnique({
@@ -410,6 +439,7 @@ export async function PUT(
         country: true,
         requirements: { orderBy: { sortOrder: "asc" } },
         faqs: { orderBy: { sortOrder: "asc" } },
+        subTypes: { orderBy: { sortOrder: "asc" } },
       },
     });
 

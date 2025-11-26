@@ -99,6 +99,9 @@ export async function GET(req: Request) {
       },
       include: {
         country: true,
+        subTypes: {
+          orderBy: { sortOrder: "asc" },
+        },
         _count: {
           select: {
             requirements: true,

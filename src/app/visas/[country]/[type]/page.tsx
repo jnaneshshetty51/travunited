@@ -47,7 +47,13 @@ const buildEntrySummary = (visa: {
   entryType?: string | null;
   stayType?: string | null;
   entryTypeLegacy?: string | null;
+  subTypes?: Array<{ label: string; code?: string | null }> | null;
 }) => {
+  // If subtypes exist, show them
+  if (visa.subTypes && visa.subTypes.length > 0) {
+    return visa.subTypes.map(st => st.label).join(", ");
+  }
+  // Fallback to legacy label
   if (visa.visaSubTypeLabel) return visa.visaSubTypeLabel;
   const entryLabel = formatEnumLabel(visa.entryType ?? null, entryTypeLabels);
   const stayLabel = formatEnumLabel(visa.stayType ?? null, stayTypeLabels);
@@ -71,6 +77,9 @@ export default async function VisaDetailPage({
       faqs: {
         orderBy: [{ category: "asc" }, { sortOrder: "asc" }],
       },
+      subTypes: {
+        orderBy: { sortOrder: "asc" },
+      },
     },
   });
 
@@ -86,6 +95,9 @@ export default async function VisaDetailPage({
   );
 
   const heroImageUrl = visa.heroImageUrl ? getMediaProxyUrl(visa.heroImageUrl) : null;
+  const sampleVisaUrl = visa.sampleVisaImageUrl
+    ? getMediaProxyUrl(visa.sampleVisaImageUrl)
+    : null;
   const modeDisplay = formatEnumLabel(visa.visaMode ?? null, visaModeLabels) || "Not specified";
   const entryDisplay = buildEntrySummary(visa);
   const stayTypeDisplay = formatEnumLabel(visa.stayType ?? null, stayTypeLabels);
@@ -219,6 +231,29 @@ export default async function VisaDetailPage({
                 {visa.eligibility}
               </p>
             </section>
+
+            {sampleVisaUrl && (
+              <section className="space-y-3">
+                <h2 className="text-2xl font-bold text-neutral-900">Visa Sample</h2>
+                <div className="border border-neutral-200 rounded-2xl p-4 flex items-start gap-3 bg-neutral-50">
+                  <FileText className="text-primary-600 mt-1" size={20} />
+                  <div>
+                    <p className="text-sm text-neutral-700 mb-2">
+                      View a sample of the approved visa document for reference.
+                    </p>
+                    <a
+                      href={sampleVisaUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-700"
+                    >
+                      <span>Open visa sample</span>
+                      <ArrowRight size={16} className="ml-1" />
+                    </a>
+                  </div>
+                </div>
+              </section>
+            )}
 
             {visa.rejectionReasons && (
               <section className="space-y-4">

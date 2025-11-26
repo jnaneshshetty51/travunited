@@ -32,6 +32,9 @@ export async function GET(
         faqs: {
           orderBy: { sortOrder: "asc" },
         },
+        subTypes: {
+          orderBy: { sortOrder: "asc" },
+        },
       },
     });
 
@@ -75,6 +78,7 @@ export async function GET(
       },
       requirements: visa.requirements,
       faqs: visa.faqs,
+      subTypes: visa.subTypes,
     });
   } catch (error) {
     console.error("[VisaDetailAPI] Fetch failed", error);

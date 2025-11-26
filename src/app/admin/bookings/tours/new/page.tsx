@@ -430,8 +430,10 @@ export default function ManualBookingPage() {
                       <input
                         type="text"
                         value={traveller.passportNumber}
-                        onChange={(e) => updateTraveller(traveller.uid, "passportNumber", e.target.value)}
-                        className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                        onChange={(e) => updateTraveller(traveller.uid, "passportNumber", e.target.value.toUpperCase())}
+                        className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 uppercase"
+                        maxLength={20}
+                        placeholder="Enter passport number"
                       />
                     </div>
                     <div>

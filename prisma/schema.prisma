@@ -247,6 +247,7 @@ model Visa {
   faqs               VisaFaq[]
   requirements       VisaDocumentRequirement[]
   applications       Application[]
+  subTypes           VisaSubType[]
 }
 
 model VisaDocumentRequirement {
@@ -274,6 +275,19 @@ model VisaFaq {
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model VisaSubType {
+  id        String   @id @default(cuid())
+  visa      Visa     @relation(fields: [visaId], references: [id], onDelete: Cascade)
+  visaId    String
+  label     String
+  code      String?  // Optional internal code
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([visaId])
 }
 
 model TourDay {

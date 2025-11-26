@@ -196,8 +196,18 @@ export async function POST(req: Request) {
         if (dob >= today) {
           travellerValidationErrors.push({
             field: `travellers[${index}].dateOfBirth`,
-            message: `Traveller ${index + 1}: Date of birth must be in the past.`,
+            message: `Traveller ${index + 1}: Date of birth cannot be today or in the future.`,
           });
+        } else {
+          // Check if person is at least 1 year old
+          const oneYearAgo = new Date(today);
+          oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+          if (dob > oneYearAgo) {
+            travellerValidationErrors.push({
+              field: `travellers[${index}].dateOfBirth`,
+              message: `Traveller ${index + 1}: Date of birth must be at least 1 year ago.`,
+            });
+          }
         }
       }
 
@@ -210,6 +220,11 @@ export async function POST(req: Request) {
           travellerValidationErrors.push({
             field: `travellers[${index}].passportNumber`,
             message: `Traveller ${index + 1}: Passport number is required.`,
+          });
+        } else if (traveller.passportNumber && traveller.passportNumber.length > 20) {
+          travellerValidationErrors.push({
+            field: `travellers[${index}].passportNumber`,
+            message: `Traveller ${index + 1}: Passport number must be 20 characters or less.`,
           });
         }
 

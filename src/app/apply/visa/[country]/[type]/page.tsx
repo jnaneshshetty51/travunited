@@ -42,6 +42,7 @@ interface VisaDetailsResponse {
     flagUrl?: string | null;
   };
   requirements: VisaRequirement[];
+  subTypes?: Array<{ id: string; label: string; code?: string | null }> | null;
 }
 
 const steps = [
@@ -83,7 +84,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
     travellers?: FormDataTraveller[];
   };
 
-  const [formData, setFormData] = useState<FormData>({
+  const buildInitialFormData = (): FormData => ({
     country: params.country,
     visaType: params.type,
     visaId: undefined,
@@ -98,6 +99,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
     applicationId: undefined,
     travellerIds: [],
   });
+
+  const [formData, setFormData] = useState<FormData>(buildInitialFormData);
 
   // Memoize travellerCount to prevent unnecessary recalculations
   const travellerCount = useMemo(() => formData.travellers?.length ?? 0, [formData.travellers?.length]);
@@ -132,6 +135,15 @@ export default function VisaApplicationPage({ params }: { params: { country: str
     visaInfo?.requirements.forEach((req) => map.set(req.id, req));
     return map;
   }, [visaInfo]);
+
+  const resetFormToInitialState = () => {
+    setFormData(buildInitialFormData());
+    setDraftId(null);
+    setCreatedTravellerIds([]);
+    setDateErrors({});
+    setPhoneErrors({});
+    // Leave visaInfo as-is so context (price, requirements) stays loaded
+  };
 
   const documentSummary = useMemo(() => {
     if (!formData.documents) return [];
@@ -359,6 +371,36 @@ export default function VisaApplicationPage({ params }: { params: { country: str
     // Only run on mount or when params/session change, NOT when travellerCount changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id, params.country, params.type]);
+
+  const handleStartFreshApplication = async () => {
+    if (!visaInfo?.id) {
+      resetFormToInitialState();
+      return;
+    }
+    if (
+      !confirm(
+        "Start a fresh application? Any saved draft data for this visa will be cleared."
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch("/api/applications/start-fresh", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visaId: visaInfo.id }),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        alert(error.error || "Failed to start a fresh application");
+        return;
+      }
+      resetFormToInitialState();
+    } catch (error) {
+      console.error("Failed to start fresh application", error);
+      alert("Failed to start a fresh application. Please try again.");
+    }
+  };
 
   // Helper function to validate dates
   const validateDates = useCallback(() => {
@@ -1271,8 +1313,10 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         type="text"
                         required
                         value={traveller.passportNumber}
-                        onChange={(e) => updateTravellerField(traveller.id, "passportNumber", e.target.value)}
-                        className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
+                        onChange={(e) => updateTravellerField(traveller.id, "passportNumber", e.target.value.toUpperCase())}
+                        className="w-full px-4 py-2 border border-neutral-300 rounded-lg uppercase"
+                        maxLength={20}
+                        placeholder="Enter passport number"
                       />
                     </div>
                     <div>
@@ -1711,13 +1755,20 @@ export default function VisaApplicationPage({ params }: { params: { country: str
   return (
     <div className="min-h-screen bg-neutral-50">
       <div className="bg-white border-b border-neutral-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href={`/visas/${params.country}/${params.type}`}
             className="text-primary-600 hover:text-primary-700 text-sm"
           >
             ← Back to Visa Details
           </Link>
+          <button
+            type="button"
+            onClick={handleStartFreshApplication}
+            className="inline-flex items-center justify-center rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-sm hover:bg-neutral-50"
+          >
+            Start fresh application
+          </button>
         </div>
       </div>
 

@@ -500,6 +500,23 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
           setTimeout(() => setValidationError(null), 5000);
           return;
         }
+        // Validate DOB: must be in the past and at least 1 year old
+        const dob = new Date(traveller.dateOfBirth);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        dob.setHours(0, 0, 0, 0);
+        if (dob >= today) {
+          setValidationError(`Traveller ${index + 1}: Date of birth cannot be today or in the future.`);
+          setTimeout(() => setValidationError(null), 5000);
+          return;
+        }
+        const oneYearAgo = new Date(today);
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        if (dob > oneYearAgo) {
+          setValidationError(`Traveller ${index + 1}: Date of birth must be at least 1 year ago.`);
+          setTimeout(() => setValidationError(null), 5000);
+          return;
+        }
         if (requiresPassport) {
           if (!traveller.nationality) {
             setValidationError(`Traveller ${index + 1}: Nationality is required.`);
@@ -574,6 +591,23 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
       }
       if (!traveller.dateOfBirth) {
         setValidationError(`Traveller ${index + 1}: Date of birth is required.`);
+        setTimeout(() => setValidationError(null), 5000);
+        return null;
+      }
+      // Validate DOB: must be in the past and at least 1 year old
+      const dob = new Date(traveller.dateOfBirth);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      dob.setHours(0, 0, 0, 0);
+      if (dob >= today) {
+        setValidationError(`Traveller ${index + 1}: Date of birth cannot be today or in the future.`);
+        setTimeout(() => setValidationError(null), 5000);
+        return null;
+      }
+      const oneYearAgo = new Date(today);
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      if (dob > oneYearAgo) {
+        setValidationError(`Traveller ${index + 1}: Date of birth must be at least 1 year ago.`);
         setTimeout(() => setValidationError(null), 5000);
         return null;
       }
@@ -1371,6 +1405,8 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                             value={traveller.passportNumber}
                             onChange={(e) => updateTraveller(index, "passportNumber", e.target.value.toUpperCase())}
                             className="w-full px-4 py-2 border border-neutral-300 rounded-lg uppercase"
+                            maxLength={20}
+                            placeholder="Enter passport number"
                           />
                         </div>
                         <div>

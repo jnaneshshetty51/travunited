@@ -122,9 +122,14 @@ export async function POST(req: Request) {
       }
     }
 
-    // Validate traveller dates
+    // Validate traveller dates and passport
     for (let i = 0; i < data.travellers.length; i++) {
       const traveller = data.travellers[i];
+
+      // Validate passport number length
+      if (traveller.passportNumber && traveller.passportNumber.length > 20) {
+        dateErrors.push(`Traveller ${i + 1}: Passport number must be 20 characters or less`);
+      }
 
       // Date of Birth - must be in the past
       if (traveller.dateOfBirth) {
