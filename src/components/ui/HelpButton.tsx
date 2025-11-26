@@ -8,15 +8,20 @@ import Link from "next/link";
 export function HelpButton() {
   const [isOpen, setIsOpen] = useState(false);
 
+  const handleWhatsAppClick = () => {
+    // Redirect to WhatsApp with the phone number
+    window.open("https://wa.me/916360392398", "_blank");
+  };
+
   return (
     <>
       {/* Floating Help Button */}
       <motion.button
-        onClick={() => setIsOpen(true)}
+        onClick={handleWhatsAppClick}
         className="fixed bottom-6 right-6 z-50 bg-primary-600 text-white p-4 rounded-full shadow-large hover:bg-primary-700 transition-colors"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        aria-label="Need Help?"
+        aria-label="Chat on WhatsApp"
       >
         <HelpCircle size={24} />
       </motion.button>
