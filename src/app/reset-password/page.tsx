@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Lock, CheckCircle, AlertCircle, ArrowRight } from "lucide-react";
 
 export default function ResetPasswordPage() {
-  const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
-  const token = params.token as string;
+  const token = searchParams.get("token");
+  const resetId = searchParams.get("id");
   
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -22,13 +23,21 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     // Validate token on mount
     const validateToken = async () => {
+      if (!token || !resetId) {
+        setError("Invalid reset link. Missing token or reset ID.");
+        setValidating(false);
+        return;
+      }
+
       try {
-        const response = await fetch(`/api/auth/validate-reset-token?token=${token}`);
+        const response = await fetch(
+          `/api/auth/validate-reset-token?token=${encodeURIComponent(token)}&id=${encodeURIComponent(resetId)}`
+        );
         const data = await response.json();
         if (response.ok && data.valid === true) {
           setTokenValid(true);
         } else {
-          setError("Invalid or expired reset link. Please request a new one.");
+          setError(data.error || "Invalid or expired reset link. Please request a new one.");
         }
       } catch (err) {
         console.error("Error validating token:", err);
@@ -38,17 +47,17 @@ export default function ResetPasswordPage() {
       }
     };
 
-    if (token) {
-      validateToken();
-    } else {
-      setValidating(false);
-      setError("Invalid reset link.");
-    }
-  }, [token]);
+    validateToken();
+  }, [token, resetId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!token || !resetId) {
+      setError("Invalid reset link. Missing token or reset ID.");
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("Passwords do not match");
@@ -66,7 +75,7 @@ export default function ResetPasswordPage() {
       const response = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ id: resetId, token, password }),
       });
 
       const data = await response.json();
@@ -80,6 +89,7 @@ export default function ResetPasswordPage() {
         setError(data.error || "Failed to reset password. Please try again.");
       }
     } catch (err) {
+      console.error("Error resetting password:", err);
       setError("An error occurred. Please try again.");
     } finally {
       setLoading(false);
@@ -97,7 +107,7 @@ export default function ResetPasswordPage() {
     );
   }
 
-  if (!tokenValid) {
+  if (!tokenValid || !token || !resetId) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-large p-8 text-center">
@@ -107,7 +117,9 @@ export default function ResetPasswordPage() {
           <h1 className="text-2xl font-bold text-neutral-900 mb-2">
             Invalid Reset Link
           </h1>
-          <p className="text-neutral-600 mb-6">{error || "This password reset link is invalid or has expired."}</p>
+          <p className="text-neutral-600 mb-6">
+            {error || "This password reset link is invalid or has expired."}
+          </p>
           <Link
             href="/forgot-password"
             className="text-primary-600 hover:text-primary-700 font-medium"

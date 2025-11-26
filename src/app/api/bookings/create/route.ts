@@ -4,6 +4,14 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import {
+  calculateAge,
+  getTravellerType,
+  calculateChildPrice,
+  isDomesticDestination,
+  getRequiredDocuments,
+  validatePassportExpiry,
+} from "@/lib/booking-helpers";
 export const dynamic = "force-dynamic";
 
 const travellerSchema = z.object({
@@ -114,6 +122,23 @@ export async function POST(req: Request) {
       );
     }
 
+    // Validate policy version
+    const refundPolicy = await prisma.sitePolicy.findUnique({
+      where: { key: "refund_cancellation" },
+    });
+
+    if (refundPolicy) {
+      if (!data.policyVersion || data.policyVersion !== refundPolicy.version) {
+        return NextResponse.json(
+          {
+            error: "Policy version mismatch. Please refresh the page and accept the latest policy version.",
+            policyVersion: refundPolicy.version,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     const tourRecord = await prisma.tour.findFirst({
       where: {
         OR: [{ id: data.tourId }, { slug: data.tourId }],
@@ -145,9 +170,43 @@ export async function POST(req: Request) {
 
     const userId = session.user.id;
 
-    const totalTravellers = data.numberOfAdults + (data.numberOfChildren || 0);
+    // Calculate pricing with child discounts
     const baseUnitPrice = tourRecord.basePriceInInr ?? tourRecord.price ?? 0;
-    let baseAmount = baseUnitPrice * totalTravellers;
+    const childAgeLimit = tourRecord.childAgeLimit ?? 12;
+    const childPricingType = tourRecord.childPricingType;
+    const childPricingValue = tourRecord.childPricingValue;
+
+    // Classify travellers and calculate pricing
+    let adultCount = 0;
+    let childCount = 0;
+    const travellerClassifications: Array<{ index: number; type: "adult" | "child" | "infant"; age: number }> = [];
+
+    data.travellers.forEach((traveller, index) => {
+      let age: number;
+      if (traveller.dateOfBirth) {
+        age = calculateAge(traveller.dateOfBirth);
+      } else if (traveller.age) {
+        age = parseInt(traveller.age) || 0;
+      } else {
+        age = 18; // Default to adult if no age/DOB provided
+      }
+
+      const travellerType = getTravellerType(age, childAgeLimit);
+      travellerClassifications.push({ index, type: travellerType, age });
+
+      if (travellerType === "adult") {
+        adultCount++;
+      } else if (travellerType === "child") {
+        childCount++;
+      }
+    });
+
+    // Calculate base amount with child pricing
+    const adultPrice = baseUnitPrice;
+    const childPrice = calculateChildPrice(baseUnitPrice, childPricingType, childPricingValue);
+    let baseAmount = (adultPrice * adultCount) + (childPrice * childCount);
+
+    const totalTravellers = data.travellers.length;
 
     if (totalTravellers < 1) {
       return NextResponse.json(
@@ -176,9 +235,23 @@ export async function POST(req: Request) {
       tourRecord.requiresPassport ||
       (tourRecord.tourType?.toLowerCase() === "international");
 
+    // Determine if destination is domestic
+    const isDomestic = isDomesticDestination(
+      tourRecord.destinationCountry || tourRecord.country?.code,
+      "IN" // Company country - adjust if needed
+    );
+
+    // Get required documents
+    const requiredDocs = getRequiredDocuments(
+      tourRecord.requiredDocuments,
+      isDomestic
+    );
+
     const travellerValidationErrors: Array<{ field: string; message: string }> = [];
 
     data.travellers.forEach((traveller, index) => {
+      const classification = travellerClassifications[index];
+      const travellerType = classification?.type || "adult";
       if (!traveller.firstName || !traveller.lastName) {
         travellerValidationErrors.push({
           field: `travellers[${index}].name`,
@@ -241,19 +314,15 @@ export async function POST(req: Request) {
             message: `Traveller ${index + 1}: Passport expiry date is required.`,
           });
         } else if (traveller.passportExpiry) {
-          const expiryDate = startOfDayUTC(new Date(traveller.passportExpiry));
-          if (expiryDate <= today) {
+          const validation = validatePassportExpiry(
+            traveller.passportExpiry,
+            travelDate,
+            6 // 6 months minimum validity
+          );
+          if (!validation.valid) {
             travellerValidationErrors.push({
               field: `travellers[${index}].passportExpiry`,
-              message: `Traveller ${index + 1}: Passport already expired.`,
-            });
-          }
-          const minValidDate = new Date(travelDate);
-          minValidDate.setUTCMonth(minValidDate.getUTCMonth() + 6);
-          if (expiryDate < minValidDate) {
-            travellerValidationErrors.push({
-              field: `travellers[${index}].passportExpiry`,
-              message: `Traveller ${index + 1}: Passport must be valid for at least 6 months from travel date.`,
+              message: `Traveller ${index + 1}: ${validation.error}`,
             });
           }
         }
@@ -481,6 +550,20 @@ export async function POST(req: Request) {
           });
         }
 
+        // Calculate age and traveller type
+        let age: number | null = null;
+        let travellerType: "adult" | "child" | "infant" | null = null;
+
+        if (travellerData.dateOfBirth) {
+          age = calculateAge(travellerData.dateOfBirth);
+          travellerType = getTravellerType(age, tourRecord.childAgeLimit ?? 12);
+        } else if (travellerData.age) {
+          age = parseInt(travellerData.age) || null;
+          if (age !== null) {
+            travellerType = getTravellerType(age, tourRecord.childAgeLimit ?? 12);
+          }
+        }
+
         await tx.bookingTraveller.create({
           data: {
             bookingId: bookingRecord.id,
@@ -490,6 +573,8 @@ export async function POST(req: Request) {
             dateOfBirth: travellerData.dateOfBirth
               ? new Date(travellerData.dateOfBirth)
               : null,
+            age: age,
+            travellerType: travellerType,
             gender: travellerData.gender || null,
             nationality: travellerData.nationality || null,
             passportNumber: travellerData.passportNumber || null,

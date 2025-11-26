@@ -60,6 +60,7 @@ model User {
   reviews               Review[]
   auditLogs             AuditLog[]
   payments              Payment[]
+  passwordResets        PasswordReset[]
   // Relations to Notification models intentionally removed for now - will be re-added when User model is finalized
   // notifications Notification[]
   // notificationSettings UserNotificationSettings?
@@ -158,6 +159,7 @@ model Booking {
   policyVersion           String?
   policyAcceptedIp        String?
   policyAcceptedUserAgent String?
+  documents               Json?              // Booking-level documents: { travellerId: [{ type, key, status, rejectionReason }], booking: [...] }
   processedBy   User?              @relation("ProcessedBy", fields: [processedById], references: [id])
   processedById String?
   voucherUrl    String? // URL to tour voucher
@@ -171,6 +173,7 @@ model Booking {
   addOns        BookingAddOn[]
   reviews       Review[]
   payments      Payment[]
+  bookingDocuments BookingDocument[]
 }
 
 model BookingTraveller {
@@ -183,6 +186,7 @@ model BookingTraveller {
   lastName               String
   dateOfBirth            DateTime?
   age                    Int?
+  travellerType          String?    // "adult" | "child" | "infant"
   gender                 String?
   nationality            String?
   passportNumber         String?
@@ -192,6 +196,7 @@ model BookingTraveller {
   isPassportRequired     Boolean    @default(false)
   createdAt              DateTime   @default(now())
   updatedAt              DateTime   @updatedAt
+  documents              BookingDocument[]
 }
 
 model Country {
@@ -360,6 +365,10 @@ model Tour {
   allowAdvance         Boolean   @default(false)
   advancePercentage    Int?
   requiresPassport     Boolean   @default(false)
+  requiredDocuments    Json?    // Tour-level override: ["passport","insurance"] or ["adhar","pan"]
+  childPricingType     String?  // "percent" | "fixed" | "none"
+  childPricingValue     Int?     // percent or fixed amount (in cents/paise)
+  childAgeLimit         Int?     @default(12)
   metaTitle            String?
   metaDescription      String?
   metaKeywords         String?
@@ -664,4 +673,51 @@ model TeamMember {
 
   @@index([isActive, isFeatured])
   @@index([sortOrder])
+}
+
+model SitePolicy {
+  id        String   @id @default(cuid())
+  key       String   @unique // "refund_cancellation"
+  title     String
+  content   String   @db.Text // HTML/Markdown
+  version   String   // e.g. "refund-v1"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
+
+model BookingDocument {
+  id              String   @id @default(cuid())
+  booking         Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId       String
+  traveller       BookingTraveller? @relation(fields: [travellerId], references: [id], onDelete: Cascade)
+  travellerId     String?
+  type            String   // 'passport','adhar','pan','photo','insurance', etc.
+  key             String   // S3/MinIO key
+  fileName        String?
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejectionReason String?
+  uploadedAt      DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([bookingId])
+  @@index([travellerId])
+  @@index([status])
+}
+
+model PasswordReset {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  tokenHash  String   // hashed token saved with bcrypt
+  expiresAt  DateTime
+  used       Boolean  @default(false)
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([used])
 }

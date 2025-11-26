@@ -1,49 +1,92 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
+
 export const dynamic = "force-dynamic";
-
-
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const token = searchParams.get("token");
+    const resetId = searchParams.get("id");
 
-    if (!token) {
-      return NextResponse.json({ valid: false }, { status: 400 });
+    if (!token || !resetId) {
+      console.warn("[Password Reset] Validation failed: missing token or id");
+      return NextResponse.json(
+        { valid: false, error: "Token and reset ID are required" },
+        { status: 400 }
+      );
     }
 
-    // Use findFirst instead of findUnique to handle potential null values better
-    const user = await prisma.user.findFirst({
-      where: {
-        passwordResetToken: token,
-        passwordResetExpires: {
-          not: null,
-        },
-      },
+    // Find password reset record
+    const passwordReset = await prisma.passwordReset.findUnique({
+      where: { id: resetId },
     });
 
-    if (!user || !user.passwordResetExpires) {
-      console.error("Validate token: Invalid token or no expiry date", { token });
-      return NextResponse.json({ valid: false }, { status: 200 });
+    if (!passwordReset) {
+      console.warn("[Password Reset] Validation failed: record not found", { resetId });
+      return NextResponse.json(
+        { valid: false, error: "Invalid reset link" },
+        { status: 200 }
+      );
     }
 
-    // Check if token has expired
-    const now = new Date();
-    const expiresAt = new Date(user.passwordResetExpires);
-    if (now > expiresAt) {
-      console.error("Validate token: Token expired", { 
-        token, 
-        expiresAt: expiresAt.toISOString(),
-        now: now.toISOString() 
+    // Check if already used
+    if (passwordReset.used) {
+      console.warn("[Password Reset] Validation failed: already used", {
+        resetId,
+        userId: passwordReset.userId,
       });
-      return NextResponse.json({ valid: false }, { status: 200 });
+      return NextResponse.json(
+        { valid: false, error: "This reset link has already been used" },
+        { status: 200 }
+      );
     }
 
-    return NextResponse.json({ valid: true });
+    // Check if expired
+    const now = new Date();
+    if (now > passwordReset.expiresAt) {
+      console.warn("[Password Reset] Validation failed: expired", {
+        resetId,
+        userId: passwordReset.userId,
+        expiresAt: passwordReset.expiresAt.toISOString(),
+        now: now.toISOString(),
+      });
+      return NextResponse.json(
+        { valid: false, error: "Reset link has expired" },
+        { status: 200 }
+      );
+    }
+
+    // Verify token matches hash
+    const tokenMatches = await bcrypt.compare(token, passwordReset.tokenHash);
+    if (!tokenMatches) {
+      console.warn("[Password Reset] Validation failed: token mismatch", {
+        resetId,
+        userId: passwordReset.userId,
+      });
+      return NextResponse.json(
+        { valid: false, error: "Invalid reset token" },
+        { status: 200 }
+      );
+    }
+
+    console.log("[Password Reset] Token validated successfully", {
+      resetId,
+      userId: passwordReset.userId,
+    });
+
+    return NextResponse.json({
+      valid: true,
+    });
   } catch (error) {
-    console.error("Error validating reset token:", error);
-    return NextResponse.json({ valid: false }, { status: 500 });
+    console.error("[Password Reset] Exception validating token:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    return NextResponse.json(
+      { valid: false, error: "An error occurred" },
+      { status: 500 }
+    );
   }
 }
-

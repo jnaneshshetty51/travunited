@@ -50,30 +50,61 @@ function stripHtml(html: string) {
 }
 
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
-  if (resendClient && emailFrom) {
-    try {
-      await resendClient.emails.send({
-        from: emailFrom,
-        to: options.to,
-        subject: options.subject,
-        html: options.html,
-        text: options.text || stripHtml(options.html),
-        reply_to: options.replyTo,
-      });
-      return true;
-    } catch (error) {
-      console.error("Error sending email via Resend:", error);
-      return false;
-    }
+  if (!resendClient) {
+    console.warn("[Email] Resend client not initialized. Check RESEND_API_KEY environment variable.");
+    console.log("📧 Email would be sent:", {
+      to: options.to,
+      subject: options.subject,
+      replyTo: options.replyTo,
+    });
+    return false; // Return false when not configured, so callers know email wasn't sent
   }
 
-  console.warn("Resend is not configured. Falling back to console logging.");
-  console.log("📧 Email would be sent:", {
-    to: options.to,
-    subject: options.subject,
-    replyTo: options.replyTo,
-  });
-  return true;
+  if (!emailFrom) {
+    console.error("[Email] EMAIL_FROM environment variable is not set.");
+    console.log("📧 Email would be sent:", {
+      to: options.to,
+      subject: options.subject,
+      replyTo: options.replyTo,
+    });
+    return false;
+  }
+
+  try {
+    const result = await resendClient.emails.send({
+      from: emailFrom,
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text || stripHtml(options.html),
+      reply_to: options.replyTo,
+    });
+
+    if (result.error) {
+      console.error("[Email] Resend API returned an error:", {
+        error: result.error,
+        to: options.to,
+        subject: options.subject,
+      });
+      return false;
+    }
+
+    console.log("[Email] Sent successfully", {
+      to: options.to,
+      subject: options.subject,
+      id: result.data?.id,
+    });
+    return true;
+  } catch (error) {
+    console.error("[Email] Exception sending email via Resend:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      to: options.to,
+      subject: options.subject,
+      resendError: error,
+    });
+    return false;
+  }
 }
 
 /**

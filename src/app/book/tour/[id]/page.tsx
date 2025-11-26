@@ -110,6 +110,9 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
   const [bookingCreationError, setBookingCreationError] = useState<string | null>(null);
   const [selectedHotelCategory, setSelectedHotelCategory] = useState<string>("");
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [policy, setPolicy] = useState<{ key: string; title: string; content: string; version: string } | null>(null);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [policyVersion, setPolicyVersion] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     travelDate: "",
@@ -156,9 +159,43 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
   const updateTraveller = (index: number, field: keyof TravellerForm, value: string | null) => {
     setFormData((prev) => {
       const travellers = [...prev.travellers];
-      travellers[index] = { ...travellers[index], [field]: value ?? "" };
+      const updatedTraveller = { ...travellers[index], [field]: value ?? "" };
+      
+      // Auto-calculate age from DOB or vice versa, and detect child/adult
+      if (field === "dateOfBirth" && value) {
+        const dob = new Date(value);
+        const today = new Date();
+        const age = Math.floor((today.getTime() - dob.getTime()) / (365.25 * 24 * 3600 * 1000));
+        updatedTraveller.age = age.toString();
+      } else if (field === "age" && value) {
+        const age = parseInt(value) || 0;
+        if (age > 0 && !updatedTraveller.dateOfBirth) {
+          // Estimate DOB from age (approximate)
+          const today = new Date();
+          const estimatedDOB = new Date(today.getFullYear() - age, today.getMonth(), today.getDate());
+          updatedTraveller.dateOfBirth = estimatedDOB.toISOString().split("T")[0];
+        }
+      }
+      
+      travellers[index] = updatedTraveller;
       return { ...prev, travellers };
     });
+  };
+
+  // Helper to get traveller type badge
+  const getTravellerTypeBadge = (traveller: TravellerForm) => {
+    if (!traveller.dateOfBirth && !traveller.age) return null;
+    const age = traveller.dateOfBirth 
+      ? Math.floor((new Date().getTime() - new Date(traveller.dateOfBirth).getTime()) / (365.25 * 24 * 3600 * 1000))
+      : parseInt(traveller.age) || 0;
+    const childAgeLimit = tour?.childAgeLimit || 12;
+    
+    if (age < 2) {
+      return { label: "Infant", color: "bg-purple-100 text-purple-800" };
+    } else if (age < childAgeLimit) {
+      return { label: "Child (under 12)", color: "bg-blue-100 text-blue-800" };
+    }
+    return null;
   };
 
   const updatePreference = (field: keyof PreferencesForm, value: string) => {
@@ -220,6 +257,23 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
     };
     fetchTour();
   }, [params.id, router]);
+
+  // Fetch refund & cancellation policy
+  useEffect(() => {
+    const fetchPolicy = async () => {
+      try {
+        const response = await fetch("/api/policies/refund_cancellation");
+        if (response.ok) {
+          const data = await response.json();
+          setPolicy(data);
+          setPolicyVersion(data.version);
+        }
+      } catch (error) {
+        console.error("Failed to load policy:", error);
+      }
+    };
+    fetchPolicy();
+  }, []);
 
   const requiresPassport = useMemo(() => {
     if (!tour) return false;
@@ -690,7 +744,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
           selectedAddOns: selectedAddOnsPayload,
           preferences: formData.preferences,
           policyAccepted: formData.policyAccepted,
-          policyVersion: tour.updatedAt || null,
+          policyVersion: policyVersion || null,
           hotelCategory: selectedHotelCategory || null,
           customisations: formData.isCustomisedPackage ? {
             isCustomisedPackage: true,
@@ -1289,6 +1343,11 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                 ? " Passport fields and document uploads are required for this tour."
                 : " Passport details are optional for this tour but recommended for faster processing."}
             </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> Children are considered under {tour?.childAgeLimit || 12} years. Age is automatically calculated from date of birth.
+              </p>
+            </div>
             <div className="space-y-4">
               {formData.travellers.map((traveller, index) => {
                 const travellerKey = traveller.uid || `traveller-${index}`;
@@ -1296,8 +1355,15 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                 const uploadState = passportUploadStatus[travellerKey];
                 return (
                   <div key={travellerKey} className="border border-neutral-200 rounded-lg p-4 space-y-6">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-neutral-900">Traveller {index + 1}</h3>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-neutral-900">Traveller {index + 1}</h3>
+                        {getTravellerTypeBadge(traveller) && (
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${getTravellerTypeBadge(traveller)?.color}`}>
+                            {getTravellerTypeBadge(traveller)?.label}
+                          </span>
+                        )}
+                      </div>
                       {requiresPassport && (
                         <span className="text-xs font-medium text-primary-600 flex items-center gap-1">
                           <ShieldCheck size={14} />
@@ -1685,9 +1751,14 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                     Secure payment via Razorpay. All major cards, UPI, and net banking accepted.
                   </p>
                   <div className="border border-neutral-200 rounded-lg p-4 bg-white mb-6">
-                    <h4 className="font-semibold text-neutral-900 mb-2">Refund & Cancellation Policy</h4>
+                    <h4 className="font-semibold text-neutral-900 mb-2">
+                      Refund & Cancellation Policy
+                      {policy && <span className="text-sm font-normal text-neutral-500 ml-2">(v{policy.version})</span>}
+                    </h4>
                     <div className="space-y-2 text-sm text-neutral-700 max-h-32 overflow-y-auto">
-                      {tour?.bookingPolicies ? (
+                      {policy ? (
+                        <div dangerouslySetInnerHTML={{ __html: policy.content.substring(0, 500) + "..." }} />
+                      ) : tour?.bookingPolicies ? (
                         <p className="whitespace-pre-line">{tour.bookingPolicies}</p>
                       ) : (
                         <p>Please review the refund and cancellation policy before continuing.</p>
@@ -1696,6 +1767,13 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                         <p className="whitespace-pre-line text-neutral-600">{tour.cancellationTerms}</p>
                       )}
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowPolicyModal(true)}
+                      className="text-primary-600 hover:text-primary-700 text-sm mt-2 underline"
+                    >
+                      Read full policy
+                    </button>
                     <label className="flex items-start gap-2 text-sm text-neutral-800 mt-4">
                       <input
                         type="checkbox"
@@ -1707,11 +1785,70 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                         className="mt-1 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                       />
                       <span>
-                        I agree to the refund & cancellation policy and understand the terms mentioned above.
+                        I have read and accept the Refund & Cancellation Policy{policy && ` (v${policy.version})`}
                       </span>
                     </label>
                     {policyError && <p className="text-sm text-red-600 mt-2">{policyError}</p>}
                   </div>
+
+                  {/* Policy Modal */}
+                  <AnimatePresence>
+                    {showPolicyModal && policy && (
+                      <>
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          onClick={() => setShowPolicyModal(false)}
+                          className="fixed inset-0 bg-black/50 z-50"
+                        />
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                        >
+                          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                            <div className="p-6 border-b border-neutral-200 flex items-center justify-between">
+                              <h3 className="text-xl font-bold text-neutral-900">
+                                {policy.title} (v{policy.version})
+                              </h3>
+                              <button
+                                onClick={() => setShowPolicyModal(false)}
+                                className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
+                              >
+                                <X size={20} />
+                              </button>
+                            </div>
+                            <div className="p-6 overflow-y-auto flex-1">
+                              <div
+                                className="prose prose-sm max-w-none"
+                                dangerouslySetInnerHTML={{ __html: policy.content }}
+                              />
+                            </div>
+                            <div className="p-6 border-t border-neutral-200 flex items-center justify-between">
+                              <button
+                                onClick={() => setShowPolicyModal(false)}
+                                className="px-4 py-2 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
+                              >
+                                Close
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setFormData((prev) => ({ ...prev, policyAccepted: true }));
+                                  setShowPolicyModal(false);
+                                  setPolicyError(null);
+                                }}
+                                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                              >
+                                Accept Policy
+                              </button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
                   <button
                     onClick={handlePayment}
                     disabled={loading || !formData.policyAccepted}

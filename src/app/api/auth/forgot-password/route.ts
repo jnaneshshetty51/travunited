@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
-export const dynamic = "force-dynamic";
+import { sendPasswordResetEmail } from "@/lib/email";
 
+export const dynamic = "force-dynamic";
 
 const forgotPasswordSchema = z.object({
   email: z.string().email(),
@@ -11,12 +13,40 @@ const forgotPasswordSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    // Ensure we're receiving JSON
+    const contentType = req.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      return NextResponse.json(
+        { error: "Content-Type must be application/json" },
+        { status: 400 }
+      );
+    }
+
+    let body;
+    try {
+      body = await req.json();
+    } catch (parseError) {
+      console.error("Failed to parse JSON body:", parseError);
+      return NextResponse.json(
+        { error: "Invalid JSON format" },
+        { status: 400 }
+      );
+    }
+
     const { email } = forgotPasswordSchema.parse(body);
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      // Always return success to avoid email enumeration
+      return NextResponse.json(
+        { message: "If an account exists with this email, a reset link has been sent." },
+        { status: 200 }
+      );
+    }
 
     // Find user by email
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     // Don't reveal if user exists or not (security best practice)
@@ -27,39 +57,78 @@ export async function POST(req: Request) {
       );
     }
 
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetExpires = new Date();
-    resetExpires.setHours(resetExpires.getHours() + 1); // Token valid for 1 hour
+    // Generate reset token (64 character hex string)
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = await bcrypt.hash(rawToken, 10);
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-    // Save reset token to database
-    await prisma.user.update({
-      where: { id: user.id },
+    // Get IP and user agent for logging
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || undefined;
+    const userAgent = req.headers.get("user-agent") || undefined;
+
+    // Create password reset record
+    const passwordReset = await prisma.passwordReset.create({
       data: {
-        passwordResetToken: resetToken,
-        passwordResetExpires: resetExpires,
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+        ip: ip || undefined,
+        userAgent: userAgent || undefined,
       },
     });
 
-    // Send email with reset link
-    const resetUrl = `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/reset-password/${resetToken}`;
+    // Send email with reset link (includes both token and resetId for easier lookup)
+    const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const resetUrl = `${baseUrl}/reset-password?token=${rawToken}&id=${passwordReset.id}`;
+    
+    console.log("[Password Reset] Attempting to send email", {
+      userId: user.id,
+      userEmail: user.email,
+      resetId: passwordReset.id,
+      resetUrl: resetUrl,
+      expiresAt: expiresAt.toISOString(),
+      ip: ip || "unknown",
+      userAgent: userAgent || "unknown",
+    });
     
     try {
-      const { sendPasswordResetEmail } = await import("@/lib/email");
       const emailSent = await sendPasswordResetEmail(user.email, resetUrl, user.role);
       
       if (!emailSent) {
-        console.error("Failed to send password reset email to", user.email);
-        console.error("Reset URL:", resetUrl);
-        console.error("Check RESEND_API_KEY and EMAIL_FROM environment variables");
+        console.error("[Password Reset] FAILED to send email", {
+          userId: user.id,
+          userEmail: user.email,
+          resetId: passwordReset.id,
+          resetUrl: resetUrl,
+          error: "sendPasswordResetEmail returned false",
+          checkEnvVars: {
+            RESEND_API_KEY: process.env.RESEND_API_KEY ? "SET" : "MISSING",
+            EMAIL_FROM: process.env.EMAIL_FROM || "MISSING",
+            NEXTAUTH_URL: baseUrl,
+          },
+        });
         // Still return success to user (security best practice - don't reveal if email exists)
       } else {
-        // Password reset email sent successfully (logging removed for production)
+        console.log("[Password Reset] Email sent successfully", {
+          userId: user.id,
+          userEmail: user.email,
+          resetId: passwordReset.id,
+          timestamp: new Date().toISOString(),
+        });
       }
     } catch (emailError) {
-      console.error("Error sending password reset email:", emailError);
-      console.error("User email:", user.email);
-      console.error("Reset URL:", resetUrl);
+      console.error("[Password Reset] Exception sending email", {
+        userId: user.id,
+        userEmail: user.email,
+        resetId: passwordReset.id,
+        resetUrl: resetUrl,
+        error: emailError instanceof Error ? emailError.message : String(emailError),
+        stack: emailError instanceof Error ? emailError.stack : undefined,
+        checkEnvVars: {
+          RESEND_API_KEY: process.env.RESEND_API_KEY ? "SET" : "MISSING",
+          EMAIL_FROM: process.env.EMAIL_FROM || "MISSING",
+        },
+      });
       // Still return success to user (security best practice - don't reveal if email exists)
     }
 
@@ -68,16 +137,18 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      // Still return generic success to avoid email enumeration
       return NextResponse.json(
-        { error: "Invalid email address" },
-        { status: 400 }
+        { message: "If an account exists with this email, a reset link has been sent." },
+        { status: 200 }
       );
     }
 
     console.error("Error in forgot password:", error);
+    // Still return success to user (security best practice)
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { message: "If an account exists with this email, a reset link has been sent." },
+      { status: 200 }
     );
   }
 }

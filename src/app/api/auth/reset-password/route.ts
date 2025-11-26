@@ -2,46 +2,82 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+
 export const dynamic = "force-dynamic";
 
-
 const resetPasswordSchema = z.object({
-  token: z.string(),
-  password: z.string().min(8),
+  id: z.string().min(1, "Reset ID is required"),
+  token: z.string().min(1, "Token is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { token, password } = resetPasswordSchema.parse(body);
+    // Ensure we're receiving JSON
+    const contentType = req.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      return NextResponse.json(
+        { error: "Content-Type must be application/json" },
+        { status: 400 }
+      );
+    }
 
-    // Find user by reset token
-    // Use findFirst instead of findUnique to handle potential null values better
-    const user = await prisma.user.findFirst({
-      where: {
-        passwordResetToken: token,
-        passwordResetExpires: {
-          not: null,
+    let body;
+    try {
+      body = await req.json();
+    } catch (parseError) {
+      console.error("Failed to parse JSON body:", parseError);
+      return NextResponse.json(
+        { error: "Invalid JSON format" },
+        { status: 400 }
+      );
+    }
+
+    const { id: resetId, token, password } = resetPasswordSchema.parse(body);
+
+    // Find password reset record
+    const passwordReset = await prisma.passwordReset.findUnique({
+      where: { id: resetId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+          },
         },
       },
     });
 
-    if (!user || !user.passwordResetExpires) {
-      console.error("Reset password: Invalid token or no expiry date", { token });
+    if (!passwordReset) {
+      console.error("[Password Reset] Record not found", { resetId });
       return NextResponse.json(
         { error: "Invalid or expired reset token" },
         { status: 400 }
       );
     }
 
-    // Check if token has expired
+    // Check if already used
+    if (passwordReset.used) {
+      console.error("[Password Reset] Token already used", {
+        resetId,
+        userId: passwordReset.userId,
+        createdAt: passwordReset.createdAt.toISOString(),
+      });
+      return NextResponse.json(
+        { error: "This reset link has already been used. Please request a new one." },
+        { status: 400 }
+      );
+    }
+
+    // Check if expired
     const now = new Date();
-    const expiresAt = new Date(user.passwordResetExpires);
-    if (now > expiresAt) {
-      console.error("Reset password: Token expired", { 
-        token, 
-        expiresAt: expiresAt.toISOString(),
-        now: now.toISOString() 
+    if (now > passwordReset.expiresAt) {
+      console.error("[Password Reset] Token expired", {
+        resetId,
+        userId: passwordReset.userId,
+        expiresAt: passwordReset.expiresAt.toISOString(),
+        now: now.toISOString(),
+        expiredBy: Math.round((now.getTime() - passwordReset.expiresAt.getTime()) / 1000 / 60) + " minutes",
       });
       return NextResponse.json(
         { error: "Reset token has expired. Please request a new one." },
@@ -49,17 +85,44 @@ export async function POST(req: Request) {
       );
     }
 
+    // Verify token matches hash
+    const tokenMatches = await bcrypt.compare(token, passwordReset.tokenHash);
+    if (!tokenMatches) {
+      console.error("[Password Reset] Token mismatch", {
+        resetId,
+        userId: passwordReset.userId,
+      });
+      return NextResponse.json(
+        { error: "Invalid reset token" },
+        { status: 400 }
+      );
+    }
+
     // Hash new password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Update password and clear reset token
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        passwordHash,
-        passwordResetToken: null,
-        passwordResetExpires: null,
-      },
+    // Update password and mark reset as used (in a transaction)
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: passwordReset.userId },
+        data: {
+          passwordHash,
+        },
+      });
+
+      await tx.passwordReset.update({
+        where: { id: resetId },
+        data: {
+          used: true,
+        },
+      });
+    });
+
+    console.log("[Password Reset] Successfully reset password", {
+      userId: passwordReset.userId,
+      userEmail: passwordReset.user.email,
+      resetId,
+      timestamp: new Date().toISOString(),
     });
 
     return NextResponse.json({
@@ -68,12 +131,21 @@ export async function POST(req: Request) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Invalid input", details: error.errors },
+        {
+          error: "Invalid input",
+          details: error.errors.map((err) => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
+        },
         { status: 400 }
       );
     }
 
-    console.error("Error resetting password:", error);
+    console.error("[Password Reset] Exception resetting password:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
