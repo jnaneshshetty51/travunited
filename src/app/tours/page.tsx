@@ -26,13 +26,19 @@ export default async function ToursPage({
     ];
   }
 
-  const tours = await prisma.tour.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    include: {
-      country: true,
-    },
-  });
+  let tours = [];
+  try {
+    tours = await prisma.tour.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      include: {
+        country: true,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching tours:", error);
+    // Continue with empty array
+  }
 
   const formatted = [...tours]
     .sort((a, b) => {

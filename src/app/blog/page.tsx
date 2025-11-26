@@ -6,10 +6,16 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function BlogPage() {
-  const posts = await prisma.blogPost.findMany({
-    where: { isPublished: true },
-    orderBy: { publishedAt: "desc" },
-  });
+  let posts = [];
+  try {
+    posts = await prisma.blogPost.findMany({
+      where: { isPublished: true },
+      orderBy: { publishedAt: "desc" },
+    });
+  } catch (error) {
+    console.error("Error fetching blog posts:", error);
+    // Continue with empty array
+  }
 
   const serialized = posts.map((post) => ({
     id: post.slug,

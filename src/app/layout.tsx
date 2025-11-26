@@ -10,8 +10,17 @@ import { MetaPixel } from "@/components/analytics/MetaPixel";
 
 const inter = Inter({ subsets: ["latin"] });
 
+// Safely get base URL for metadata
+function getBaseUrl(): string {
+  try {
+    return process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+  } catch {
+    return "http://localhost:3000";
+  }
+}
+
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
+  metadataBase: new URL(getBaseUrl()),
   title: "Travunited - Visas & Holidays, Seamlessly Managed",
   description: "Premium visa services and tour packages for Indian travellers. Trusted by thousands for seamless travel experiences.",
   icons: {
