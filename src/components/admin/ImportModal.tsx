@@ -115,28 +115,84 @@ export function ImportModal({
     }
 
     setImporting(true);
+    setImportResult(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
 
+      console.log(`[ImportModal] Starting import for ${entityType}...`);
       const response = await fetch(`/api/admin/content/${entityType}/import?mode=commit`, {
         method: "POST",
         body: formData,
       });
 
+      const data = await response.json().catch(async () => {
+        // If JSON parsing fails, try to get text
+        const text = await response.text().catch(() => "Unknown error");
+        return { error: text, rawResponse: true };
+      });
+
+      console.log(`[ImportModal] Import response:`, { status: response.status, data });
+
       if (response.ok) {
-        const data = await response.json();
+        // Check if import was actually successful
+        if (data.success === false) {
+          const errorMsg = data.error || "Import failed: No tours were created or updated. Check server logs for details.";
+          alert(errorMsg);
+          setImportResult(data.summary || {
+            totalRows: summary?.totalRows || 0,
+            validRows: summary?.validRows || 0,
+            created: 0,
+            updated: 0,
+            failed: data.failed?.length || 0,
+          });
+          return;
+        }
+        
+        // Check if anything was actually created/updated
+        if (data.summary && data.summary.created === 0 && data.summary.updated === 0) {
+          if (data.failed && data.failed.length > 0) {
+            const errorMessages = data.failed.slice(0, 10).map((f: any) => `Row ${f.row}: ${f.message}`).join("\n");
+            const moreErrors = data.failed.length > 10 ? `\n... and ${data.failed.length - 10} more errors` : "";
+            alert(`Import completed but no tours were created or updated.\n\nErrors:\n${errorMessages}${moreErrors}\n\nCheck browser console for full details.`);
+            console.error("[ImportModal] Import failed for all rows:", data.failed);
+          } else {
+            alert("Import completed but no tours were created or updated. This may indicate a database schema mismatch. Check server logs for details.");
+            console.error("[ImportModal] No tours created/updated and no error details provided");
+          }
+        } else {
+          // Success - show success message
+          const successMsg = `Successfully imported: ${data.summary.created || 0} created, ${data.summary.updated || 0} updated${data.summary.failed > 0 ? `, ${data.summary.failed} failed` : ""}`;
+          console.log(`[ImportModal] ${successMsg}`);
+        }
+        
         setImportResult(data.summary);
         if (onImportComplete) {
           onImportComplete();
         }
       } else {
-        const error = await response.json();
-        alert(error.error || "Import failed");
+        const errorMessage = data.error || data.message || `Import failed with status ${response.status}`;
+        const details = data.details ? `\n\nDetails: ${JSON.stringify(data.details)}` : "";
+        alert(`Import failed: ${errorMessage}${details}`);
+        console.error("[ImportModal] Import error response:", { status: response.status, data });
+        setImportResult({
+          totalRows: summary?.totalRows || 0,
+          validRows: summary?.validRows || 0,
+          created: 0,
+          updated: 0,
+          failed: summary?.validRows || 0,
+        });
       }
-    } catch (error) {
-      console.error("Import error:", error);
-      alert("Failed to import file");
+    } catch (error: any) {
+      console.error("[ImportModal] Import error:", error);
+      alert(`Failed to import file: ${error.message || "Network error or server unavailable"}`);
+      setImportResult({
+        totalRows: summary?.totalRows || 0,
+        validRows: summary?.validRows || 0,
+        created: 0,
+        updated: 0,
+        failed: summary?.validRows || 0,
+      });
     } finally {
       setImporting(false);
     }

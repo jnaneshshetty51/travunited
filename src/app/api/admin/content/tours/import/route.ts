@@ -57,11 +57,53 @@ export async function POST(req: NextRequest) {
     }
 
     // Import mode - commit to database
+    if (validation.validRows.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: "No valid rows to import",
+        summary: {
+          totalRows: rows.length,
+          validRows: 0,
+          invalidRows: validation.invalidRows.length,
+          created: 0,
+          updated: 0,
+          failed: 0,
+        },
+        errors: validation.invalidRows,
+      }, { status: 400 });
+    }
+    
     let created = 0;
     let updated = 0;
     const failed: Array<{ row: number; message: string }> = [];
     const createdIds: string[] = [];
     const updatedIds: string[] = [];
+    
+    console.log(`[Tour Import] Starting import of ${validation.validRows.length} valid rows`);
+    
+    // Quick schema validation - try to create a test query to verify schema
+    try {
+      await prisma.tour.findFirst({
+        select: {
+          id: true,
+          name: true,
+          shortDescription: true,
+          requiresPassport: true,
+        },
+      });
+    } catch (schemaError: any) {
+      console.error("[Tour Import] Schema validation failed:", schemaError);
+      if (schemaError.code === "P2021" || schemaError.code === "P2022") {
+        return NextResponse.json({
+          success: false,
+          error: `Database schema mismatch: ${schemaError.message}. Please run migrations and regenerate Prisma Client.`,
+          details: {
+            code: schemaError.code,
+            message: schemaError.message,
+          },
+        }, { status: 500 });
+      }
+    }
 
     // Helper function to generate slug from title
     const slugify = (text: string) =>
@@ -159,7 +201,7 @@ export async function POST(req: NextRequest) {
           groupSizeMin: data.group_size_min || null,
           groupSizeMax: data.group_size_max || null,
           availableDates: parseJsonField(data.available_dates),
-          bookingDeadline: data.booking_deadline || null,
+          bookingDeadline: data.booking_deadline ? new Date(data.booking_deadline) : null,
           status: data.status || "active",
           isActive: data.status === "active" || !data.status ? true : false,
           isFeatured: data.featured || false,
@@ -229,33 +271,57 @@ export async function POST(req: NextRequest) {
         }
 
         // Use transaction for each tour to ensure data consistency
-        await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
           if (existingTour) {
-            await tx.tour.update({
+            const updatedTour = await tx.tour.update({
               where: { id: existingTour.id },
               data: tourData,
             });
-            updated++;
-            updatedIds.push(existingTour.id);
+            console.log(`[Tour Import] Updated tour ${updatedTour.id} (row ${row}): ${updatedTour.name}`);
+            return { type: "update" as const, id: updatedTour.id, name: updatedTour.name };
           } else {
             const newTour = await tx.tour.create({
               data: tourData,
             });
-            created++;
-            createdIds.push(newTour.id);
+            console.log(`[Tour Import] Created tour ${newTour.id} (row ${row}): ${newTour.name}`);
+            return { type: "create" as const, id: newTour.id, name: newTour.name };
           }
         });
+        
+        // Verify the transaction succeeded
+        if (result.type === "update") {
+          updated++;
+          updatedIds.push(result.id);
+        } else {
+          created++;
+          createdIds.push(result.id);
+        }
       } catch (error: any) {
-        console.error(`Error importing tour at row ${row}:`, error);
+        console.error(`[Tour Import] Error importing tour at row ${row}:`, {
+          error: error.message,
+          code: error.code,
+          meta: error.meta,
+          stack: error.stack,
+          data: {
+            title: data.title,
+            slug: tourSlug,
+            destination,
+          },
+        });
         
         // Provide more helpful error messages for common issues
         let errorMessage = error.message || "Failed to import";
         if (error.message?.includes("Unknown argument")) {
-          errorMessage = `Schema mismatch: ${error.message}. Please ensure migrations are applied and Prisma Client is regenerated on the server.`;
+          const fieldMatch = error.message.match(/Unknown argument `(\w+)`/);
+          errorMessage = `Schema mismatch: Field '${fieldMatch?.[1] || "unknown"}' does not exist in database. Please ensure migrations are applied and Prisma Client is regenerated on the server.`;
         } else if (error.code === "P2002") {
-          errorMessage = `Duplicate slug or unique constraint violation`;
+          errorMessage = `Duplicate slug or unique constraint violation: ${error.meta?.target || "unknown field"}`;
         } else if (error.code === "P2003") {
           errorMessage = `Foreign key constraint failed: ${error.meta?.field_name || "related record not found"}`;
+        } else if (error.code === "P2021") {
+          errorMessage = `Table does not exist in database. Please run migrations.`;
+        } else if (error.code === "P2022") {
+          errorMessage = `Column does not exist in database. Please run migrations.`;
         }
         
         failed.push({ row, message: errorMessage });
@@ -282,10 +348,32 @@ export async function POST(req: NextRequest) {
       console.error("Failed to log audit event for tour import:", auditError);
     }
 
+    console.log(`[Tour Import] Import complete: ${created} created, ${updated} updated, ${failed.length} failed`);
+    
+    // If nothing was created or updated, but there were valid rows, something went wrong
+    if (validation.validRows.length > 0 && created === 0 && updated === 0 && failed.length === 0) {
+      console.error(`[Tour Import] WARNING: No tours were created/updated despite ${validation.validRows.length} valid rows`);
+      return NextResponse.json({
+        success: false,
+        error: "Import completed but no tours were created or updated. Check server logs for details.",
+        summary: {
+          totalRows: rows.length,
+          validRows: validation.validRows.length,
+          created: 0,
+          updated: 0,
+          failed: 0,
+        },
+        createdIds: [],
+        updatedIds: [],
+        failed: [],
+      }, { status: 500 });
+    }
+    
     return NextResponse.json({
       success: true,
       summary: {
         totalRows: rows.length,
+        validRows: validation.validRows.length,
         created,
         updated,
         failed: failed.length,
