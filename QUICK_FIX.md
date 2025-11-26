@@ -1,39 +1,55 @@
-# 🚨 QUICK FIX: Missing requiresPassport Column
+# 🚨 QUICK FIX: Complete Migration Fix
 
 ## The Problem
-Your production database is missing the `requiresPassport` column in the `Tour` table, causing 500 errors on:
-- `/api/admin/bookings/[id]` 
-- `/api/admin/content/tours/*`
-- Tour imports
-- Any query that touches the Tour model
+The migration `20251125163000_booking_customizations` was marked as "applied" but the SQL never actually ran. This causes:
+- Missing `requiresPassport` column in `Tour` table
+- Missing `BookingAddOn` table
+- Missing `TourAddOn` table  
+- Missing Booking and BookingTraveller columns
+- 500 errors on booking routes, tour imports, and bulk operations
 
-## The Solution (Run on VPS)
+## The Solution (Run on VPS) - RECOMMENDED
 
-**SSH into your VPS and run:**
+**Use the complete migration fix script:**
+
+```bash
+cd /var/www/travunited/travunitedlatest
+bash scripts/fix-complete-migration.sh
+```
+
+This will:
+1. ✅ Apply ALL missing tables and columns from the migration
+2. ✅ Regenerate Prisma Client
+3. ✅ Restart PM2
+
+## Alternative: Manual SQL Fix
+
+If you prefer to run SQL manually:
 
 ```bash
 cd /var/www/travunited/travunitedlatest
 source .env
 
-# Add the missing column
-psql "$DATABASE_URL" -c "ALTER TABLE \"Tour\" ADD COLUMN IF NOT EXISTS \"requiresPassport\" BOOLEAN NOT NULL DEFAULT false;"
+# Apply the complete migration SQL
+psql "$DATABASE_URL" -f scripts/apply-booking-customizations-migration.sql
 
-# CRITICAL: Regenerate Prisma Client
+# Regenerate Prisma Client
 npx prisma generate
 
 # Restart the app
 pm2 restart travunited --update-env
-
-# Check logs to verify
-pm2 logs travunited --lines 20
 ```
 
-## Or Use the Automated Script
+## Quick Fix (Only requiresPassport column)
+
+If you only need the `requiresPassport` column fixed quickly:
 
 ```bash
 cd /var/www/travunited/travunitedlatest
 bash scripts/fix-requires-passport.sh
 ```
+
+**Note:** This only fixes the `requiresPassport` column. You'll still get errors for `BookingAddOn` table. Use the complete fix above instead.
 
 ## Verify It Worked
 
