@@ -74,8 +74,11 @@ export default async function TourDetailPage({
   const tour = await prisma.tour.findFirst({
     where: { 
       slug: params.id,
-      isActive: true,
-      status: "active",
+      OR: [
+        { isActive: true },
+        { status: "active" },
+        { status: null },
+      ],
     },
     include: {
       country: true,
