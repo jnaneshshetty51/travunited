@@ -316,6 +316,52 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Handle SubTypes
+        // Support both JSON array format and comma-separated string format
+        const rawData = data as typeof data & { subtypes?: string; visa_subtypes?: string; sub_types?: string };
+        const subtypesInput = rawData.subtypes || rawData.visa_subtypes || rawData.sub_types;
+        if (subtypesInput) {
+          // Delete existing subtypes
+          await prisma.visaSubType.deleteMany({
+            where: { visaId: visa.id },
+          });
+
+          let subtypesArray: Array<{ label: string; code?: string }> = [];
+          
+          // Try to parse as JSON first
+          try {
+            const parsed = JSON.parse(subtypesInput);
+            if (Array.isArray(parsed)) {
+              subtypesArray = parsed;
+            } else if (typeof parsed === 'object' && parsed.label) {
+              subtypesArray = [parsed];
+            }
+          } catch {
+            // If not JSON, try comma-separated format
+            // Format: "Label1,Label2" or "Label1:Code1,Label2:Code2"
+            const parts = subtypesInput.split(',').map(s => s.trim()).filter(Boolean);
+            subtypesArray = parts.map(part => {
+              const [label, code] = part.split(':').map(s => s.trim());
+              return { label, code: code || undefined };
+            });
+          }
+
+          // Create subtypes
+          for (let i = 0; i < subtypesArray.length; i++) {
+            const subtype = subtypesArray[i];
+            if (subtype.label) {
+              await prisma.visaSubType.create({
+                data: {
+                  visaId: visa.id,
+                  label: subtype.label,
+                  code: subtype.code || null,
+                  sortOrder: i,
+                },
+              });
+            }
+          }
+        }
+
         if (existingVisa) {
           updated++;
         } else {
