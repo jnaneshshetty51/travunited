@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { HelpCircle, Mail, Phone, MessageCircle, ChevronDown, ChevronUp, CheckCircle, AlertCircle } from "lucide-react";
 
@@ -81,6 +81,7 @@ export default function HelpPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
 
   const toggleFaq = (category: string, index: number) => {
     const key = `${category}-${index}`;
@@ -219,6 +220,7 @@ export default function HelpPage() {
                 Can&rsquo;t find what you&rsquo;re looking for? Send us a message and we&rsquo;ll get back to you as soon as possible.
               </p>
               <form
+                ref={formRef}
                 className="space-y-4"
                 onSubmit={async (e) => {
                   e.preventDefault();
@@ -248,7 +250,10 @@ export default function HelpPage() {
                     if (response.ok && result.ok) {
                       setSubmitSuccess(true);
                       setSubmitError("");
-                      e.currentTarget.reset();
+                      // Reset form safely using ref
+                      if (formRef.current) {
+                        formRef.current.reset();
+                      }
                       // Hide success message after 5 seconds
                       setTimeout(() => {
                         setSubmitSuccess(false);
