@@ -207,7 +207,9 @@ export async function POST(req: NextRequest) {
           availableDates: parseJsonField(data.available_dates),
           bookingDeadline: data.booking_deadline ? new Date(data.booking_deadline) : null,
           status: data.status || "active",
-          isActive: data.status === "active" || !data.status ? true : false,
+          // Only set isActive if column exists (will be added via migration)
+          // For now, rely on status field
+          ...(data.status === "active" || !data.status ? { isActive: true } : { isActive: false }),
           isFeatured: data.featured || false,
           categoryId: data.category_id || null,
           metaTitle: data.meta_title || null,
@@ -275,22 +277,50 @@ export async function POST(req: NextRequest) {
         }
 
         // Use transaction for each tour to ensure data consistency
-        const result = await prisma.$transaction(async (tx) => {
-          if (existingTour) {
-            const updatedTour = await tx.tour.update({
-              where: { id: existingTour.id },
-              data: tourData,
+        // Try with isActive first, fallback to without if column doesn't exist
+        let result;
+        try {
+          result = await prisma.$transaction(async (tx) => {
+            if (existingTour) {
+              const updatedTour = await tx.tour.update({
+                where: { id: existingTour.id },
+                data: tourData,
+              });
+              console.log(`[Tour Import] Updated tour ${updatedTour.id} (row ${row}): ${updatedTour.name}`);
+              return { type: "update" as const, id: updatedTour.id, name: updatedTour.name };
+            } else {
+              const newTour = await tx.tour.create({
+                data: tourData,
+              });
+              console.log(`[Tour Import] Created tour ${newTour.id} (row ${row}): ${newTour.name}`);
+              return { type: "create" as const, id: newTour.id, name: newTour.name };
+            }
+          });
+        } catch (schemaError: any) {
+          // If isActive column doesn't exist, retry without it
+          if (schemaError.code === "P2022" || schemaError.message?.includes("Unknown argument `isActive`")) {
+            const { isActive, ...tourDataWithoutIsActive } = tourData;
+            console.log(`[Tour Import] Retrying without isActive field (row ${row})`);
+            result = await prisma.$transaction(async (tx) => {
+              if (existingTour) {
+                const updatedTour = await tx.tour.update({
+                  where: { id: existingTour.id },
+                  data: tourDataWithoutIsActive,
+                });
+                console.log(`[Tour Import] Updated tour ${updatedTour.id} (row ${row}): ${updatedTour.name}`);
+                return { type: "update" as const, id: updatedTour.id, name: updatedTour.name };
+              } else {
+                const newTour = await tx.tour.create({
+                  data: tourDataWithoutIsActive,
+                });
+                console.log(`[Tour Import] Created tour ${newTour.id} (row ${row}): ${newTour.name}`);
+                return { type: "create" as const, id: newTour.id, name: newTour.name };
+              }
             });
-            console.log(`[Tour Import] Updated tour ${updatedTour.id} (row ${row}): ${updatedTour.name}`);
-            return { type: "update" as const, id: updatedTour.id, name: updatedTour.name };
           } else {
-            const newTour = await tx.tour.create({
-              data: tourData,
-            });
-            console.log(`[Tour Import] Created tour ${newTour.id} (row ${row}): ${newTour.name}`);
-            return { type: "create" as const, id: newTour.id, name: newTour.name };
+            throw schemaError;
           }
-        });
+        }
         
         // Verify the transaction succeeded
         if (result.type === "update") {

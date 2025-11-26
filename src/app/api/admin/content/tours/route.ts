@@ -53,24 +53,32 @@ export async function GET(req: Request) {
     const status = url.searchParams.get("status");
     const search = url.searchParams.get("search");
 
+    // Build where clause - use status field for filtering (isActive column may not exist yet)
+    const whereClause: any = {
+      ...(countryId ? { countryId } : {}),
+      ...(status === "active"
+        ? { 
+            OR: [
+              { status: "active" },
+              { status: null },
+            ]
+          }
+        : status === "inactive"
+        ? { status: "inactive" }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { destination: { contains: search, mode: "insensitive" } },
+              { slug: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+
     const tours = await prisma.tour.findMany({
-      where: {
-        ...(countryId ? { countryId } : {}),
-        ...(status === "active"
-          ? { isActive: true }
-          : status === "inactive"
-          ? { isActive: false }
-          : {}),
-        ...(search
-          ? {
-              OR: [
-                { name: { contains: search, mode: "insensitive" } },
-                { destination: { contains: search, mode: "insensitive" } },
-                { slug: { contains: search, mode: "insensitive" } },
-              ],
-            }
-          : {}),
-      },
+      where: whereClause,
       include: {
         country: true,
         _count: {
