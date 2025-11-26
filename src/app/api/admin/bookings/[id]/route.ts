@@ -121,7 +121,13 @@ export async function GET(
     });
 
     // Parse customised package info from specialRequests if present
-    let customisedPackage = null;
+    let customisedPackage: {
+      isCustomisedPackage: boolean;
+      customRequestNotes: string | null;
+      customBasePrice: number | null;
+      customAddOnsPrice: number | null;
+      customDiscount: number | null;
+    } | null = null;
     if (booking.specialRequests && booking.specialRequests.includes("[CUSTOMISED PACKAGE REQUEST]")) {
       const customMatch = booking.specialRequests.match(/\[CUSTOMISED PACKAGE REQUEST\]\n([^\n]+)/);
       if (customMatch) {
