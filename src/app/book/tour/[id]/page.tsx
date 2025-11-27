@@ -23,6 +23,7 @@ import {
 import Link from "next/link";
 import { loadRazorpayScript } from "@/lib/razorpay-client";
 import { formatDate } from "@/lib/dateFormat";
+import TermsAndPolicy from "@/components/ui/TermsAndPolicy";
 
 const steps = [
   { id: 1, name: "Select Tour & Date", icon: Calendar },
@@ -111,8 +112,8 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
   const [bookingCreationError, setBookingCreationError] = useState<string | null>(null);
   const [selectedHotelCategory, setSelectedHotelCategory] = useState<string>("");
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [policy, setPolicy] = useState<{ key: string; title: string; content: string; version: string } | null>(null);
-  const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [refundPolicy, setRefundPolicy] = useState<{ key: string; title: string; content: string; version: string } | null>(null);
+  const [termsPolicy, setTermsPolicy] = useState<{ key: string; title: string; content: string; version: string } | null>(null);
   const [policyVersion, setPolicyVersion] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -259,21 +260,32 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
     fetchTour();
   }, [params.id, router]);
 
-  // Fetch refund & cancellation policy
+  // Fetch refund & cancellation policy and terms & conditions
   useEffect(() => {
-    const fetchPolicy = async () => {
+    const fetchPolicies = async () => {
       try {
-        const response = await fetch("/api/policies/refund_cancellation");
-        if (response.ok) {
-          const data = await response.json();
-          setPolicy(data);
-          setPolicyVersion(data.version);
+        // Fetch both policies in parallel
+        const [refundResponse, termsResponse] = await Promise.all([
+          fetch("/api/policies/refund_cancellation"),
+          fetch("/api/policies/terms_conditions").catch(() => null), // Terms policy might not exist yet
+        ]);
+
+        if (refundResponse.ok) {
+          const refundData = await refundResponse.json();
+          setRefundPolicy(refundData);
+          // Use refund policy version as primary (this is what the API validates)
+          setPolicyVersion(refundData.version);
+        }
+
+        if (termsResponse && termsResponse.ok) {
+          const termsData = await termsResponse.json();
+          setTermsPolicy(termsData);
         }
       } catch (error) {
-        console.error("Failed to load policy:", error);
+        console.error("Failed to load policies:", error);
       }
     };
-    fetchPolicy();
+    fetchPolicies();
   }, []);
 
   const requiresPassport = useMemo(() => {
@@ -694,7 +706,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
     }
 
     if (!formData.policyAccepted) {
-      setPolicyError("Please agree to the refund & cancellation policy before continuing.");
+      setPolicyError("Please review and accept our Terms & Conditions and Refund & Cancellation Policy to proceed with booking.");
       return null;
     }
 
@@ -792,7 +804,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
 
   const handlePayment = async () => {
     if (!formData.policyAccepted) {
-      setPolicyError("Please accept the refund & cancellation policy before paying.");
+      setPolicyError("Please review and accept our Terms & Conditions and Refund & Cancellation Policy to proceed with booking.");
       return;
     }
 
@@ -1771,104 +1783,20 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                     </>
                   )}
                   <div className="border border-neutral-200 rounded-lg p-4 bg-white mb-6">
-                    <h4 className="font-semibold text-neutral-900 mb-2">
-                      Refund & Cancellation Policy
-                      {policy && <span className="text-sm font-normal text-neutral-500 ml-2">(v{policy.version})</span>}
-                    </h4>
-                    <div className="space-y-2 text-sm text-neutral-700 max-h-32 overflow-y-auto">
-                      {policy ? (
-                        <div dangerouslySetInnerHTML={{ __html: policy.content.substring(0, 500) + "..." }} />
-                      ) : tour?.bookingPolicies ? (
-                        <p className="whitespace-pre-line">{tour.bookingPolicies}</p>
-                      ) : (
-                        <p>Please review the refund and cancellation policy before continuing.</p>
-                      )}
-                      {tour?.cancellationTerms && (
-                        <p className="whitespace-pre-line text-neutral-600">{tour.cancellationTerms}</p>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowPolicyModal(true)}
-                      className="text-primary-600 hover:text-primary-700 text-sm mt-2 underline"
-                    >
-                      Read full policy
-                    </button>
-                    <label className="flex items-start gap-2 text-sm text-neutral-800 mt-4">
-                      <input
-                        type="checkbox"
-                        checked={formData.policyAccepted}
-                        onChange={(e) => {
-                          setFormData((prev) => ({ ...prev, policyAccepted: e.target.checked }));
-                          setPolicyError(null);
-                        }}
-                        className="mt-1 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-                      />
-                      <span>
-                        I have read and accept the Refund & Cancellation Policy{policy && ` (v${policy.version})`}
-                      </span>
-                    </label>
-                    {policyError && <p className="text-sm text-red-600 mt-2">{policyError}</p>}
+                    <TermsAndPolicy
+                      termsPolicyHtml={termsPolicy?.content}
+                      refundPolicyHtml={refundPolicy?.content}
+                      termsPolicyVersion={termsPolicy?.version}
+                      refundPolicyVersion={refundPolicy?.version}
+                      required={true}
+                      value={formData.policyAccepted}
+                      onChange={(accepted) => {
+                        setFormData((prev) => ({ ...prev, policyAccepted: accepted }));
+                        setPolicyError(null);
+                      }}
+                      error={policyError || undefined}
+                    />
                   </div>
-
-                  {/* Policy Modal */}
-                  <AnimatePresence>
-                    {showPolicyModal && policy && (
-                      <>
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          onClick={() => setShowPolicyModal(false)}
-                          className="fixed inset-0 bg-black/50 z-50"
-                        />
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-                        >
-                          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                            <div className="p-6 border-b border-neutral-200 flex items-center justify-between">
-                              <h3 className="text-xl font-bold text-neutral-900">
-                                {policy.title} (v{policy.version})
-                              </h3>
-                              <button
-                                onClick={() => setShowPolicyModal(false)}
-                                className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
-                              >
-                                <X size={20} />
-                              </button>
-                            </div>
-                            <div className="p-6 overflow-y-auto flex-1">
-                              <div
-                                className="prose prose-sm max-w-none"
-                                dangerouslySetInnerHTML={{ __html: policy.content }}
-                              />
-                            </div>
-                            <div className="p-6 border-t border-neutral-200 flex items-center justify-between">
-                              <button
-                                onClick={() => setShowPolicyModal(false)}
-                                className="px-4 py-2 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
-                              >
-                                Close
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setFormData((prev) => ({ ...prev, policyAccepted: true }));
-                                  setShowPolicyModal(false);
-                                  setPolicyError(null);
-                                }}
-                                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                              >
-                                Accept Policy
-                              </button>
-                            </div>
-                          </div>
-                        </motion.div>
-                      </>
-                    )}
-                  </AnimatePresence>
                   <button
                     onClick={handlePayment}
                     disabled={loading || !formData.policyAccepted}

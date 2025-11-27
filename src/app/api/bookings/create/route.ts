@@ -117,27 +117,34 @@ export async function POST(req: Request) {
 
     if (!data.policyAccepted) {
       return NextResponse.json(
-        { error: "You must accept the refund & cancellation policy before continuing." },
+        { error: "TERMS_NOT_ACCEPTED", message: "Please accept Terms & Conditions and Refund & Cancellation Policy before continuing." },
         { status: 400 }
       );
     }
 
-    // Validate policy version
-    const refundPolicy = await prisma.sitePolicy.findUnique({
-      where: { key: "refund_cancellation" },
-    });
+    // Validate policy versions - check both Terms & Conditions and Refund & Cancellation
+    const [refundPolicy, termsPolicy] = await Promise.all([
+      prisma.sitePolicy.findUnique({ where: { key: "refund_cancellation" } }),
+      prisma.sitePolicy.findUnique({ where: { key: "terms_conditions" } }),
+    ]);
 
+    // If refund policy exists, validate version
     if (refundPolicy) {
       if (!data.policyVersion || data.policyVersion !== refundPolicy.version) {
         return NextResponse.json(
           {
-            error: "Policy version mismatch. Please refresh the page and accept the latest policy version.",
+            error: "POLICY_VERSION_MISMATCH",
+            message: "Policy has changed. Please review and accept the latest policy version.",
             policyVersion: refundPolicy.version,
           },
           { status: 400 }
         );
       }
     }
+
+    // If terms policy exists and has a different version, also validate it
+    // For now, we'll use the refund policy version as the primary version
+    // In the future, you might want to track both versions separately
 
     const tourRecord = await prisma.tour.findFirst({
       where: {
