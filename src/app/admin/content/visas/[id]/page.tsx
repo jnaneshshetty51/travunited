@@ -1453,10 +1453,11 @@ const handleFaqChange = (
                         <img
                           src={getMediaProxyUrl(formData.sampleVisaImageUrl)}
                           alt="Sample visa preview"
-                          className="w-full max-h-56 object-cover rounded-xl border border-neutral-200"
+                          className="w-full rounded-xl border border-neutral-200"
+                          style={{ maxWidth: "100%", height: "auto" }}
                         />
                         <p className="text-xs text-neutral-500">
-                          This image is for reference inside the admin panel and CMS.
+                          This image is for reference inside the admin panel and CMS. Sample visa images are displayed at full size, not as thumbnails.
                         </p>
                       </div>
                     )}

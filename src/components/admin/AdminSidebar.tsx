@@ -28,6 +28,7 @@ import {
   Briefcase,
   Star,
   UserCircle,
+  Mail,
 } from "lucide-react";
 
 const BASE_MENU_ITEMS = [
@@ -53,6 +54,12 @@ const BASE_MENU_ITEMS = [
     label: "Homepage Reviews",
     href: "/admin/reviews/homepage",
     icon: Star,
+    roles: ["SUPER_ADMIN"],
+  },
+  {
+    label: "Email Test",
+    href: "/admin/email-test",
+    icon: Mail,
     roles: ["SUPER_ADMIN"],
   },
   {
