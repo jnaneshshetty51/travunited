@@ -78,6 +78,18 @@ export function buildMediaProxyUrlFromKey(key: string) {
   return `${MEDIA_PROXY_BASE}/${encodeKey(normalized)}`;
 }
 
+export function buildMediaDownloadUrlFromKey(key: string, filename?: string) {
+  const base = buildMediaProxyUrlFromKey(key);
+  if (!base) {
+    return "";
+  }
+  const params = new URLSearchParams({ download: "true" });
+  if (filename) {
+    params.set("filename", filename);
+  }
+  return `${base}?${params.toString()}`;
+}
+
 export function extractMediaKeyFromUrl(value?: string | null) {
   if (!value) {
     return null;

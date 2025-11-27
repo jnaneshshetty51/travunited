@@ -177,6 +177,7 @@ export async function POST(
       id: document.id,
       key: document.key,
       url: `/api/media/${key}`,
+      downloadUrl: `/api/media/${key}?download=true&filename=${encodeURIComponent(file.name)}`,
       fileName: document.fileName,
       type: document.type,
       status: document.status,

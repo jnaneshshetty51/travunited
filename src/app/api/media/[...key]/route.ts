@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDocumentObject } from "@/lib/minio";
 import { Readable } from "stream";
+import path from "path";
 export const dynamic = "force-dynamic";
 
 
@@ -28,7 +29,7 @@ function readableToWebStream(stream: Readable): ReadableStream<Uint8Array> {
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: { key: string[] } }
 ) {
   const keyPath = params.key?.join("/");
@@ -39,7 +40,10 @@ export async function GET(
     return NextResponse.json({ error: "Invalid media path" }, { status: 400 });
   }
 
-  // Media proxy request (logging removed for production)
+  const { searchParams } = new URL(request.url);
+  const download = searchParams.get("download");
+  const isDownload = download === "true";
+  const filenameParam = searchParams.get("filename");
 
   try {
     const object = await getDocumentObject(keyPath);
@@ -52,7 +56,7 @@ export async function GET(
     const webStream = readableToWebStream(object.stream);
     const headers = new Headers();
 
-    headers.set("Cache-Control", "public, max-age=3600, stale-while-revalidate=60");
+    headers.set("Cache-Control", "private, max-age=60");
     headers.set("Content-Type", object.contentType || "application/octet-stream");
 
     if (object.contentLength) {
@@ -61,6 +65,13 @@ export async function GET(
 
     if (object.lastModified) {
       headers.set("Last-Modified", object.lastModified.toUTCString());
+    }
+
+    if (isDownload) {
+      const basename = path.basename(keyPath);
+      const filename = filenameParam || basename || "download";
+      headers.set("Content-Disposition", `attachment; filename="${filename}"`);
+      headers.set("Cache-Control", "private, max-age=0, no-cache");
     }
 
     return new NextResponse(webStream, { headers });

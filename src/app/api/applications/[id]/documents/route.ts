@@ -205,6 +205,9 @@ export async function POST(
       documentId: document.id,
       fileKey: key,
       signedUrl: await getSignedDocumentUrl(key, 60),
+      downloadUrl: `/api/media/${key}?download=true&filename=${encodeURIComponent(
+        file.name
+      )}`,
       message: "Document uploaded successfully",
     });
   } catch (error) {

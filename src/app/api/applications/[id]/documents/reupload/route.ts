@@ -178,6 +178,9 @@ export async function POST(
 
     return NextResponse.json({
       message: "Document re-uploaded successfully",
+      downloadUrl: `/api/media/${key}?download=true&filename=${encodeURIComponent(
+        file.name || existingDoc.documentType || "document"
+      )}`,
     });
   } catch (error) {
     console.error("Error re-uploading document:", error);

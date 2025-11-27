@@ -181,6 +181,7 @@ export async function PATCH(
       id: updated.id,
       key: updated.key,
       url: `/api/media/${key}`,
+      downloadUrl: `/api/media/${key}?download=true&filename=${encodeURIComponent(file.name)}`,
       fileName: updated.fileName,
       type: updated.type,
       status: updated.status,
