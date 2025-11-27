@@ -22,5 +22,13 @@ CREATE INDEX IF NOT EXISTS "PasswordReset_expiresAt_idx" ON "PasswordReset"("exp
 CREATE INDEX IF NOT EXISTS "PasswordReset_used_idx" ON "PasswordReset"("used");
 
 -- AddForeignKey
-ALTER TABLE "PasswordReset" ADD CONSTRAINT IF NOT EXISTS "PasswordReset_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'PasswordReset_userId_fkey'
+    ) THEN
+        ALTER TABLE "PasswordReset" ADD CONSTRAINT "PasswordReset_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
+
 

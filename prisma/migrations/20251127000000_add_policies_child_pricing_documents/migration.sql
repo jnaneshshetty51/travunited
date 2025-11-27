@@ -43,10 +43,24 @@ CREATE INDEX IF NOT EXISTS "BookingDocument_travellerId_idx" ON "BookingDocument
 CREATE INDEX IF NOT EXISTS "BookingDocument_status_idx" ON "BookingDocument"("status");
 
 -- AddForeignKey
-ALTER TABLE "BookingDocument" ADD CONSTRAINT IF NOT EXISTS "BookingDocument_bookingId_fkey" FOREIGN KEY ("bookingId") REFERENCES "Booking"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'BookingDocument_bookingId_fkey'
+    ) THEN
+        ALTER TABLE "BookingDocument" ADD CONSTRAINT "BookingDocument_bookingId_fkey" FOREIGN KEY ("bookingId") REFERENCES "Booking"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "BookingDocument" ADD CONSTRAINT IF NOT EXISTS "BookingDocument_travellerId_fkey" FOREIGN KEY ("travellerId") REFERENCES "BookingTraveller"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'BookingDocument_travellerId_fkey'
+    ) THEN
+        ALTER TABLE "BookingDocument" ADD CONSTRAINT "BookingDocument_travellerId_fkey" FOREIGN KEY ("travellerId") REFERENCES "BookingTraveller"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    END IF;
+END $$;
 
 -- AddColumn (idempotent - only add if not exists)
 DO $$ 
