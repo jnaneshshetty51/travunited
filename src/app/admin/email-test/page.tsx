@@ -24,7 +24,9 @@ export default function EmailTestPage() {
   const [emailConfig, setEmailConfig] = useState<{
     configured: boolean;
     resendApiKey: string;
-    emailFrom: string;
+    emailFromGeneral: string;
+    emailFromVisa: string;
+    emailFromTours: string;
     message: string;
   } | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
