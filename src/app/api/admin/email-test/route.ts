@@ -17,6 +17,7 @@ import {
   sendCorporateLeadAdminEmail,
   sendCorporateLeadConfirmationEmail,
   getEmailServiceConfig,
+  getLastEmailError,
 } from "@/lib/email";
 export const dynamic = "force-dynamic";
 
@@ -87,6 +88,14 @@ export async function POST(req: Request) {
 
     let result: { success: boolean; message: string; error?: string };
 
+    const failWithLastEmailError = () => {
+      const lastError = getLastEmailError();
+      throw new Error(
+        lastError ||
+          "Email provider rejected the request. Check Resend configuration or server logs."
+      );
+    };
+
     try {
       let emailSent = false;
       
@@ -94,7 +103,7 @@ export async function POST(req: Request) {
         case "password-reset":
           emailSent = await sendPasswordResetEmail(email, testResetLink);
           if (!emailSent) {
-            throw new Error("Email function returned false. Check server logs for details.");
+            failWithLastEmailError();
           }
           result = { success: true, message: "Password reset email sent successfully" };
           break;
@@ -102,7 +111,7 @@ export async function POST(req: Request) {
         case "email-verification":
           emailSent = await sendEmailVerificationEmail(email, testVerificationLink, "Test User");
           if (!emailSent) {
-            throw new Error("Email function returned false. Check server logs for details.");
+            failWithLastEmailError();
           }
           result = { success: true, message: "Email verification email sent successfully" };
           break;
@@ -117,7 +126,7 @@ export async function POST(req: Request) {
             "CUSTOMER"
           );
           if (!emailSent) {
-            throw new Error("Email function returned false. Check server logs for details.");
+            failWithLastEmailError();
           }
           result = { success: true, message: "Visa payment success email sent successfully" };
           break;
@@ -131,7 +140,7 @@ export async function POST(req: Request) {
             "IN_PROCESS"
           );
           if (!emailSent) {
-            throw new Error("Email function returned false. Check server logs for details.");
+            failWithLastEmailError();
           }
           result = { success: true, message: "Visa status update email sent successfully" };
           break;
@@ -148,7 +157,7 @@ export async function POST(req: Request) {
             ]
           );
           if (!emailSent) {
-            throw new Error("Email function returned false. Check server logs for details.");
+            failWithLastEmailError();
           }
           result = { success: true, message: "Visa document rejected email sent successfully" };
           break;
@@ -161,7 +170,7 @@ export async function POST(req: Request) {
             testVisaType
           );
           if (!emailSent) {
-            throw new Error("Email function returned false. Check server logs for details.");
+            failWithLastEmailError();
           }
           result = { success: true, message: "Visa approved email sent successfully" };
           break;
@@ -175,7 +184,7 @@ export async function POST(req: Request) {
             "Incomplete documentation provided"
           );
           if (!emailSent) {
-            throw new Error("Email function returned false. Check server logs for details.");
+            failWithLastEmailError();
           }
           result = { success: true, message: "Visa rejected email sent successfully" };
           break;
@@ -191,7 +200,7 @@ export async function POST(req: Request) {
             "CUSTOMER"
           );
           if (!emailSent) {
-            throw new Error("Email function returned false. Check server logs for details.");
+            failWithLastEmailError();
           }
           result = { success: true, message: "Tour payment success email sent successfully" };
           break;
@@ -199,7 +208,7 @@ export async function POST(req: Request) {
         case "tour-confirmed":
           emailSent = await sendTourConfirmedEmail(email, testBookingId, testTourName);
           if (!emailSent) {
-            throw new Error("Email function returned false. Check server logs for details.");
+            failWithLastEmailError();
           }
           result = { success: true, message: "Tour confirmed email sent successfully" };
           break;
@@ -213,7 +222,7 @@ export async function POST(req: Request) {
             new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
           );
           if (!emailSent) {
-            throw new Error("Email function returned false. Check server logs for details.");
+            failWithLastEmailError();
           }
           result = { success: true, message: "Tour payment reminder email sent successfully" };
           break;
@@ -226,7 +235,7 @@ export async function POST(req: Request) {
             "CONFIRMED"
           );
           if (!emailSent) {
-            throw new Error("Email function returned false. Check server logs for details.");
+            failWithLastEmailError();
           }
           result = { success: true, message: "Tour status update email sent successfully" };
           break;
@@ -234,7 +243,7 @@ export async function POST(req: Request) {
         case "tour-vouchers-ready":
           emailSent = await sendTourVouchersReadyEmail(email, testBookingId, testTourName);
           if (!emailSent) {
-            throw new Error("Email function returned false. Check server logs for details.");
+            failWithLastEmailError();
           }
           result = { success: true, message: "Tour vouchers ready email sent successfully" };
           break;
@@ -249,7 +258,7 @@ export async function POST(req: Request) {
             createdAt: new Date(),
           });
           if (!emailSent) {
-            throw new Error("Email function returned false. Check server logs for details.");
+            failWithLastEmailError();
           }
           result = { success: true, message: "Corporate lead admin email sent successfully" };
           break;
@@ -261,7 +270,7 @@ export async function POST(req: Request) {
             "John Doe"
           );
           if (!emailSent) {
-            throw new Error("Email function returned false. Check server logs for details.");
+            failWithLastEmailError();
           }
           result = { success: true, message: "Corporate lead confirmation email sent successfully" };
           break;
@@ -275,12 +284,17 @@ export async function POST(req: Request) {
 
       return NextResponse.json(result);
     } catch (emailError) {
-      console.error(`Error sending test email ${testId}:`, emailError);
+      const detailedError = getLastEmailError();
+      console.error(`Error sending test email ${testId}:`, emailError, {
+        detailedError,
+      });
       return NextResponse.json(
         {
           success: false,
           message: "Failed to send email",
-          error: emailError instanceof Error ? emailError.message : "Unknown error",
+          error:
+            detailedError ||
+            (emailError instanceof Error ? emailError.message : "Unknown error"),
         },
         { status: 500 }
       );

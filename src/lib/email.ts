@@ -27,6 +27,7 @@ const EMAIL_CONFIG_CACHE_TTL = 1000 * 60 * 5;
 
 let cachedResendClient: Resend | null = null;
 let cachedResendKey: string | null = null;
+let lastEmailError: string | null = null;
 
 async function loadEmailConfig(forceReload = false): Promise<EmailConfig> {
   if (
@@ -125,13 +126,15 @@ function stripHtml(html: string) {
 }
 
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
+  lastEmailError = null;
   const config = await loadEmailConfig();
   const resendClient = await getResendClient(config.resendApiKey);
 
   if (!resendClient) {
-    console.warn(
-      "[Email] Resend client not initialized. Configure RESEND_API_KEY in settings or environment."
-    );
+    const message =
+      "Resend client not initialized. Configure RESEND_API_KEY in admin email settings.";
+    lastEmailError = message;
+    console.warn("[Email]", message);
     return false;
   }
 
@@ -150,9 +153,10 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     "";
 
   if (!from) {
-    console.error(
-      "[Email] Sender email not configured. Set EMAIL_FROM or configure sender addresses in admin settings."
-    );
+    const message =
+      "Sender email not configured. Set EMAIL_FROM or configure sender addresses in admin settings.";
+    console.error("[Email]", message);
+    lastEmailError = message;
     return false;
   }
 
@@ -167,11 +171,12 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     });
 
     if (result.error) {
-      console.error("[Email] Resend API returned an error:", {
-        error: result.error,
+      const message = `[Email] Resend API returned an error: ${JSON.stringify(result.error)}`;
+      console.error(message, {
         to: options.to,
         subject: options.subject,
       });
+      lastEmailError = result.error?.message || message;
       return false;
     }
 
@@ -182,15 +187,22 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     });
     return true;
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error sending email via Resend";
     console.error("[Email] Exception sending email via Resend:", {
-      error: error instanceof Error ? error.message : String(error),
+      error: message,
       stack: error instanceof Error ? error.stack : undefined,
       to: options.to,
       subject: options.subject,
       resendError: error,
     });
+    lastEmailError = message;
     return false;
   }
+}
+
+export function getLastEmailError() {
+  return lastEmailError;
 }
 
 /**
