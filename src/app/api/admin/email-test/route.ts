@@ -189,7 +189,8 @@ export async function POST(req: Request) {
         case "corporate-lead-confirmation":
           await sendCorporateLeadConfirmationEmail(
             email,
-            "Test Company Ltd"
+            "Test Company Ltd",
+            "John Doe"
           );
           result = { success: true, message: "Corporate lead confirmation email sent successfully" };
           break;

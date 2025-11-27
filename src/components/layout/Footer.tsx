@@ -34,7 +34,7 @@ export function Footer() {
           {/* Brand */}
           <div className="lg:col-span-2">
             <img 
-              src="/logo.png" 
+              src="/white-logo.png" 
               alt="Travunited Logo" 
               className="h-10 w-auto mb-4"
             />
