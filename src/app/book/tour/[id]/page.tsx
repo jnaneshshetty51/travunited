@@ -51,6 +51,9 @@ type TravellerForm = {
   passportIssuingCountry: string;
   passportFileKey?: string | null;
   passportFileName?: string | null;
+  panNumber?: string; // PAN for Indian travellers
+  aadharFileKey?: string | null; // Aadhaar file for Indian travellers
+  aadharFileName?: string | null;
 };
 
 type AddOnSelectionState = Record<string, { selected: boolean; quantity: number }>;
@@ -156,6 +159,9 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
     passportIssuingCountry: "",
     passportFileKey: null,
     passportFileName: null,
+    panNumber: "",
+    aadharFileKey: null,
+    aadharFileName: null,
   }), []);
 
   const updateTraveller = (index: number, field: keyof TravellerForm, value: string | null) => {
@@ -329,6 +335,49 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
       }));
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to upload passport copy.";
+      setPassportUploadStatus((prev) => ({
+        ...prev,
+        [travellerKey]: { uploading: false, error: message },
+      }));
+      setValidationError(message);
+      setTimeout(() => setValidationError(null), 5000);
+    }
+  };
+
+  const handleAadharFileChange = async (travellerIndex: number, file: File | null) => {
+    if (!file) return;
+    const traveller = formData.travellers[travellerIndex];
+    if (!traveller) return;
+    const travellerKey = traveller.uid;
+    setPassportUploadStatus((prev) => ({
+      ...prev,
+      [travellerKey]: { uploading: true, error: null },
+    }));
+    try {
+      const uploadForm = new FormData();
+      uploadForm.append("file", file);
+      uploadForm.append(
+        "travellerName",
+        `${traveller.firstName} ${traveller.lastName}`.trim() || `traveller-${travellerIndex + 1}`
+      );
+      uploadForm.append("documentType", "aadhaar");
+      const response = await fetch("/api/bookings/passport-upload", {
+        method: "POST",
+        body: uploadForm,
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || "Failed to upload Aadhaar document.");
+      }
+      const result = await response.json();
+      updateTraveller(travellerIndex, "aadharFileKey", result.key);
+      updateTraveller(travellerIndex, "aadharFileName", file.name);
+      setPassportUploadStatus((prev) => ({
+        ...prev,
+        [travellerKey]: { uploading: false, error: null },
+      }));
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to upload Aadhaar document.";
       setPassportUploadStatus((prev) => ({
         ...prev,
         [travellerKey]: { uploading: false, error: message },
@@ -753,6 +802,8 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
             passportIssuingCountry: t.passportIssuingCountry || null,
             passportFileKey: t.passportFileKey || null,
             passportFileName: t.passportFileName || null,
+            panNumber: t.panNumber || null,
+            aadharFileKey: t.aadharFileKey || null,
           })),
           selectedAddOns: selectedAddOnsPayload,
           preferences: formData.preferences,
@@ -1469,87 +1520,167 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                   </div>
                 </div>
 
-                    <div className="border border-dashed border-neutral-200 rounded-lg p-4 bg-neutral-50">
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <h4 className="font-medium text-neutral-900">Passport details</h4>
-                          <p className="text-sm text-neutral-600">
-                            {requiresPassport
-                              ? "All fields below are required for international tours."
-                              : "Optional now, but required before visa processing."}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-2">
-                            Passport Number {requiresPassport && "*"}
-                          </label>
-                          <input
-                            type="text"
-                            value={traveller.passportNumber}
-                            onChange={(e) => updateTraveller(index, "passportNumber", e.target.value.toUpperCase())}
-                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg uppercase"
-                            maxLength={20}
-                            placeholder="Enter passport number"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-2">
-                            Issuing Country {requiresPassport && "*"}
-                          </label>
-                          <input
-                            type="text"
-                            value={traveller.passportIssuingCountry}
-                            onChange={(e) => updateTraveller(index, "passportIssuingCountry", e.target.value)}
-                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
-                            placeholder="India"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-2">
-                            Passport Expiry {requiresPassport && "*"}
-                          </label>
-                          <input
-                            type="date"
-                            value={traveller.passportExpiry}
-                            onChange={(e) => updateTraveller(index, "passportExpiry", e.target.value)}
-                            className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
-                          />
-                          {expiryIssue && (
-                            <p className="text-sm text-red-600 mt-1">{expiryIssue}</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-2">
-                            Passport Copy {requiresPassport && "*"}
-                          </label>
-                          <input
-                            type="file"
-                            accept=".pdf,image/*"
-                            onChange={(e) => handlePassportFileChange(index, e.target.files?.[0] || null)}
-                            className="w-full text-sm text-neutral-600"
-                          />
-                          <div className="text-xs mt-1 text-neutral-500">
-                            Accepted: PDF, JPG, PNG up to 10MB
+                    {(() => {
+                      const isIndian = (traveller.nationality || "").toLowerCase().trim() === "india" || 
+                                       (traveller.nationality || "").toLowerCase().trim() === "indian";
+                      const showPassport = requiresPassport || !isIndian;
+                      const showIndianDocs = isIndian && !requiresPassport;
+
+                      if (showPassport) {
+                        return (
+                          <div className="border border-dashed border-neutral-200 rounded-lg p-4 bg-neutral-50">
+                            <div className="flex items-center justify-between mb-4">
+                              <div>
+                                <h4 className="font-medium text-neutral-900">Passport details</h4>
+                                <p className="text-sm text-neutral-600">
+                                  {requiresPassport
+                                    ? "All fields below are required for international tours."
+                                    : isIndian
+                                    ? "Passport required for non-Indian travellers."
+                                    : "Passport details are required for non-Indian travellers."}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                                  Passport Number {requiresPassport && "*"}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={traveller.passportNumber}
+                                  onChange={(e) => updateTraveller(index, "passportNumber", e.target.value.toUpperCase())}
+                                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg uppercase"
+                                  maxLength={20}
+                                  placeholder="Enter passport number"
+                                  required={requiresPassport || !isIndian}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                                  Issuing Country {requiresPassport && "*"}
+                                </label>
+                                <input
+                                  type="text"
+                                  value={traveller.passportIssuingCountry}
+                                  onChange={(e) => updateTraveller(index, "passportIssuingCountry", e.target.value)}
+                                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
+                                  placeholder="India"
+                                  required={requiresPassport || !isIndian}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                                  Passport Expiry {requiresPassport && "*"}
+                                </label>
+                                <input
+                                  type="date"
+                                  value={traveller.passportExpiry}
+                                  onChange={(e) => updateTraveller(index, "passportExpiry", e.target.value)}
+                                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg"
+                                  required={requiresPassport || !isIndian}
+                                />
+                                {expiryIssue && (
+                                  <p className="text-sm text-red-600 mt-1">{expiryIssue}</p>
+                                )}
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                                  Passport Copy {requiresPassport && "*"}
+                                </label>
+                                <input
+                                  type="file"
+                                  accept=".pdf,image/*"
+                                  onChange={(e) => handlePassportFileChange(index, e.target.files?.[0] || null)}
+                                  className="w-full text-sm text-neutral-600"
+                                  required={requiresPassport || !isIndian}
+                                />
+                                <div className="text-xs mt-1 text-neutral-500">
+                                  Accepted: PDF, JPG, PNG up to 10MB
+                                </div>
+                                {uploadState?.uploading && (
+                                  <p className="text-sm text-primary-600 mt-1 flex items-center gap-1">
+                                    <Upload size={14} className="animate-spin" />
+                                    Uploading...
+                                  </p>
+                                )}
+                                {traveller.passportFileName && !uploadState?.uploading && (
+                                  <p className="text-sm text-green-600 mt-1">
+                                    Uploaded: {traveller.passportFileName}
+                                  </p>
+                                )}
+                                {uploadState?.error && (
+                                  <p className="text-sm text-red-600 mt-1">{uploadState.error}</p>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                          {uploadState?.uploading && (
-                            <p className="text-sm text-primary-600 mt-1 flex items-center gap-1">
-                              <Upload size={14} className="animate-spin" />
-                              Uploading...
-                            </p>
-                          )}
-                          {traveller.passportFileName && !uploadState?.uploading && (
-                            <p className="text-sm text-green-600 mt-1">
-                              Uploaded: {traveller.passportFileName}
-                            </p>
-                          )}
-                          {uploadState?.error && (
-                            <p className="text-sm text-red-600 mt-1">{uploadState.error}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                        );
+                      } else if (showIndianDocs) {
+                        return (
+                          <div className="border border-dashed border-neutral-200 rounded-lg p-4 bg-neutral-50">
+                            <div className="flex items-center justify-between mb-4">
+                              <div>
+                                <h4 className="font-medium text-neutral-900">Indian ID Documents</h4>
+                                <p className="text-sm text-neutral-600">
+                                  PAN and Aadhaar are required for Indian travellers on domestic tours.
+                                </p>
+                              </div>
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                                  PAN Number *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={traveller.panNumber || ""}
+                                  onChange={(e) => updateTraveller(index, "panNumber", e.target.value.toUpperCase())}
+                                  className="w-full px-4 py-2 border border-neutral-300 rounded-lg uppercase"
+                                  maxLength={10}
+                                  placeholder="ABCDE1234F"
+                                  required
+                                  pattern="[A-Z]{5}[0-9]{4}[A-Z]{1}"
+                                />
+                                <div className="text-xs mt-1 text-neutral-500">
+                                  Format: 5 letters, 4 digits, 1 letter (e.g., ABCDE1234F)
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                                  Aadhaar Document *
+                                </label>
+                                <input
+                                  type="file"
+                                  accept=".pdf,image/*"
+                                  onChange={(e) => handleAadharFileChange(index, e.target.files?.[0] || null)}
+                                  className="w-full text-sm text-neutral-600"
+                                  required
+                                />
+                                <div className="text-xs mt-1 text-neutral-500">
+                                  Accepted: PDF, JPG, PNG up to 10MB
+                                </div>
+                                {uploadState?.uploading && (
+                                  <p className="text-sm text-primary-600 mt-1 flex items-center gap-1">
+                                    <Upload size={14} className="animate-spin" />
+                                    Uploading...
+                                  </p>
+                                )}
+                                {traveller.aadharFileName && !uploadState?.uploading && (
+                                  <p className="text-sm text-green-600 mt-1">
+                                    Uploaded: {traveller.aadharFileName}
+                                  </p>
+                                )}
+                                {uploadState?.error && (
+                                  <p className="text-sm text-red-600 mt-1">{uploadState.error}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 );
               })}

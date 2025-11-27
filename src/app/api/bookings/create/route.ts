@@ -26,6 +26,8 @@ const travellerSchema = z.object({
   passportIssuingCountry: z.string().nullable().optional(),
   passportFileKey: z.string().nullable().optional(),
   passportFileName: z.string().nullable().optional(),
+  panNumber: z.string().nullable().optional(), // PAN for Indian travellers
+  aadharFileKey: z.string().nullable().optional(), // Aadhaar file for Indian travellers
 });
 
 const bookingSchema = z.object({
@@ -291,7 +293,91 @@ export async function POST(req: Request) {
         }
       }
 
-      if (requiresPassport) {
+      // Check nationality for document requirements
+      const isIndian = (traveller.nationality || "").toLowerCase().trim() === "india" || 
+                       (traveller.nationality || "").toLowerCase().trim() === "indian";
+      
+      // Indian travellers: require PAN + Aadhaar (unless tour requires passport)
+      if (isIndian) {
+        if (requiresPassport) {
+          // Tour requires passport even for Indians (e.g., international tour)
+          const passportNumberMissing = !traveller.passportNumber;
+          const passportExpiryMissing = !traveller.passportExpiry;
+          const passportCountryMissing = !traveller.passportIssuingCountry;
+
+          if (passportNumberMissing) {
+            travellerValidationErrors.push({
+              field: `travellers[${index}].passportNumber`,
+              message: `Traveller ${index + 1}: Passport number is required for this tour.`,
+            });
+          } else if (traveller.passportNumber && traveller.passportNumber.length > 20) {
+            travellerValidationErrors.push({
+              field: `travellers[${index}].passportNumber`,
+              message: `Traveller ${index + 1}: Passport number must be 20 characters or less.`,
+            });
+          }
+
+          if (passportCountryMissing) {
+            travellerValidationErrors.push({
+              field: `travellers[${index}].passportIssuingCountry`,
+              message: `Traveller ${index + 1}: Passport issuing country is required.`,
+            });
+          }
+
+          if (passportExpiryMissing) {
+            travellerValidationErrors.push({
+              field: `travellers[${index}].passportExpiry`,
+              message: `Traveller ${index + 1}: Passport expiry date is required.`,
+            });
+          } else if (traveller.passportExpiry) {
+            const validation = validatePassportExpiry(
+              traveller.passportExpiry,
+              travelDate,
+              6 // 6 months minimum validity
+            );
+            if (!validation.valid) {
+              travellerValidationErrors.push({
+                field: `travellers[${index}].passportExpiry`,
+                message: `Traveller ${index + 1}: ${validation.error}`,
+              });
+            }
+          }
+
+          if (!traveller.passportFileKey) {
+            travellerValidationErrors.push({
+              field: `travellers[${index}].passportFileKey`,
+              message: `Traveller ${index + 1}: Passport copy upload is required.`,
+            });
+          }
+        } else {
+          // Domestic tour for Indian: require PAN + Aadhaar
+          if (!traveller.panNumber || traveller.panNumber.trim().length === 0) {
+            travellerValidationErrors.push({
+              field: `travellers[${index}].panNumber`,
+              message: `Traveller ${index + 1}: PAN number is required for Indian travellers.`,
+              code: "PAN_REQUIRED",
+            });
+          } else {
+            // Basic PAN validation (10 alphanumeric characters)
+            const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i;
+            if (!panRegex.test(traveller.panNumber.trim())) {
+              travellerValidationErrors.push({
+                field: `travellers[${index}].panNumber`,
+                message: `Traveller ${index + 1}: Invalid PAN format. PAN must be 10 alphanumeric characters.`,
+              });
+            }
+          }
+
+          if (!traveller.aadharFileKey) {
+            travellerValidationErrors.push({
+              field: `travellers[${index}].aadharFileKey`,
+              message: `Traveller ${index + 1}: Aadhaar document upload is required for Indian travellers.`,
+              code: "AADHAAR_REQUIRED",
+            });
+          }
+        }
+      } else {
+        // Non-Indian travellers: always require passport
         const passportNumberMissing = !traveller.passportNumber;
         const passportExpiryMissing = !traveller.passportExpiry;
         const passportCountryMissing = !traveller.passportIssuingCountry;
@@ -299,7 +385,8 @@ export async function POST(req: Request) {
         if (passportNumberMissing) {
           travellerValidationErrors.push({
             field: `travellers[${index}].passportNumber`,
-            message: `Traveller ${index + 1}: Passport number is required.`,
+            message: `Traveller ${index + 1}: Passport number is required for non-Indian travellers.`,
+            code: "PASSPORT_REQUIRED",
           });
         } else if (traveller.passportNumber && traveller.passportNumber.length > 20) {
           travellerValidationErrors.push({
@@ -330,6 +417,7 @@ export async function POST(req: Request) {
             travellerValidationErrors.push({
               field: `travellers[${index}].passportExpiry`,
               message: `Traveller ${index + 1}: ${validation.error}`,
+              code: "PASSPORT_EXPIRY_TOO_SOON",
             });
           }
         }
@@ -338,14 +426,7 @@ export async function POST(req: Request) {
           travellerValidationErrors.push({
             field: `travellers[${index}].passportFileKey`,
             message: `Traveller ${index + 1}: Passport copy upload is required.`,
-          });
-        }
-      } else if (traveller.passportExpiry) {
-        const expiryDate = startOfDayUTC(new Date(traveller.passportExpiry));
-        if (expiryDate <= today) {
-          travellerValidationErrors.push({
-            field: `travellers[${index}].passportExpiry`,
-            message: `Traveller ${index + 1}: Passport already expired.`,
+            code: "PASSPORT_COPY_REQUIRED",
           });
         }
       }
@@ -590,6 +671,8 @@ export async function POST(req: Request) {
               : null,
             passportIssuingCountry: travellerData.passportIssuingCountry || null,
             passportFileKey: travellerData.passportFileKey || null,
+            panNumber: travellerData.panNumber ? travellerData.panNumber.trim().toUpperCase() : null,
+            aadharFileKey: travellerData.aadharFileKey || null,
             isPassportRequired: requiresPassport,
           },
         });
