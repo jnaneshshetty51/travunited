@@ -1,8 +1,17 @@
 import { prisma } from "@/lib/prisma";
-import { sendTourPaymentSuccessEmail, sendVisaPaymentSuccessEmail } from "@/lib/email";
-import { notify } from "@/lib/notifications";
+import {
+  sendTourPaymentSuccessEmail,
+  sendVisaPaymentSuccessEmail,
+  sendEmail,
+} from "@/lib/email";
+import { notify, notifyMultiple } from "@/lib/notifications";
 import { logAuditEvent } from "@/lib/audit";
-import { AuditAction, AuditEntityType } from "@prisma/client";
+import { AuditAction, AuditEntityType, Prisma } from "@prisma/client";
+import {
+  getAdminUserIds,
+  getTourAdminEmail,
+  getVisaAdminEmail,
+} from "@/lib/admin-contacts";
 
 /**
  * Handles post-payment success workflow for both paid and free bookings/applications
@@ -12,6 +21,33 @@ import { AuditAction, AuditEntityType } from "@prisma/client";
  * - Sending notifications
  * - Logging audit events
  */
+export const paymentInclude = {
+  booking: {
+    include: {
+      user: {
+        select: { email: true, name: true, id: true, role: true },
+      },
+      tour: {
+        select: { name: true },
+      },
+    },
+  },
+  application: {
+    include: {
+      user: {
+        select: { email: true, name: true, id: true, role: true },
+      },
+    },
+  },
+  user: {
+    select: { id: true, email: true, name: true, role: true },
+  },
+} as const;
+
+export type PaymentWithRelations = Prisma.PaymentGetPayload<{
+  include: typeof paymentInclude;
+}>;
+
 export async function handlePaymentSuccess({
   paymentId,
   bookingId,
@@ -23,28 +59,7 @@ export async function handlePaymentSuccess({
 }) {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
-    include: {
-      booking: {
-        include: {
-          user: {
-            select: { email: true, name: true, id: true, role: true },
-          },
-          tour: {
-            select: { name: true },
-          },
-        },
-      },
-      application: {
-        include: {
-          user: {
-            select: { email: true, name: true, id: true, role: true },
-          },
-        },
-      },
-      user: {
-        select: { id: true, email: true, name: true, role: true },
-      },
-    },
+    include: paymentInclude,
   });
 
   if (!payment) {
@@ -185,5 +200,160 @@ export async function handlePaymentSuccess({
       // Don't fail the whole process if audit logging fails
     }
   }
+
+  try {
+    await notifyAdminsOfPaymentSuccess(payment);
+  } catch (adminNotifyError) {
+    console.error("Error notifying admins of payment success:", adminNotifyError);
+  }
+}
+
+export async function notifyAdminsOfPaymentSuccess(payment: PaymentWithRelations) {
+  const context = buildPaymentContext(payment);
+  if (!context) {
+    return;
+  }
+
+  try {
+    const adminIds = await getAdminUserIds();
+    if (adminIds.length) {
+      await notifyMultiple(adminIds, {
+        type: "ADMIN_PAYMENT_RECEIVED",
+        title: "Payment received",
+        message: `₹${payment.amount.toLocaleString()} received for ${context.label} ${context.reference}.`,
+        link: context.adminLink,
+        data: {
+          amount: payment.amount,
+          bookingId: payment.bookingId,
+          applicationId: payment.applicationId,
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Failed to notify admins in-app about payment success:", error);
+  }
+
+  if (!context.adminEmail) {
+    return;
+  }
+
+  try {
+    await sendEmail({
+      to: context.adminEmail,
+      subject: `Payment received - ${context.subject}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Payment received</h2>
+          <p><strong>Amount:</strong> ₹${payment.amount.toLocaleString()}</p>
+          <p><strong>${context.label}:</strong> ${context.reference}</p>
+          <p><strong>Customer:</strong> ${context.customer}</p>
+          <p>
+            <a href="${process.env.NEXTAUTH_URL || "https://travunited.com"}${context.adminLink}" style="display:inline-block;padding:10px 16px;background:#16a34a;color:#fff;text-decoration:none;border-radius:6px;">
+              View details
+            </a>
+          </p>
+        </div>
+      `,
+      category: context.category,
+    });
+  } catch (error) {
+    console.error("Failed to send admin payment success email:", error);
+  }
+}
+
+export async function notifyAdminsOfPaymentFailure(
+  payment: PaymentWithRelations,
+  reason: string
+) {
+  const context = buildPaymentContext(payment);
+  if (!context) {
+    return;
+  }
+
+  try {
+    const adminIds = await getAdminUserIds();
+    if (adminIds.length) {
+      await notifyMultiple(adminIds, {
+        type: "ADMIN_PAYMENT_FAILED",
+        title: "Payment failed",
+        message: `Payment of ₹${payment.amount.toLocaleString()} for ${context.label} ${context.reference} failed.`,
+        link: context.adminLink,
+        data: {
+          amount: payment.amount,
+          bookingId: payment.bookingId,
+          applicationId: payment.applicationId,
+          reason,
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Failed to notify admins in-app about payment failure:", error);
+  }
+
+  if (!context.adminEmail) {
+    return;
+  }
+
+  try {
+    await sendEmail({
+      to: context.adminEmail,
+      subject: `Payment failed - ${context.subject}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Payment failed</h2>
+          <p><strong>Amount:</strong> ₹${payment.amount.toLocaleString()}</p>
+          <p><strong>${context.label}:</strong> ${context.reference}</p>
+          <p><strong>Customer:</strong> ${context.customer}</p>
+          <p><strong>Reason:</strong> ${reason}</p>
+          <p>
+            <a href="${process.env.NEXTAUTH_URL || "https://travunited.com"}${context.adminLink}" style="display:inline-block;padding:10px 16px;background:#dc2626;color:#fff;text-decoration:none;border-radius:6px;">
+              Review payment
+            </a>
+          </p>
+        </div>
+      `,
+      category: context.category,
+    });
+  } catch (error) {
+    console.error("Failed to send admin payment failure email:", error);
+  }
+}
+
+function buildPaymentContext(payment: PaymentWithRelations) {
+  if (payment.application) {
+    return {
+      label: "Application",
+      reference: payment.applicationId,
+      customer:
+        payment.application.user?.name ||
+        payment.application.user?.email ||
+        payment.user?.email ||
+        "Customer",
+      adminLink: `/admin/applications/${payment.applicationId}`,
+      adminEmail: getVisaAdminEmail(),
+      category: "visa" as const,
+      subject: `${payment.application.country || ""} ${
+        payment.application.visaType || ""
+      }`.trim() || `Application ${payment.applicationId}`,
+    };
+  }
+
+  if (payment.booking) {
+    return {
+      label: "Booking",
+      reference: payment.bookingId,
+      customer:
+        payment.booking.user?.name ||
+        payment.booking.user?.email ||
+        payment.user?.email ||
+        "Customer",
+      adminLink: `/admin/bookings/${payment.bookingId}`,
+      adminEmail: getTourAdminEmail(),
+      category: "tours" as const,
+      subject: payment.booking.tourName || payment.booking.tour?.name || `Booking ${payment.bookingId}`,
+    };
+  }
+
+  return null;
 }
 

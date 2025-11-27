@@ -3,9 +3,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { uploadVisaDocument } from "@/lib/minio";
+import { notify, notifyMultiple } from "@/lib/notifications";
+import { sendEmail } from "@/lib/email";
+import { getAdminUserIds, getVisaAdminEmail } from "@/lib/admin-contacts";
 export const dynamic = "force-dynamic";
 
-
+const APP_BASE_URL = process.env.NEXTAUTH_URL || "https://travunited.com";
 
 export async function POST(
   req: Request,
@@ -23,6 +26,16 @@ export async function POST(
 
     const application = await prisma.application.findUnique({
       where: { id: params.id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+          },
+        },
+      },
     });
 
     if (!application || application.userId !== session.user.id) {
@@ -105,6 +118,63 @@ export async function POST(
         updatedAt: new Date(),
       },
     });
+
+    const documentName = existingDoc.documentType || "Document";
+    const applicantLink = `/dashboard/applications/${params.id}?requiredDoc=${existingDoc.id}`;
+
+    await notify({
+      userId: application.userId,
+      type: "VISA_DOCUMENT_UPLOADED",
+      title: "Document re-uploaded",
+      message: `We received the updated ${documentName} for your ${
+        application.country || "visa"
+      } application.`,
+      link: applicantLink,
+      data: {
+        applicationId: params.id,
+        documentId: existingDoc.id,
+        documentType: documentName,
+      },
+      sendEmail: true,
+    });
+
+    const adminIds = await getAdminUserIds();
+    if (adminIds.length) {
+      await notifyMultiple(adminIds, {
+        type: "ADMIN_VISA_DOCUMENT_UPLOADED",
+        title: "Visa document re-uploaded",
+        message: `${application.user?.name || application.user?.email || "Applicant"} re-uploaded ${documentName} for application ${params.id}.`,
+        link: `/admin/applications/${params.id}`,
+        data: {
+          applicationId: params.id,
+          documentId: existingDoc.id,
+          documentType: documentName,
+        },
+      });
+    }
+
+    const adminEmail = getVisaAdminEmail();
+    if (adminEmail) {
+      const adminLink = `${APP_BASE_URL}/admin/applications/${params.id}`;
+      await sendEmail({
+        to: adminEmail,
+        subject: `Document re-uploaded for application ${params.id}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>Document re-uploaded</h2>
+            <p><strong>Application:</strong> ${params.id}</p>
+            <p><strong>Applicant:</strong> ${application.user?.name || "Unknown"} (${application.user?.email || "N/A"})</p>
+            <p><strong>Document:</strong> ${documentName}</p>
+            <p>
+              <a href="${adminLink}" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;">
+                Review application
+              </a>
+            </p>
+          </div>
+        `,
+        category: "visa",
+      });
+    }
 
     return NextResponse.json({
       message: "Document re-uploaded successfully",

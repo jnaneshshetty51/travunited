@@ -5,8 +5,16 @@ import { prisma } from "@/lib/prisma";
 import {
   sendVisaPaymentSuccessEmail,
   sendTourPaymentSuccessEmail,
+  sendVisaPaymentFailedEmail,
+  sendTourPaymentFailedEmail,
 } from "@/lib/email";
 import { logAuditEvent } from "@/lib/audit";
+import { notify } from "@/lib/notifications";
+import {
+  paymentInclude,
+  notifyAdminsOfPaymentSuccess,
+  notifyAdminsOfPaymentFailure,
+} from "@/lib/payment-helpers";
 export const dynamic = "force-dynamic";
 
 
@@ -71,22 +79,7 @@ export async function POST(req: Request) {
         where: {
           razorpayOrderId: order_id,
         },
-        include: {
-          application: {
-            include: {
-              user: {
-                select: { email: true, name: true },
-              },
-            },
-          },
-          booking: {
-            include: {
-              user: {
-                select: { email: true, name: true },
-              },
-            },
-          },
-        },
+        include: paymentInclude,
       });
 
       if (!payment) {
@@ -171,6 +164,12 @@ export async function POST(req: Request) {
       });
 
       console.log(`Successfully processed payment.captured for payment ${payment.id}`);
+
+      try {
+        await notifyAdminsOfPaymentSuccess(payment);
+      } catch (adminNotifyError) {
+        console.error("Failed to notify admins about payment success:", adminNotifyError);
+      }
     }
 
     // Handle payment.failed event
@@ -189,9 +188,16 @@ export async function POST(req: Request) {
 
       console.log(`Updated ${updated.count} payment(s) to FAILED status`);
 
+      const failureEntity = payload?.payment?.entity;
+      const failureReason =
+        failureEntity?.error_description ||
+        failureEntity?.description ||
+        failureEntity?.notes?.reason ||
+        "Payment failed. Please try again.";
+
       const failedPayments = await prisma.payment.findMany({
         where: { razorpayOrderId: order_id },
-        select: { id: true, applicationId: true, bookingId: true, amount: true },
+        include: paymentInclude,
       });
 
       for (const payment of failedPayments) {
@@ -209,6 +215,82 @@ export async function POST(req: Request) {
             razorpayPaymentId: payment_id,
           },
         });
+
+        const amountFormatted = `₹${payment.amount.toLocaleString()}`;
+        const baseMessage = `${amountFormatted} payment failed.`;
+
+        if (payment.applicationId && payment.application) {
+          try {
+            await notify({
+              userId: payment.application.userId,
+              type: "VISA_PAYMENT_FAILED",
+              title: "Payment Failed",
+              message: `${baseMessage} ${failureReason}`,
+              link: `/dashboard/applications/${payment.applicationId}`,
+              data: {
+                applicationId: payment.applicationId,
+                amount: payment.amount,
+                reason: failureReason,
+              },
+            });
+          } catch (notifyError) {
+            console.error("Failed to notify applicant about payment failure:", notifyError);
+          }
+
+          if (payment.application.user?.email) {
+            try {
+              await sendVisaPaymentFailedEmail(
+                payment.application.user.email,
+                payment.applicationId,
+                payment.application.country || "",
+                payment.application.visaType || "",
+                payment.amount,
+                failureReason,
+                payment.application.user.role || "CUSTOMER"
+              );
+            } catch (emailError) {
+              console.error("Failed to send visa payment failure email:", emailError);
+            }
+          }
+        } else if (payment.bookingId && payment.booking) {
+          try {
+            await notify({
+              userId: payment.booking.userId,
+              type: "TOUR_PAYMENT_FAILED",
+              title: "Payment Failed",
+              message: `${baseMessage} ${failureReason}`,
+              link: `/dashboard/bookings/${payment.bookingId}`,
+              data: {
+                bookingId: payment.bookingId,
+                amount: payment.amount,
+                reason: failureReason,
+              },
+            });
+          } catch (notifyError) {
+            console.error("Failed to notify customer about tour payment failure:", notifyError);
+          }
+
+          if (payment.booking.user?.email) {
+            try {
+              await sendTourPaymentFailedEmail(
+                payment.booking.user.email,
+                payment.bookingId,
+                payment.booking.tourName || payment.booking.tour?.name || "Tour",
+                payment.amount,
+                failureReason,
+                payment.booking.user.role || "CUSTOMER"
+              );
+            } catch (emailError) {
+              console.error("Failed to send tour payment failure email:", emailError);
+            }
+          }
+        }
+
+        try {
+          await notifyAdminsOfPaymentFailure(payment, failureReason);
+        } catch (adminNotifyError) {
+          console.error("Failed to notify admins about payment failure:", adminNotifyError);
+        }
       }
     }
 

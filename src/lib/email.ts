@@ -306,6 +306,30 @@ export async function sendVisaPaymentSuccessEmail(
   return sendUserEmail({ to: email, role, subject, html, category: "visa" });
 }
 
+export async function sendVisaPaymentFailedEmail(
+  email: string,
+  applicationId: string,
+  country: string,
+  visaType: string,
+  amount: number,
+  reason?: string,
+  role?: UserRole | "CUSTOMER" | "STAFF_ADMIN" | "SUPER_ADMIN" | null
+) {
+  const subject = `Payment Failed - ${country} ${visaType}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1>Payment Failed</h1>
+      <p>Your payment attempt for ${country} ${visaType} could not be completed.</p>
+      <p><strong>Amount:</strong> ₹${amount.toLocaleString()}</p>
+      ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ""}
+      <p>Please try again from your <a href="${process.env.NEXTAUTH_URL}/dashboard/applications/${applicationId}">application dashboard</a>. If the issue persists, contact support.</p>
+      <p>Best regards,<br>The Travunited Team</p>
+    </div>
+  `;
+
+  return sendUserEmail({ to: email, role, subject, html, category: "visa" });
+}
+
 export async function sendVisaStatusUpdateEmail(
   email: string,
   applicationId: string,
@@ -332,18 +356,28 @@ export async function sendVisaDocumentRejectedEmail(
   applicationId: string,
   country: string,
   visaType: string,
-  rejectedDocs: Array<{ type: string; reason: string }>,
+  rejectedDocs: Array<{ type: string; reason: string; documentId?: string }>,
   role?: UserRole | "CUSTOMER" | "STAFF_ADMIN" | "SUPER_ADMIN" | null
 ) {
   const subject = `Documents Need Re-upload - ${country} ${visaType}`;
+  const baseUrl = process.env.NEXTAUTH_URL || "https://travunited.com";
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h1>Documents Rejected</h1>
       <p>Some documents for your ${country} ${visaType} application need to be re-uploaded:</p>
       <ul>
-        ${rejectedDocs.map(doc => `<li><strong>${doc.type}:</strong> ${doc.reason}</li>`).join("")}
+        ${rejectedDocs
+          .map(
+            (doc) =>
+              `<li><strong>${doc.type}:</strong> ${doc.reason}${
+                doc.documentId
+                  ? `<br/><a href="${baseUrl}/dashboard/applications/${applicationId}?requiredDoc=${doc.documentId}">Re-upload this document</a>`
+                  : ""
+              }</li>`
+          )
+          .join("")}
       </ul>
-      <p><a href="${process.env.NEXTAUTH_URL}/dashboard/applications/${applicationId}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Re-upload Documents</a></p>
+      <p><a href="${baseUrl}/dashboard/applications/${applicationId}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Open Application</a></p>
       <p>Best regards,<br>The Travunited Team</p>
     </div>
   `;
@@ -416,6 +450,29 @@ export async function sendTourPaymentSuccessEmail(
     </div>
   `;
   
+  return sendUserEmail({ to: email, role, subject, html, category: "tours" });
+}
+
+export async function sendTourPaymentFailedEmail(
+  email: string,
+  bookingId: string,
+  tourName: string,
+  amount: number,
+  reason?: string,
+  role?: UserRole | "CUSTOMER" | "STAFF_ADMIN" | "SUPER_ADMIN" | null
+) {
+  const subject = `Payment Failed - ${tourName}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h1>Payment Failed</h1>
+      <p>Your payment attempt for ${tourName} could not be completed.</p>
+      <p><strong>Amount:</strong> ₹${amount.toLocaleString()}</p>
+      ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ""}
+      <p>Please try again from your <a href="${process.env.NEXTAUTH_URL}/dashboard/bookings/${bookingId}">booking dashboard</a>. If the issue persists, contact support.</p>
+      <p>Best regards,<br>The Travunited Team</p>
+    </div>
+  `;
+
   return sendUserEmail({ to: email, role, subject, html, category: "tours" });
 }
 

@@ -5,8 +5,13 @@ import { prisma } from "@/lib/prisma";
 import { uploadVisaDocument } from "@/lib/minio";
 import { logAuditEvent } from "@/lib/audit";
 import { AuditAction, AuditEntityType } from "@prisma/client";
+import { notify, notifyMultiple } from "@/lib/notifications";
+import { sendEmail } from "@/lib/email";
+import { getAdminUserIds, getTourAdminEmail } from "@/lib/admin-contacts";
 
 export const dynamic = "force-dynamic";
+
+const APP_BASE_URL = process.env.NEXTAUTH_URL || "https://travunited.com";
 
 export async function PATCH(
   req: Request,
@@ -24,6 +29,19 @@ export async function PATCH(
 
     const booking = await prisma.booking.findUnique({
       where: { id: params.id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+          },
+        },
+        tour: {
+          select: { name: true },
+        },
+      },
     });
 
     if (!booking || booking.userId !== session.user.id) {
@@ -101,6 +119,63 @@ export async function PATCH(
         rejectionReason: null, // Clear rejection reason on re-upload
       },
     });
+
+    const documentName = updated.type || document.type || "Document";
+    const bookingLink = `/dashboard/bookings/${params.id}?requiredDoc=${updated.id}`;
+
+    await notify({
+      userId: booking.userId,
+      type: "TOUR_BOOKING_DOCUMENT_UPLOADED",
+      title: "Document re-uploaded",
+      message: `We received the updated ${documentName} for your ${
+        booking.tourName || booking.tour?.name || "tour"
+      } booking.`,
+      link: bookingLink,
+      data: {
+        bookingId: params.id,
+        documentId: updated.id,
+        documentType: documentName,
+      },
+      sendEmail: true,
+    });
+
+    const adminIds = await getAdminUserIds();
+    if (adminIds.length) {
+      await notifyMultiple(adminIds, {
+        type: "ADMIN_TOUR_DOCUMENT_UPLOADED",
+        title: "Tour document re-uploaded",
+        message: `${booking.user?.name || booking.user?.email || "Customer"} re-uploaded ${documentName} for booking ${params.id}.`,
+        link: `/admin/bookings/${params.id}`,
+        data: {
+          bookingId: params.id,
+          documentId: updated.id,
+          documentType: documentName,
+        },
+      });
+    }
+
+    const adminEmail = getTourAdminEmail();
+    if (adminEmail) {
+      const adminLink = `${APP_BASE_URL}/admin/bookings/${params.id}`;
+      await sendEmail({
+        to: adminEmail,
+        subject: `Document re-uploaded for booking ${params.id}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>Document re-uploaded</h2>
+            <p><strong>Booking:</strong> ${params.id}</p>
+            <p><strong>Customer:</strong> ${booking.user?.name || "Unknown"} (${booking.user?.email || "N/A"})</p>
+            <p><strong>Document:</strong> ${documentName}</p>
+            <p>
+              <a href="${adminLink}" style="display:inline-block;padding:10px 16px;background:#16a34a;color:#fff;text-decoration:none;border-radius:6px;">
+                Review booking
+              </a>
+            </p>
+          </div>
+        `,
+        category: "tours",
+      });
+    }
 
     return NextResponse.json({
       id: updated.id,

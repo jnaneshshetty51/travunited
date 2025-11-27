@@ -5,7 +5,9 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendVisaDocumentRejectedEmail } from "@/lib/email";
 import { logAuditEvent } from "@/lib/audit";
-import { notify } from "@/lib/notifications";
+import { notify, notifyMultiple } from "@/lib/notifications";
+import { getAdminUserIds, getVisaAdminEmail } from "@/lib/admin-contacts";
+import { sendEmail } from "@/lib/email";
 export const dynamic = "force-dynamic";
 
 
@@ -42,7 +44,9 @@ export async function PUT(
           include: {
             user: {
               select: {
+                id: true,
                 email: true,
+                name: true,
               },
             },
           },
@@ -92,21 +96,71 @@ export async function PUT(
         document.applicationId,
         document.application.country || "",
         document.application.visaType || "",
-        [{ type: document.documentType || "Document", reason: rejectionReason }]
+        [
+          {
+            type: document.documentType || "Document",
+            reason: rejectionReason,
+            documentId: document.id,
+          },
+        ]
       );
       await notify({
         userId: document.application.userId,
         type: "VISA_DOCUMENT_REJECTED",
         title: "Document Rejected",
         message: `Document "${document.documentType || "Document"}" was rejected. ${rejectionReason}`,
-        link: `/dashboard/applications/${document.applicationId}`,
+        link: `/dashboard/applications/${document.applicationId}?requiredDoc=${document.id}`,
         data: {
           applicationId: document.applicationId,
           documentType: document.documentType,
+          documentId: document.id,
           reason: rejectionReason,
         },
         sendEmail: false, // Email already sent above
       });
+
+      const adminIds = await getAdminUserIds();
+      if (adminIds.length) {
+        await notifyMultiple(adminIds, {
+          type: "ADMIN_VISA_DOCUMENT_UPLOADED",
+          title: "Visa document rejected",
+          message: `${document.application.user?.name || document.application.user.email || "Applicant"}'s ${document.documentType || "document"} was rejected.`,
+          link: `/admin/applications/${document.applicationId}`,
+          data: {
+            applicationId: document.applicationId,
+            documentId: document.id,
+            documentType: document.documentType,
+            reason: rejectionReason,
+          },
+        });
+      }
+
+      const adminEmail = getVisaAdminEmail();
+      if (adminEmail) {
+        await sendEmail({
+          to: adminEmail,
+          subject: `Document rejected for application ${document.applicationId}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2>Document rejected</h2>
+              <p><strong>Application:</strong> ${document.applicationId}</p>
+              <p><strong>Applicant:</strong> ${
+                document.application.user?.name || document.application.user.email
+              }</p>
+              <p><strong>Document:</strong> ${document.documentType || "Document"}</p>
+              <p><strong>Reason:</strong> ${rejectionReason}</p>
+              <p>
+                <a href="${process.env.NEXTAUTH_URL || "https://travunited.com"}/admin/applications/${
+            document.applicationId
+          }" style="display:inline-block;padding:10px 16px;background:#dc2626;color:#fff;text-decoration:none;border-radius:6px;">
+                  Review application
+                </a>
+              </p>
+            </div>
+          `,
+          category: "visa",
+        });
+      }
     }
 
     return NextResponse.json(updated);
