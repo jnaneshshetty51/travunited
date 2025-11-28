@@ -113,6 +113,106 @@ const BestForInput = memo(({ value, onChange }: {
 });
 BestForInput.displayName = "BestForInput";
 
+// Memoized input components to prevent focus loss
+const TextInput = memo(({ value, onChange, placeholder, required, type = "text", className = "" }: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  required?: boolean;
+  type?: string;
+  className?: string;
+}) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.value);
+  }, [onChange]);
+
+  return (
+    <input
+      type={type}
+      required={required}
+      value={value}
+      onChange={handleChange}
+      placeholder={placeholder}
+      className={`mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 ${className}`}
+    />
+  );
+});
+TextInput.displayName = "TextInput";
+
+const NumberInput = memo(({ value, onChange, placeholder, min, required, className = "" }: {
+  value: number | null;
+  onChange: (value: number | null) => void;
+  placeholder?: string;
+  min?: number;
+  required?: boolean;
+  className?: string;
+}) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const numValue = e.target.value === "" ? null : Number(e.target.value);
+    onChange(isNaN(numValue as number) ? null : numValue);
+  }, [onChange]);
+
+  return (
+    <input
+      type="number"
+      required={required}
+      min={min}
+      value={value ?? ""}
+      onChange={handleChange}
+      placeholder={placeholder}
+      className={`mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 ${className}`}
+    />
+  );
+});
+NumberInput.displayName = "NumberInput";
+
+const TextareaInput = memo(({ value, onChange, placeholder, rows = 3, className = "" }: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  rows?: number;
+  className?: string;
+}) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onChange(e.target.value);
+  }, [onChange]);
+
+  return (
+    <textarea
+      rows={rows}
+      value={value}
+      onChange={handleChange}
+      placeholder={placeholder}
+      className={`mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 ${className}`}
+    />
+  );
+});
+TextareaInput.displayName = "TextareaInput";
+
+const SelectInput = memo(({ value, onChange, children, className = "", required }: {
+  value: string;
+  onChange: (value: string) => void;
+  children: React.ReactNode;
+  className?: string;
+  required?: boolean;
+}) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    onChange(e.target.value);
+  }, [onChange]);
+
+  return (
+    <select
+      required={required}
+      value={value}
+      onChange={handleChange}
+      className={`mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 ${className}`}
+    >
+      {children}
+    </select>
+  );
+});
+SelectInput.displayName = "SelectInput";
+
 type CountryOption = { id: string; name: string };
 
 type DayState = {
@@ -1015,12 +1115,10 @@ export default function AdminTourEditorPage() {
             <span className="text-sm font-medium text-neutral-700">
               Tour Name <span className="text-red-500">*</span>
             </span>
-            <input
-              type="text"
+            <TextInput
               required
               value={formData.name}
-              onChange={(e) => updateForm("name", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("name", value)}
             />
           </label>
           <label className="flex flex-col">
@@ -1028,13 +1126,12 @@ export default function AdminTourEditorPage() {
               Slug <span className="text-red-500">*</span>
             </span>
             <div className="flex gap-2">
-              <input
-                type="text"
+              <TextInput
                 required
                 value={formData.slug}
-                onChange={(e) => updateForm("slug", e.target.value)}
-                className="mt-1 flex-1 border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                onChange={(value) => updateForm("slug", value)}
                 placeholder="dubai-deluxe-getaway"
+                className="flex-1"
               />
               <button
                 type="button"
@@ -1049,22 +1146,20 @@ export default function AdminTourEditorPage() {
 
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Short Description</span>
-          <textarea
+          <TextareaInput
             rows={3}
             value={formData.shortDescription}
-            onChange={(e) => updateForm("shortDescription", e.target.value)}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            onChange={(value) => updateForm("shortDescription", value)}
             placeholder="Brief overview (shown in listings)"
           />
         </label>
 
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Full Description</span>
-          <textarea
+          <TextareaInput
             rows={6}
             value={formData.description}
-            onChange={(e) => updateForm("description", e.target.value)}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            onChange={(value) => updateForm("description", value)}
             placeholder="Detailed tour description"
           />
         </label>
@@ -1072,24 +1167,22 @@ export default function AdminTourEditorPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Tour Type</span>
-            <select
+            <SelectInput
               value={formData.tourType}
-              onChange={(e) => updateForm("tourType", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("tourType", value)}
             >
               <option value="">Select type</option>
               <option value="group">Group Tour</option>
               <option value="private">Private Tour</option>
               <option value="fixed_departure">Fixed Departure</option>
               <option value="on_demand">On Demand</option>
-            </select>
+            </SelectInput>
           </label>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Tour Sub Type</span>
-            <select
+            <SelectInput
               value={formData.tourSubType}
-              onChange={(e) => updateForm("tourSubType", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("tourSubType", value)}
             >
               <option value="">Select sub type</option>
               <option value="honeymoon">Honeymoon</option>
@@ -1098,7 +1191,7 @@ export default function AdminTourEditorPage() {
               <option value="leisure">Leisure</option>
               <option value="religious">Religious</option>
               <option value="wildlife">Wildlife</option>
-            </select>
+            </SelectInput>
           </label>
         </div>
 
@@ -1146,11 +1239,10 @@ export default function AdminTourEditorPage() {
             <span className="text-sm font-medium text-neutral-700">
               Country <span className="text-red-500">*</span>
             </span>
-            <select
+            <SelectInput
               required
               value={formData.countryId}
-              onChange={(e) => updateForm("countryId", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("countryId", value)}
             >
               <option value="">Select country</option>
               {countries.map((country) => (
@@ -1158,18 +1250,16 @@ export default function AdminTourEditorPage() {
                   {country.name}
                 </option>
               ))}
-            </select>
+            </SelectInput>
           </label>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">
               Destination <span className="text-red-500">*</span>
             </span>
-            <input
-              type="text"
+            <TextInput
               required
               value={formData.destination}
-              onChange={(e) => updateForm("destination", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("destination", value)}
             />
           </label>
         </div>
@@ -1177,21 +1267,17 @@ export default function AdminTourEditorPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Primary Destination</span>
-            <input
-              type="text"
+            <TextInput
               value={formData.primaryDestination}
-              onChange={(e) => updateForm("primaryDestination", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("primaryDestination", value)}
               placeholder="Main city or location"
             />
           </label>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Destination Country</span>
-            <input
-              type="text"
+            <TextInput
               value={formData.destinationCountry}
-              onChange={(e) => updateForm("destinationCountry", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("destinationCountry", value)}
             />
           </label>
         </div>
@@ -1199,20 +1285,16 @@ export default function AdminTourEditorPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Destination State</span>
-            <input
-              type="text"
+            <TextInput
               value={formData.destinationState}
-              onChange={(e) => updateForm("destinationState", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("destinationState", value)}
             />
           </label>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Region</span>
-            <input
-              type="text"
+            <TextInput
               value={formData.region}
-              onChange={(e) => updateForm("region", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("region", value)}
               placeholder="e.g., South East Asia, Europe"
             />
           </label>
@@ -1256,49 +1338,42 @@ export default function AdminTourEditorPage() {
             <span className="text-sm font-medium text-neutral-700">
               Duration (Display) <span className="text-red-500">*</span>
             </span>
-            <input
-              type="text"
+            <TextInput
               required
               value={formData.duration}
-              onChange={(e) => updateForm("duration", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("duration", value)}
               placeholder="5 Nights / 6 Days"
             />
           </label>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Difficulty Level</span>
-            <select
+            <SelectInput
               value={formData.difficultyLevel}
-              onChange={(e) => updateForm("difficultyLevel", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("difficultyLevel", value)}
             >
               <option value="">Select level</option>
               <option value="Easy">Easy</option>
               <option value="Moderate">Moderate</option>
               <option value="Difficult">Difficult</option>
-            </select>
+            </SelectInput>
           </label>
         </div>
 
         <div className="grid md:grid-cols-2 gap-4">
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Duration (Days)</span>
-            <input
-              type="number"
+            <NumberInput
               min={1}
-              value={formData.durationDays ?? ""}
-              onChange={(e) => updateForm("durationDays", e.target.value ? Number(e.target.value) : null)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              value={formData.durationDays}
+              onChange={(value) => updateForm("durationDays", value)}
             />
           </label>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Duration (Nights)</span>
-            <input
-              type="number"
+            <NumberInput
               min={0}
-              value={formData.durationNights ?? ""}
-              onChange={(e) => updateForm("durationNights", e.target.value ? Number(e.target.value) : null)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              value={formData.durationNights}
+              onChange={(value) => updateForm("durationNights", value)}
             />
           </label>
         </div>
@@ -1306,22 +1381,18 @@ export default function AdminTourEditorPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Group Size Min</span>
-            <input
-              type="number"
+            <NumberInput
               min={1}
-              value={formData.groupSizeMin ?? ""}
-              onChange={(e) => updateForm("groupSizeMin", e.target.value ? Number(e.target.value) : null)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              value={formData.groupSizeMin}
+              onChange={(value) => updateForm("groupSizeMin", value)}
             />
           </label>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Group Size Max</span>
-            <input
-              type="number"
+            <NumberInput
               min={1}
-              value={formData.groupSizeMax ?? ""}
-              onChange={(e) => updateForm("groupSizeMax", e.target.value ? Number(e.target.value) : null)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              value={formData.groupSizeMax}
+              onChange={(value) => updateForm("groupSizeMax", value)}
             />
           </label>
         </div>
@@ -1329,22 +1400,18 @@ export default function AdminTourEditorPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Minimum Travelers</span>
-            <input
-              type="number"
+            <NumberInput
               min={1}
-              value={formData.minimumTravelers ?? ""}
-              onChange={(e) => updateForm("minimumTravelers", e.target.value ? Number(e.target.value) : null)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              value={formData.minimumTravelers}
+              onChange={(value) => updateForm("minimumTravelers", value)}
             />
           </label>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Maximum Travelers</span>
-            <input
-              type="number"
+            <NumberInput
               min={1}
-              value={formData.maximumTravelers ?? ""}
-              onChange={(e) => updateForm("maximumTravelers", e.target.value ? Number(e.target.value) : null)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              value={formData.maximumTravelers}
+              onChange={(value) => updateForm("maximumTravelers", value)}
             />
           </label>
         </div>
@@ -1360,49 +1427,42 @@ export default function AdminTourEditorPage() {
             <span className="text-sm font-medium text-neutral-700">
               Price <span className="text-red-500">*</span>
             </span>
-            <input
-              type="number"
+            <NumberInput
               min={0}
               required
               value={formData.price}
-              onChange={(e) => updateForm("price", Number(e.target.value) || 0)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("price", value ?? 0)}
             />
           </label>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Currency</span>
-            <select
+            <SelectInput
               value={formData.currency}
-              onChange={(e) => updateForm("currency", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("currency", value)}
             >
               <option value="INR">INR (₹)</option>
               <option value="USD">USD ($)</option>
               <option value="EUR">EUR (€)</option>
-            </select>
+            </SelectInput>
           </label>
         </div>
 
         <div className="grid md:grid-cols-2 gap-4">
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Original Price</span>
-            <input
-              type="number"
+            <NumberInput
               min={0}
-              value={formData.originalPrice ?? ""}
-              onChange={(e) => updateForm("originalPrice", e.target.value ? Number(e.target.value) : null)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              value={formData.originalPrice}
+              onChange={(value) => updateForm("originalPrice", value)}
               placeholder="For showing strikethrough price"
             />
           </label>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Base Price Override</span>
-            <input
-              type="number"
+            <NumberInput
               min={0}
               value={formData.basePriceInInr}
-              onChange={(e) => updateForm("basePriceInInr", Number(e.target.value) || 0)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("basePriceInInr", value ?? 0)}
               placeholder="Defaults to price above"
             />
           </label>
@@ -1410,25 +1470,24 @@ export default function AdminTourEditorPage() {
 
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Package Type</span>
-          <select
+          <SelectInput
             value={formData.packageType}
-            onChange={(e) => updateForm("packageType", e.target.value)}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            onChange={(value) => updateForm("packageType", value)}
           >
             <option value="">Select type</option>
             <option value="fixed_departure">Fixed Departure</option>
             <option value="on_demand">On Demand</option>
             <option value="private">Private</option>
-          </select>
+          </SelectInput>
         </label>
 
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Seasonal Pricing (JSON)</span>
-          <textarea
+          <TextareaInput
             rows={6}
             value={formData.seasonalPricing}
-            onChange={(e) => updateForm("seasonalPricing", e.target.value)}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 font-mono text-sm focus:ring-2 focus:ring-primary-500"
+            onChange={(value) => updateForm("seasonalPricing", value)}
+            className="font-mono text-sm"
             placeholder='{"peak": {"from": "2025-12-15", "to": "2026-01-10", "price": 65000}}'
           />
           <p className="text-xs text-neutral-500 mt-1">
@@ -1537,23 +1596,19 @@ export default function AdminTourEditorPage() {
               <div className="grid md:grid-cols-2 gap-4">
                 <label className="flex flex-col">
                   <span className="text-sm font-medium text-neutral-700">Name</span>
-                  <input
-                    type="text"
+                  <TextInput
                     value={addOn.name}
-                    onChange={(e) => updateAddOn(addOn.uid, "name", e.target.value)}
-                    className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                    onChange={(value) => updateAddOn(addOn.uid, "name", value)}
                     placeholder="E.g. 4★ Hotel Upgrade"
                     required
                   />
                 </label>
                 <label className="flex flex-col">
                   <span className="text-sm font-medium text-neutral-700">Price (₹)</span>
-                  <input
-                    type="number"
+                  <NumberInput
                     min={0}
                     value={addOn.price}
-                    onChange={(e) => updateAddOn(addOn.uid, "price", Number(e.target.value) || 0)}
-                    className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                    onChange={(value) => updateAddOn(addOn.uid, "price", value ?? 0)}
                     placeholder="0 for free add-on"
                   />
                 </label>
@@ -1561,11 +1616,10 @@ export default function AdminTourEditorPage() {
 
               <label className="flex flex-col mt-4">
                 <span className="text-sm font-medium text-neutral-700">Description</span>
-                <textarea
+                <TextareaInput
                   rows={2}
                   value={addOn.description}
-                  onChange={(e) => updateAddOn(addOn.uid, "description", e.target.value)}
-                  className="mt-1 border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                  onChange={(value) => updateAddOn(addOn.uid, "description", value)}
                   placeholder="Short description that appears to travellers"
                 />
               </label>
@@ -1573,35 +1627,32 @@ export default function AdminTourEditorPage() {
               <div className="grid md:grid-cols-3 gap-4 mt-4">
                 <label className="flex flex-col">
                   <span className="text-sm font-medium text-neutral-700">Pricing Type</span>
-                  <select
+                  <SelectInput
                     value={addOn.pricingType}
-                    onChange={(e) =>
+                    onChange={(value) =>
                       updateAddOn(
                         addOn.uid,
                         "pricingType",
-                        e.target.value as "PER_BOOKING" | "PER_PERSON"
+                        value as "PER_BOOKING" | "PER_PERSON"
                       )
                     }
-                    className="mt-1 border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="PER_BOOKING">Per booking</option>
                     <option value="PER_PERSON">Per traveller</option>
-                  </select>
+                  </SelectInput>
                 </label>
 
                 <label className="flex flex-col">
                   <span className="text-sm font-medium text-neutral-700">Sort order</span>
-                  <input
-                    type="number"
+                  <NumberInput
                     value={addOn.sortOrder}
-                    onChange={(e) =>
+                    onChange={(value) =>
                       updateAddOn(
                         addOn.uid,
                         "sortOrder",
-                        Number(e.target.value) || 0
+                        value ?? 0
                       )
                     }
-                    className="mt-1 border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
                   />
                 </label>
 
@@ -1649,18 +1700,17 @@ export default function AdminTourEditorPage() {
       <div className="space-y-4">
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Status</span>
-          <select
+          <SelectInput
             value={formData.status}
-            onChange={(e) => {
-              updateForm("status", e.target.value);
-              updateForm("isActive", e.target.value === "active");
+            onChange={(value) => {
+              updateForm("status", value);
+              updateForm("isActive", value === "active");
             }}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
           >
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="draft">Draft</option>
-          </select>
+          </SelectInput>
         </label>
 
         <label className="flex flex-col">
@@ -1679,11 +1729,10 @@ export default function AdminTourEditorPage() {
 
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Booking Deadline</span>
-          <input
+          <TextInput
             type="date"
             value={formData.bookingDeadline}
-            onChange={(e) => updateForm("bookingDeadline", e.target.value)}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            onChange={(value) => updateForm("bookingDeadline", value)}
           />
           <p className="text-xs text-neutral-500 mt-1">
             Last date for booking (leave empty for no deadline)
@@ -1698,11 +1747,10 @@ export default function AdminTourEditorPage() {
       <div className="space-y-4">
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Overview</span>
-          <textarea
+          <TextareaInput
             rows={5}
             value={formData.overview}
-            onChange={(e) => updateForm("overview", e.target.value)}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            onChange={(value) => updateForm("overview", value)}
           />
         </label>
 
@@ -1761,31 +1809,28 @@ export default function AdminTourEditorPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Booking Policies</span>
-            <textarea
+            <TextareaInput
               rows={4}
               value={formData.bookingPolicies}
-              onChange={(e) => updateForm("bookingPolicies", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("bookingPolicies", value)}
             />
           </label>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Cancellation Terms</span>
-            <textarea
+            <TextareaInput
               rows={4}
               value={formData.cancellationTerms}
-              onChange={(e) => updateForm("cancellationTerms", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("cancellationTerms", value)}
             />
           </label>
         </div>
 
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Important Notes</span>
-          <textarea
+          <TextareaInput
             rows={3}
             value={formData.importantNotes}
-            onChange={(e) => updateForm("importantNotes", e.target.value)}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            onChange={(value) => updateForm("importantNotes", value)}
           />
         </label>
       </div>
@@ -1827,25 +1872,23 @@ export default function AdminTourEditorPage() {
                   <span className="text-xs font-medium text-neutral-600">
                     Day number
                   </span>
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     value={day.dayIndex}
-                    onChange={(e) =>
-                      updateDay(day.uid, "dayIndex", Number(e.target.value) || 1)
+                    onChange={(value) =>
+                      updateDay(day.uid, "dayIndex", value ?? 1)
                     }
-                    className="mt-1 w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                    className="text-sm"
                   />
                 </label>
                 <label className="flex flex-col md:col-span-2">
                   <span className="text-xs font-medium text-neutral-600">
                     Title
                   </span>
-                  <input
-                    type="text"
+                  <TextInput
                     value={day.title}
-                    onChange={(e) => updateDay(day.uid, "title", e.target.value)}
-                    className="mt-1 w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                    onChange={(value) => updateDay(day.uid, "title", value)}
+                    className="text-sm"
                     placeholder="Arrival & Marina Cruise"
                   />
                 </label>
@@ -1854,11 +1897,11 @@ export default function AdminTourEditorPage() {
                 <span className="text-xs font-medium text-neutral-600">
                   Description
                 </span>
-                <textarea
+                <TextareaInput
                   rows={3}
                   value={day.content}
-                  onChange={(e) => updateDay(day.uid, "content", e.target.value)}
-                  className="mt-1 w-full border border-neutral-300 rounded-lg px-3 py-2 text-sm"
+                  onChange={(value) => updateDay(day.uid, "content", value)}
+                  className="text-sm"
                   placeholder="Outline activities, transfers, dining, etc."
                 />
               </label>
@@ -1938,11 +1981,11 @@ export default function AdminTourEditorPage() {
               </div>
             </div>
             {featuredImageMode === "url" ? (
-              <input
+              <TextInput
                 type="url"
                 value={formData.featuredImage}
-                onChange={(e) => updateForm("featuredImage", e.target.value)}
-                className="mt-2 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                onChange={(value) => updateForm("featuredImage", value)}
+                className="mt-2"
                 placeholder="https://..."
               />
             ) : (
@@ -2003,11 +2046,11 @@ export default function AdminTourEditorPage() {
             </div>
             </div>
             {coverImageMode === "url" ? (
-              <input
+              <TextInput
                 type="url"
                 value={formData.imageUrl}
-                onChange={(e) => updateForm("imageUrl", e.target.value)}
-                className="mt-2 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                onChange={(value) => updateForm("imageUrl", value)}
+                className="mt-2"
                 placeholder="https://..."
               />
             ) : (
@@ -2068,11 +2111,11 @@ export default function AdminTourEditorPage() {
               </div>
             </div>
             {heroImageMode === "url" ? (
-              <input
+              <TextInput
                 type="url"
                 value={formData.heroImageUrl}
-                onChange={(e) => updateForm("heroImageUrl", e.target.value)}
-                className="mt-2 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                onChange={(value) => updateForm("heroImageUrl", value)}
+                className="mt-2"
                 placeholder="https://..."
               />
             ) : (
@@ -2129,11 +2172,10 @@ export default function AdminTourEditorPage() {
               <p className="text-sm text-red-600">{galleryUploadError}</p>
             )}
           </div>
-          <textarea
+          <TextareaInput
             rows={4}
             value={formData.galleryImageUrls}
-            onChange={(e) => updateForm("galleryImageUrls", e.target.value)}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+            onChange={(value) => updateForm("galleryImageUrls", value)}
             placeholder="https://example.com/photo1.jpg"
           />
           {galleryArray.length > 0 && (
@@ -2181,40 +2223,34 @@ export default function AdminTourEditorPage() {
           <div className="grid md:grid-cols-2 gap-4">
             <label className="flex flex-col">
               <span className="text-sm font-medium text-neutral-700">Meta Title</span>
-              <input
-                type="text"
+              <TextInput
                 value={formData.metaTitle}
-                onChange={(e) => updateForm("metaTitle", e.target.value)}
-                className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                onChange={(value) => updateForm("metaTitle", value)}
               />
             </label>
             <label className="flex flex-col">
               <span className="text-sm font-medium text-neutral-700">Meta Keywords</span>
-              <input
-                type="text"
+              <TextInput
                 value={formData.metaKeywords}
-                onChange={(e) => updateForm("metaKeywords", e.target.value)}
-                className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                onChange={(value) => updateForm("metaKeywords", value)}
                 placeholder="comma, separated, keywords"
               />
             </label>
           </div>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Meta Description</span>
-            <textarea
+            <TextareaInput
               rows={3}
               value={formData.metaDescription}
-              onChange={(e) => updateForm("metaDescription", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("metaDescription", value)}
             />
           </label>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Canonical URL</span>
-            <input
+            <TextInput
               type="url"
               value={formData.canonicalUrl}
-              onChange={(e) => updateForm("canonicalUrl", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("canonicalUrl", value)}
               placeholder="https://travunited.com/tours/slug"
             />
           </label>
@@ -2225,30 +2261,26 @@ export default function AdminTourEditorPage() {
           <div className="grid md:grid-cols-2 gap-4">
             <label className="flex flex-col">
               <span className="text-sm font-medium text-neutral-700">OG Title</span>
-              <input
-                type="text"
+              <TextInput
                 value={formData.ogTitle}
-                onChange={(e) => updateForm("ogTitle", e.target.value)}
-                className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                onChange={(value) => updateForm("ogTitle", value)}
               />
             </label>
             <label className="flex flex-col">
               <span className="text-sm font-medium text-neutral-700">OG Image URL</span>
-              <input
+              <TextInput
                 type="url"
                 value={formData.ogImage}
-                onChange={(e) => updateForm("ogImage", e.target.value)}
-                className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                onChange={(value) => updateForm("ogImage", value)}
               />
             </label>
           </div>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">OG Description</span>
-            <textarea
+            <TextareaInput
               rows={2}
               value={formData.ogDescription}
-              onChange={(e) => updateForm("ogDescription", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("ogDescription", value)}
             />
           </label>
         </div>
@@ -2258,30 +2290,26 @@ export default function AdminTourEditorPage() {
           <div className="grid md:grid-cols-2 gap-4">
             <label className="flex flex-col">
               <span className="text-sm font-medium text-neutral-700">Twitter Title</span>
-              <input
-                type="text"
+              <TextInput
                 value={formData.twitterTitle}
-                onChange={(e) => updateForm("twitterTitle", e.target.value)}
-                className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                onChange={(value) => updateForm("twitterTitle", value)}
               />
             </label>
             <label className="flex flex-col">
               <span className="text-sm font-medium text-neutral-700">Twitter Image URL</span>
-              <input
+              <TextInput
                 type="url"
                 value={formData.twitterImage}
-                onChange={(e) => updateForm("twitterImage", e.target.value)}
-                className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                onChange={(value) => updateForm("twitterImage", value)}
               />
             </label>
           </div>
           <label className="flex flex-col">
             <span className="text-sm font-medium text-neutral-700">Twitter Description</span>
-            <textarea
+            <TextareaInput
               rows={2}
               value={formData.twitterDescription}
-              onChange={(e) => updateForm("twitterDescription", e.target.value)}
-              className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+              onChange={(value) => updateForm("twitterDescription", value)}
             />
           </label>
         </div>

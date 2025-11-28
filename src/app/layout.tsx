@@ -8,6 +8,7 @@ import { HelpButton } from "@/components/ui/HelpButton";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { MetaPixel } from "@/components/analytics/MetaPixel";
+import { ScrollToTop } from "@/components/layout/ScrollToTop";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -45,6 +46,7 @@ export default function RootLayout({
         <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
         <MetaPixel pixelId={process.env.NEXT_PUBLIC_META_PIXEL_ID} />
         <SessionProvider>
+          <ScrollToTop />
           <Navbar />
           <main className="min-h-screen pt-16">
             {children}

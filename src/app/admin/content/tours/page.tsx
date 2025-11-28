@@ -9,6 +9,7 @@ import { Plus, Edit, Search, Filter, Star, RefreshCw, CheckSquare, Square, Chevr
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { ImportModal } from "@/components/admin/ImportModal";
 import { formatDate } from "@/lib/dateFormat";
+import { memo } from "react";
 
 interface TourRecord {
   id: string;
@@ -154,11 +155,43 @@ export default function AdminToursPage() {
     );
   }, [session, status, router, fetchCountries, fetchTours]);
 
-  const handleFilterChange = (field: string, value: string) => {
+  const handleFilterChange = useCallback((field: string, value: string) => {
     const nextFilters = { ...filters, [field]: value };
     setFilters(nextFilters);
     fetchTours(nextFilters);
-  };
+  }, [filters, fetchTours]);
+
+  // Debounced search handler
+  const [searchValue, setSearchValue] = useState(filters.search);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    // Sync searchValue with filters.search when filters change externally
+    if (filters.search !== searchValue) {
+      setSearchValue(filters.search);
+    }
+  }, [filters.search]);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchValue(value);
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    // Set new timeout for debounced search
+    searchTimeoutRef.current = setTimeout(() => {
+      handleFilterChange("search", value);
+    }, 300);
+  }, [handleFilterChange]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -515,8 +548,8 @@ export default function AdminToursPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={16} />
               <input
                 type="search"
-                value={filters.search}
-                onChange={(e) => handleFilterChange("search", e.target.value)}
+                value={searchValue}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Search tours..."
                   className="w-full pl-10 pr-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
               />
