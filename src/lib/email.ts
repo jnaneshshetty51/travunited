@@ -134,27 +134,43 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   lastEmailError = null;
   
   // Load config with timeout to prevent delays
-  const configPromise = loadEmailConfig();
-  const configTimeout = new Promise<EmailConfig>((_, reject) => {
-    setTimeout(() => reject(new Error("Email config load timeout")), 5000);
-  });
-  
   let config: EmailConfig;
   try {
+    const configPromise = loadEmailConfig();
+    const configTimeout = new Promise<EmailConfig>((_, reject) => {
+      setTimeout(() => reject(new Error("Email config load timeout after 5 seconds")), 5000);
+    });
     config = await Promise.race([configPromise, configTimeout]);
   } catch (error) {
-    console.error("[Email] Failed to load email config:", error);
-    lastEmailError = "Failed to load email configuration";
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("[Email] Failed to load email config:", {
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    lastEmailError = `Failed to load email configuration: ${errorMessage}`;
+    return false;
+  }
+  
+  // Check if API key is configured
+  if (!config.resendApiKey) {
+    const message = "Resend API key not configured. Set RESEND_API_KEY in environment variables or admin email settings.";
+    lastEmailError = message;
+    console.error("[Email]", message, {
+      hasEnvVar: !!process.env.RESEND_API_KEY,
+      hasConfigKey: !!config.resendApiKey,
+    });
     return false;
   }
   
   const resendClient = await getResendClient(config.resendApiKey);
 
   if (!resendClient) {
-    const message =
-      "Resend client not initialized. Configure RESEND_API_KEY in admin email settings.";
+    const message = "Resend client not initialized. Check RESEND_API_KEY configuration.";
     lastEmailError = message;
-    console.warn("[Email]", message);
+    console.error("[Email]", message, {
+      hasApiKey: !!config.resendApiKey,
+      apiKeyLength: config.resendApiKey?.length || 0,
+    });
     return false;
   }
 
@@ -169,16 +185,31 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   };
 
   const from =
-    (determineFromAddress(options.category) || process.env.EMAIL_FROM || config.emailFromGeneral) ??
+    determineFromAddress(options.category) || 
+    process.env.EMAIL_FROM || 
+    config.emailFromGeneral || 
     "";
 
   if (!from) {
-    const message =
-      "Sender email not configured. Set EMAIL_FROM or configure sender addresses in admin settings.";
-    console.error("[Email]", message);
+    const message = "Sender email not configured. Set EMAIL_FROM in environment variables or configure sender addresses in admin settings.";
+    console.error("[Email]", message, {
+      category: options.category,
+      emailFromGeneral: config.emailFromGeneral,
+      emailFromVisa: config.emailFromVisa,
+      emailFromTours: config.emailFromTours,
+      envEmailFrom: process.env.EMAIL_FROM,
+    });
     lastEmailError = message;
     return false;
   }
+  
+  console.log("[Email] Sending email", {
+    to: Array.isArray(options.to) ? options.to.join(", ") : options.to,
+    from,
+    subject: options.subject,
+    category: options.category || "general",
+    hasApiKey: !!config.resendApiKey,
+  });
 
   try {
     // Add timeout to Resend API call to prevent long delays

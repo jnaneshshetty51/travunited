@@ -104,46 +104,62 @@ export async function POST(req: Request) {
       hasNEXTAUTH_URL: !!process.env.NEXTAUTH_URL,
     });
     
-    // Send email asynchronously (fire-and-forget) so API responds immediately
-    // This prevents delays while still ensuring email is sent
-    sendPasswordResetEmail(user.email, resetUrl, user.role)
-      .then((emailSent) => {
-        if (emailSent) {
-          console.log("[Password Reset] Email sent successfully", {
-            userId: user.id,
-            userEmail: user.email,
-            resetId: passwordReset.id,
-            timestamp: new Date().toISOString(),
-          });
-        } else {
-          console.error("[Password Reset] FAILED to send email", {
-            userId: user.id,
-            userEmail: user.email,
-            resetId: passwordReset.id,
-            resetUrl: resetUrl,
-            error: "sendPasswordResetEmail returned false",
-            checkEnvVars: {
-              RESEND_API_KEY: process.env.RESEND_API_KEY ? "SET" : "MISSING",
-              EMAIL_FROM: process.env.EMAIL_FROM || "MISSING",
-              NEXTAUTH_URL: baseUrl,
-            },
-          });
-        }
-      })
-      .catch((emailError) => {
-        console.error("[Password Reset] Exception sending email", {
+    // Send email - await it to ensure it's sent before responding
+    // This ensures we catch errors and can log them properly
+    try {
+      const emailSent = await sendPasswordResetEmail(user.email, resetUrl, user.role);
+      
+      if (emailSent) {
+        console.log("[Password Reset] Email sent successfully", {
+          userId: user.id,
+          userEmail: user.email,
+          resetId: passwordReset.id,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        console.error("[Password Reset] FAILED to send email", {
           userId: user.id,
           userEmail: user.email,
           resetId: passwordReset.id,
           resetUrl: resetUrl,
-          error: emailError instanceof Error ? emailError.message : String(emailError),
-          stack: emailError instanceof Error ? emailError.stack : undefined,
+          error: "sendPasswordResetEmail returned false",
           checkEnvVars: {
             RESEND_API_KEY: process.env.RESEND_API_KEY ? "SET" : "MISSING",
             EMAIL_FROM: process.env.EMAIL_FROM || "MISSING",
+            NEXTAUTH_URL: baseUrl,
           },
         });
+        // Log the last email error if available
+        const { getLastEmailError } = await import("@/lib/email");
+        const lastError = getLastEmailError();
+        if (lastError) {
+          console.error("[Password Reset] Last email error:", lastError);
+        }
+      }
+    } catch (emailError) {
+      console.error("[Password Reset] Exception sending email", {
+        userId: user.id,
+        userEmail: user.email,
+        resetId: passwordReset.id,
+        resetUrl: resetUrl,
+        error: emailError instanceof Error ? emailError.message : String(emailError),
+        stack: emailError instanceof Error ? emailError.stack : undefined,
+        checkEnvVars: {
+          RESEND_API_KEY: process.env.RESEND_API_KEY ? "SET" : "MISSING",
+          EMAIL_FROM: process.env.EMAIL_FROM || "MISSING",
+        },
       });
+      // Log the last email error if available
+      try {
+        const { getLastEmailError } = await import("@/lib/email");
+        const lastError = getLastEmailError();
+        if (lastError) {
+          console.error("[Password Reset] Last email error:", lastError);
+        }
+      } catch (e) {
+        // Ignore import errors
+      }
+    }
 
     return NextResponse.json({
       message: "If an account exists with this email, a reset link has been sent.",
