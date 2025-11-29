@@ -95,7 +95,17 @@ export default function TravellersPage() {
       if (response.ok) {
         await fetchTravellers();
       } else {
-        alert("Failed to delete traveller. Please try again.");
+        // Try to show a specific error message from the API if available
+        let message = "Failed to delete traveller. Please try again.";
+        try {
+          const data = await response.json();
+          if (data?.error) {
+            message = data.error;
+          }
+        } catch {
+          // ignore JSON parse errors and fall back to generic message
+        }
+        alert(message);
       }
     } catch (error) {
       alert("An error occurred. Please try again.");
