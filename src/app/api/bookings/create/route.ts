@@ -740,10 +740,42 @@ export async function POST(req: Request) {
           });
         }
       } else {
-        // Regular booking - notify admins
+        // Regular booking - send email to user
+        const paymentMessage = initialStatus === "DRAFT" ? "Please complete payment to secure your booking." : "";
+        await notify({
+          userId,
+          type: "TOUR_BOOKING_CREATED",
+          title: "Tour Booking Confirmed",
+          message: `Your booking for ${data.tourName || tourRecord.name} has been confirmed. ${paymentMessage}`,
+          link: `/dashboard/bookings/${booking.id}`,
+        });
+
+        // Send email to customer
+        const { sendTourConfirmedEmail } = await import("@/lib/email");
+        const userRole = (session.user.role as "CUSTOMER" | "STAFF_ADMIN" | "SUPER_ADMIN") || "CUSTOMER";
+        await sendTourConfirmedEmail(
+          data.primaryContact.email,
+          booking.id,
+          data.tourName || tourRecord.name,
+          userRole
+        );
+
+        // Regular booking - notify admins with document information
         if (!tourAdminEmail) {
           console.warn("Tour admin email not configured; skipping tour booking admin notification.");
         } else {
+          // Get document information
+          const documentsInfo = data.travellers.map((t, idx) => {
+            const docs = [];
+            if (t.passportFileKey) docs.push(`Passport: Uploaded`);
+            if (t.aadharFileKey) docs.push(`Aadhaar: Uploaded`);
+            return `${idx + 1}. ${t.firstName} ${t.lastName}${docs.length > 0 ? ` - Documents: ${docs.join(", ")}` : " - No documents uploaded yet"}`;
+          }).join("<br>");
+
+          const travellersList = data.travellers.map((t, idx) => 
+            `${idx + 1}. ${t.firstName} ${t.lastName} (Age: ${t.age || "N/A"}, Gender: ${t.gender || "N/A"}, Passport: ${t.passportNumber || "N/A"})`
+          ).join("<br>");
+
           await sendEmail({
             to: tourAdminEmail,
             subject: `New Tour Booking - ${data.tourName || tourRecord.name}`,
@@ -754,11 +786,22 @@ export async function POST(req: Request) {
                 <ul>
                   <li><strong>Tour:</strong> ${data.tourName || tourRecord.name}</li>
                   <li><strong>Customer:</strong> ${data.primaryContact.name} (${data.primaryContact.email})</li>
+                  <li><strong>Phone:</strong> ${data.primaryContact.phone || "N/A"}</li>
                   <li><strong>Travel Date:</strong> ${new Date(data.travelDate).toLocaleDateString()}</li>
                   <li><strong>Total Amount:</strong> ₹${finalTotalAmount.toLocaleString()}</li>
+                  <li><strong>Payment Type:</strong> ${data.paymentType === "full" ? "Full Payment" : `Advance Payment (${data.advancePercentage || 0}%)`}</li>
                   <li><strong>Booking ID:</strong> ${booking.id}</li>
+                  <li><strong>Status:</strong> ${initialStatus}</li>
+                  <li><strong>Number of Travellers:</strong> ${data.travellers.length} (${adultCount} adults, ${childCount} children)</li>
                 </ul>
-                <p><a href="${process.env.NEXTAUTH_URL}/admin/bookings/${booking.id}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View Booking</a></p>
+                <h3>Travellers:</h3>
+                <p>${travellersList}</p>
+                <h3>Documents:</h3>
+                <p>${documentsInfo || "No documents uploaded yet"}</p>
+                ${data.preferences?.specialRequests ? `<p><strong>Special Requests:</strong> ${data.preferences.specialRequests}</p>` : ""}
+                ${data.preferences?.foodPreference ? `<p><strong>Food Preference:</strong> ${data.preferences.foodPreference}</p>` : ""}
+                <p><a href="${process.env.NEXTAUTH_URL || "https://travunited.com"}/admin/bookings/${booking.id}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View Booking</a></p>
+                <p>Best regards,<br>Travunited System</p>
               </div>
             `,
             category: "tours",

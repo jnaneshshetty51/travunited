@@ -330,7 +330,9 @@ export async function sendPasswordResetEmail(
       <h1>Password Reset Request</h1>
       <p>You requested to reset your password. Click the link below to set a new password:</p>
       <p><a href="${resetLink}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Reset Password</a></p>
-      <p>This link will expire in 1 hour.</p>
+      <p style="margin-top: 20px; font-size: 12px; color: #666;">If the button doesn't work, copy and paste this link into your browser:</p>
+      <p style="font-size: 11px; color: #999; word-break: break-all;">${resetLink}</p>
+      <p>This link will expire in 24 hours.</p>
       <p>If you didn't request this, please ignore this email.</p>
       <p>Best regards,<br>The Travunited Team</p>
     </div>

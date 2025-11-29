@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { sendVisaStatusUpdateEmail, sendEmail } from "@/lib/email";
+import { getVisaAdminEmail, getAdminUserIds } from "@/lib/admin-contacts";
+import { notify, notifyMultiple } from "@/lib/notifications";
 export const dynamic = "force-dynamic";
 
 
@@ -273,6 +276,92 @@ export async function POST(req: Request) {
         inputIndex: index,
         travellerId: traveller.id,
       });
+    }
+
+    // Send email notifications (non-blocking)
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, name: true, role: true },
+      });
+
+      if (user) {
+        // Send email to user
+        await sendVisaStatusUpdateEmail(
+          user.email,
+          application.id,
+          application.country || "",
+          application.visaType || "",
+          "DRAFT",
+          user.role || "CUSTOMER"
+        );
+
+        // Send in-app notification to user
+        await notify({
+          userId,
+          type: "VISA_APPLICATION_SUBMITTED",
+          title: "Visa Application Created",
+          message: `Your ${application.country || ""} ${application.visaType || ""} application has been created. Please upload required documents to proceed.`,
+          link: `/dashboard/applications/${application.id}`,
+          data: {
+            applicationId: application.id,
+            country: application.country,
+            visaType: application.visaType,
+          },
+        });
+
+        // Send email to admin with application details
+        const visaAdminEmail = getVisaAdminEmail();
+        const travellersList = data.travellers.map((t, idx) => 
+          `${idx + 1}. ${t.firstName} ${t.lastName} (DOB: ${t.dateOfBirth}, Passport: ${t.passportNumber || "N/A"})`
+        ).join("<br>");
+
+        await sendEmail({
+          to: visaAdminEmail,
+          subject: `New Visa Application - ${application.country || ""} ${application.visaType || ""}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h1>New Visa Application Received</h1>
+              <p>A new visa application has been created:</p>
+              <ul>
+                <li><strong>Application ID:</strong> ${application.id}</li>
+                <li><strong>Country:</strong> ${application.country || "N/A"}</li>
+                <li><strong>Visa Type:</strong> ${application.visaType || "N/A"}</li>
+                <li><strong>Customer:</strong> ${data.primaryContact.name} (${data.primaryContact.email})</li>
+                <li><strong>Phone:</strong> ${data.primaryContact.phone || "N/A"}</li>
+                <li><strong>Travel Date:</strong> ${data.travelDate ? new Date(data.travelDate).toLocaleDateString() : "Not specified"}</li>
+                <li><strong>Total Amount:</strong> ₹${(data.totalAmount || 0).toLocaleString()}</li>
+                <li><strong>Number of Travellers:</strong> ${data.travellers.length}</li>
+              </ul>
+              <h3>Travellers:</h3>
+              <p>${travellersList}</p>
+              <p><strong>Note:</strong> Documents will be uploaded separately. Please check the application dashboard for document uploads.</p>
+              <p><a href="${process.env.NEXTAUTH_URL || "https://travunited.com"}/admin/applications/${application.id}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View Application</a></p>
+              <p>Best regards,<br>Travunited System</p>
+            </div>
+          `,
+          category: "visa",
+        });
+
+        // Notify admins in-app
+        const adminIds = await getAdminUserIds();
+        if (adminIds.length > 0) {
+          await notifyMultiple(adminIds, {
+            type: "ADMIN_VISA_DOCUMENT_UPLOADED",
+            title: "New Visa Application",
+            message: `New visa application for ${application.country || ""} ${application.visaType || ""} from ${data.primaryContact.name}`,
+            link: `/admin/applications/${application.id}`,
+            data: {
+              applicationId: application.id,
+              country: application.country,
+              visaType: application.visaType,
+            },
+          });
+        }
+      }
+    } catch (emailError) {
+      console.error("Error sending application creation emails:", emailError);
+      // Don't fail the request if emails fail
     }
 
     return NextResponse.json({

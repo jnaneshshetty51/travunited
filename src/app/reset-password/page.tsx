@@ -9,6 +9,7 @@ import { Lock, CheckCircle, AlertCircle, ArrowRight } from "lucide-react";
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  // Get raw values - searchParams.get() automatically decodes URL-encoded values
   const token = searchParams.get("token");
   const resetId = searchParams.get("id");
   
@@ -23,20 +24,51 @@ function ResetPasswordContent() {
   useEffect(() => {
     // Validate token on mount
     const validateToken = async () => {
-      if (!token || !resetId) {
-        setError("Invalid reset link. Missing token or reset ID.");
+      // searchParams.get() automatically decodes URL-encoded values
+      // So we get the raw values here
+      let rawToken = searchParams.get("token");
+      let rawResetId = searchParams.get("id");
+
+      // Fallback: Try parsing from URL directly if searchParams didn't work
+      if (!rawToken || !rawResetId) {
+        try {
+          const url = new URL(window.location.href);
+          rawToken = rawToken || url.searchParams.get("token");
+          rawResetId = rawResetId || url.searchParams.get("id");
+        } catch (e) {
+          console.error("[Reset Password] Failed to parse URL:", e);
+        }
+      }
+
+      if (!rawToken || !rawResetId) {
+        console.error("[Reset Password] Missing parameters", {
+          hasToken: !!rawToken,
+          hasId: !!rawResetId,
+          url: window.location.href,
+          searchParamsKeys: Array.from(searchParams.keys()),
+        });
+        setError("Invalid reset link. Missing token or reset ID. Please make sure you copied the entire link from your email.");
         setValidating(false);
         return;
       }
 
       try {
-        // Token and id should already be URL-encoded from the URL, but ensure they're properly encoded
-        const encodedToken = encodeURIComponent(token || "");
-        const encodedId = encodeURIComponent(resetId || "");
+        // Re-encode for the API call to ensure proper transmission
+        const encodedToken = encodeURIComponent(rawToken);
+        const encodedId = encodeURIComponent(rawResetId);
+        
+        console.log("[Reset Password] Validating token", {
+          hasToken: !!rawToken,
+          hasId: !!rawResetId,
+          tokenLength: rawToken.length,
+          idLength: rawResetId.length,
+        });
+
         const response = await fetch(
           `/api/auth/validate-reset-token?token=${encodedToken}&id=${encodedId}`
         );
         const data = await response.json();
+        
         if (response.ok && data.valid === true) {
           setTokenValid(true);
         } else {
@@ -51,13 +83,17 @@ function ResetPasswordContent() {
     };
 
     validateToken();
-  }, [token, resetId]);
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!token || !resetId) {
+    // Re-get values from searchParams in case they changed
+    const currentToken = searchParams.get("token");
+    const currentResetId = searchParams.get("id");
+
+    if (!currentToken || !currentResetId) {
       setError("Invalid reset link. Missing token or reset ID.");
       return;
     }
@@ -78,7 +114,7 @@ function ResetPasswordContent() {
       const response = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: resetId, token, password }),
+        body: JSON.stringify({ id: currentResetId, token: currentToken, password }),
       });
 
       const data = await response.json();
@@ -110,7 +146,11 @@ function ResetPasswordContent() {
     );
   }
 
-  if (!tokenValid || !token || !resetId) {
+  // Re-get current values for validation check
+  const currentToken = searchParams.get("token");
+  const currentResetId = searchParams.get("id");
+  
+  if (!tokenValid || !currentToken || !currentResetId) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-large p-8 text-center">
@@ -122,6 +162,9 @@ function ResetPasswordContent() {
           </h1>
           <p className="text-neutral-600 mb-6">
             {error || "This password reset link is invalid or has expired."}
+          </p>
+          <p className="text-xs text-neutral-500 mb-4">
+            If you copied the link from your email, make sure you copied the entire link including all parameters.
           </p>
           <Link
             href="/forgot-password"

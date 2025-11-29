@@ -85,9 +85,20 @@ export async function POST(req: Request) {
     }
 
     // Properly URL-encode the token to prevent issues with special characters
+    // Note: encodeURIComponent ensures safe transmission in URLs
     const encodedToken = encodeURIComponent(rawToken);
     const encodedId = encodeURIComponent(passwordReset.id);
+    // Ensure the URL is properly formatted
     const resetUrl = `${baseUrl}/reset-password?token=${encodedToken}&id=${encodedId}`;
+    
+    // Log the URL for debugging (in production, you might want to remove this)
+    console.log("[Password Reset] Generated reset URL", {
+      baseUrl,
+      tokenLength: rawToken.length,
+      idLength: passwordReset.id.length,
+      urlLength: resetUrl.length,
+      urlPreview: resetUrl.substring(0, 100) + "...",
+    });
 
     console.log("[Password Reset] Attempting to send email", {
       userId: user.id,

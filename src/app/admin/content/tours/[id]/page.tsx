@@ -139,11 +139,12 @@ const TextInput = memo(({ value, onChange, placeholder, required, type = "text",
 });
 TextInput.displayName = "TextInput";
 
-const NumberInput = memo(({ value, onChange, placeholder, min, required, className = "" }: {
+const NumberInput = memo(({ value, onChange, placeholder, min, max, required, className = "" }: {
   value: number | null;
   onChange: (value: number | null) => void;
   placeholder?: string;
   min?: number;
+  max?: number;
   required?: boolean;
   className?: string;
 }) => {
@@ -157,6 +158,7 @@ const NumberInput = memo(({ value, onChange, placeholder, min, required, classNa
       type="number"
       required={required}
       min={min}
+      max={max}
       value={value ?? ""}
       onChange={handleChange}
       placeholder={placeholder}
@@ -650,24 +652,25 @@ export default function AdminTourEditorPage() {
     setFormData((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  const addDay = () => {
+  // Memoize handlers to prevent recreation
+  const addDay = useCallback(() => {
     setDays((prev) => [
       ...prev,
       { uid: uid(), dayIndex: prev.length + 1, title: "", content: "" },
     ]);
-  };
+  }, []);
 
-  const updateDay = (uidValue: string, key: keyof DayState, value: string | number) => {
+  const updateDay = useCallback((uidValue: string, key: keyof DayState, value: string | number) => {
     setDays((prev) =>
       prev.map((day) => (day.uid === uidValue ? { ...day, [key]: value } : day))
     );
-  };
+  }, []);
 
-  const removeDay = (uidValue: string) => {
+  const removeDay = useCallback((uidValue: string) => {
     setDays((prev) => prev.filter((day) => day.uid !== uidValue));
-  };
+  }, []);
 
-  const addAddOnRow = () => {
+  const addAddOnRow = useCallback(() => {
     setAddOns((prev) => [
       ...prev,
       {
@@ -681,9 +684,9 @@ export default function AdminTourEditorPage() {
         sortOrder: prev.length,
       },
     ]);
-  };
+  }, []);
 
-  const updateAddOn = (
+  const updateAddOn = useCallback((
     uidValue: string,
     key: keyof Omit<AddOnForm, "uid">,
     value: string | number | boolean
@@ -695,15 +698,15 @@ export default function AdminTourEditorPage() {
           : addOn
       )
     );
-  };
+  }, []);
 
-  const removeAddOn = (uidValue: string) => {
+  const removeAddOn = useCallback((uidValue: string) => {
     setAddOns((prev) =>
       prev
         .filter((addOn) => addOn.uid !== uidValue)
         .map((addOn, index) => ({ ...addOn, sortOrder: index }))
     );
-  };
+  }, []);
 
   const galleryArray = useMemo(
     () =>
@@ -1512,18 +1515,11 @@ export default function AdminTourEditorPage() {
               <span className="text-sm font-medium text-neutral-700">
                 Advance percentage
               </span>
-              <input
-                type="number"
+              <NumberInput
                 min={0}
                 max={100}
-                value={formData.advancePercentage ?? ""}
-                onChange={(e) =>
-                  updateForm(
-                    "advancePercentage",
-                    e.target.value ? Number(e.target.value) : null
-                  )
-                }
-                className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500"
+                value={formData.advancePercentage}
+                onChange={(value) => updateForm("advancePercentage", value)}
               />
             </label>
           )}
@@ -1794,11 +1790,11 @@ export default function AdminTourEditorPage() {
 
         <label className="flex flex-col">
           <span className="text-sm font-medium text-neutral-700">Customization Options (JSON)</span>
-          <textarea
+          <TextareaInput
             rows={6}
             value={formData.customizationOptions}
-            onChange={(e) => updateForm("customizationOptions", e.target.value)}
-            className="mt-1 w-full border border-neutral-300 rounded-lg px-4 py-2 font-mono text-sm focus:ring-2 focus:ring-primary-500"
+            onChange={(value) => updateForm("customizationOptions", value)}
+            className="font-mono text-sm"
             placeholder='{"Private Transfers": {"price": 5000, "type": "per_person"}, "Extra Night": {"price": 3000, "type": "flat"}}'
           />
           <p className="text-xs text-neutral-500 mt-1">

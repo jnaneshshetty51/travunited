@@ -7,11 +7,17 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
+    // searchParams.get() automatically decodes URL-encoded values
     const token = searchParams.get("token");
     const resetId = searchParams.get("id");
 
     if (!token || !resetId) {
-      console.warn("[Password Reset] Validation failed: missing token or id");
+      console.warn("[Password Reset] Validation failed: missing token or id", {
+        hasToken: !!token,
+        hasId: !!resetId,
+        url: req.url,
+        searchParamsKeys: Array.from(searchParams.keys()),
+      });
       return NextResponse.json(
         { valid: false, error: "Token and reset ID are required" },
         { status: 400 }
