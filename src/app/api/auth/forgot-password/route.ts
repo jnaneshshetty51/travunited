@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { sendPasswordResetEmail, getLastEmailError } from "@/lib/email";
+import { sendPasswordResetEmail, getLastEmailError, getEmailServiceConfig } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +113,55 @@ export async function POST(req: Request) {
       userAgent: userAgent || "unknown",
       baseUrl: baseUrl,
       hasNEXTAUTH_URL: !!process.env.NEXTAUTH_URL,
+    });
+
+    // Validate email configuration before attempting to send
+    const emailServiceConfig = await getEmailServiceConfig();
+    if (!emailServiceConfig.resendApiKey) {
+      const errorMsg = "Email service not configured - Resend API key missing. Configure it in Admin → Settings → Email Service Configuration or set RESEND_API_KEY environment variable.";
+      console.error("[Password Reset]", errorMsg, {
+        userId: user.id,
+        userEmail: user.email,
+        resetId: passwordReset.id,
+        hasEnvVar: !!process.env.RESEND_API_KEY,
+        hasConfigKey: !!emailServiceConfig.resendApiKey,
+        configDetails: {
+          resendApiKey: emailServiceConfig.resendApiKey ? "SET" : "MISSING",
+          emailFromGeneral: emailServiceConfig.emailFromGeneral ? "SET" : "MISSING",
+        },
+      });
+      // Still return success to user (security best practice - don't reveal if account exists)
+      return NextResponse.json({
+        message: "If an account exists with this email, a reset link has been sent.",
+      });
+    }
+
+    if (!emailServiceConfig.emailFromGeneral) {
+      const errorMsg = "Email service not configured - Sender email missing. Configure it in Admin → Settings → Email Service Configuration or set EMAIL_FROM environment variable.";
+      console.error("[Password Reset]", errorMsg, {
+        userId: user.id,
+        userEmail: user.email,
+        resetId: passwordReset.id,
+        hasEnvVar: !!process.env.EMAIL_FROM,
+        hasConfigEmail: !!emailServiceConfig.emailFromGeneral,
+        configDetails: {
+          resendApiKey: emailServiceConfig.resendApiKey ? "SET" : "MISSING",
+          emailFromGeneral: emailServiceConfig.emailFromGeneral ? "SET" : "MISSING",
+        },
+      });
+      // Still return success to user (security best practice - don't reveal if account exists)
+      return NextResponse.json({
+        message: "If an account exists with this email, a reset link has been sent.",
+      });
+    }
+
+    console.log("[Password Reset] Email configuration validated", {
+      userId: user.id,
+      userEmail: user.email,
+      resetId: passwordReset.id,
+      hasResendApiKey: !!emailServiceConfig.resendApiKey,
+      hasEmailFrom: !!emailServiceConfig.emailFromGeneral,
+      emailFrom: emailServiceConfig.emailFromGeneral?.substring(0, 50) + "...",
     });
 
     // Send email - await it to ensure it's sent before responding
