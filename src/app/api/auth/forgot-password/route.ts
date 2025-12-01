@@ -155,7 +155,9 @@ export async function POST(req: Request) {
         hasEnvVar: !!process.env.EMAIL_FROM,
         hasConfigEmail: !!emailServiceConfig.emailFromGeneral,
         configDetails: {
-          resendApiKey: emailServiceConfig.resendApiKey ? "SET" : "MISSING",
+          awsAccessKeyId: emailServiceConfig.awsAccessKeyId ? "SET" : "MISSING",
+          awsSecretAccessKey: emailServiceConfig.awsSecretAccessKey ? "SET" : "MISSING",
+          awsRegion: emailServiceConfig.awsRegion ? "SET" : "MISSING",
           emailFromGeneral: emailServiceConfig.emailFromGeneral ? "SET" : "MISSING",
         },
       });
