@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -9,7 +9,72 @@ import { Plus, Edit, Search, Filter, Star, RefreshCw, CheckSquare, Square, Chevr
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { ImportModal } from "@/components/admin/ImportModal";
 import { formatDate } from "@/lib/dateFormat";
-import { memo } from "react";
+
+// Memoized input components to prevent focus loss
+const SearchInput = memo(({ value, onChange, placeholder }: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.value);
+  }, [onChange]);
+
+  return (
+    <div className="relative">
+      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={16} />
+      <input
+        type="search"
+        value={value}
+        onChange={handleChange}
+        placeholder={placeholder}
+        className="w-full pl-10 pr-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+      />
+    </div>
+  );
+});
+SearchInput.displayName = "SearchInput";
+
+const SelectInput = memo(({ value, onChange, children, className = "" }: {
+  value: string;
+  onChange: (value: string) => void;
+  children: React.ReactNode;
+  className?: string;
+}) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    onChange(e.target.value);
+  }, [onChange]);
+
+  return (
+    <select
+      value={value}
+      onChange={handleChange}
+      className={`w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm ${className}`}
+    >
+      {children}
+    </select>
+  );
+});
+SelectInput.displayName = "SelectInput";
+
+const CheckboxInput = memo(({ checked, onChange }: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.checked);
+  }, [onChange]);
+
+  return (
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={handleChange}
+      className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+    />
+  );
+});
+CheckboxInput.displayName = "CheckboxInput";
 
 interface TourRecord {
   id: string;
@@ -155,11 +220,13 @@ export default function AdminToursPage() {
     );
   }, [session, status, router, fetchCountries, fetchTours]);
 
-  const handleFilterChange = useCallback((field: string, value: string) => {
-    const nextFilters = { ...filters, [field]: value };
-    setFilters(nextFilters);
-    fetchTours(nextFilters);
-  }, [filters, fetchTours]);
+  const handleFilterChange = useCallback((field: keyof TourFilters, value: string) => {
+    setFilters((prev) => {
+      const nextFilters = { ...prev, [field]: value } as TourFilters;
+      fetchTours(nextFilters);
+      return nextFilters;
+    });
+  }, [fetchTours]);
 
   // Debounced search handler
   const [searchValue, setSearchValue] = useState(filters.search);
@@ -544,23 +611,17 @@ export default function AdminToursPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">Search</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={16} />
-              <input
-                type="search"
+              <SearchInput
                 value={searchValue}
-                onChange={(e) => handleSearchChange(e.target.value)}
+                onChange={handleSearchChange}
                 placeholder="Search tours..."
-                  className="w-full pl-10 pr-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
               />
-              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">Country</label>
-              <select
+              <SelectInput
                 value={filters.countryId}
-                onChange={(e) => handleFilterChange("countryId", e.target.value)}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+                onChange={(value) => handleFilterChange("countryId", value)}
               >
                 <option value="">All Countries</option>
                 {countries.map((country) => (
@@ -568,27 +629,25 @@ export default function AdminToursPage() {
                     {country.name}
                   </option>
                 ))}
-              </select>
+              </SelectInput>
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">Status</label>
-              <select
+              <SelectInput
                 value={filters.status}
-                onChange={(e) => handleFilterChange("status", e.target.value)}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+                onChange={(value) => handleFilterChange("status", value)}
               >
                 <option value="all">All Statuses</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
                 <option value="draft">Draft</option>
-              </select>
+              </SelectInput>
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">Tour Type</label>
-              <select
+              <SelectInput
                 value={filters.tourType}
-                onChange={(e) => handleFilterChange("tourType", e.target.value)}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+                onChange={(value) => handleFilterChange("tourType", value)}
               >
                 <option value="all">All Types</option>
                 {uniqueTourTypes.map((type) => (
@@ -596,14 +655,13 @@ export default function AdminToursPage() {
                     {type}
                   </option>
                 ))}
-              </select>
+              </SelectInput>
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">Region</label>
-              <select
+              <SelectInput
                 value={filters.region}
-                onChange={(e) => handleFilterChange("region", e.target.value)}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+                onChange={(value) => handleFilterChange("region", value)}
               >
                 <option value="all">All Regions</option>
                 {uniqueRegions.map((region) => (
@@ -611,19 +669,18 @@ export default function AdminToursPage() {
                     {region}
                   </option>
                 ))}
-              </select>
+              </SelectInput>
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">Featured</label>
-              <select
+              <SelectInput
                 value={filters.featured}
-                onChange={(e) => handleFilterChange("featured", e.target.value)}
-                className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
+                onChange={(value) => handleFilterChange("featured", value)}
               >
                 <option value="all">All</option>
                 <option value="yes">Featured</option>
                 <option value="no">Not Featured</option>
-              </select>
+              </SelectInput>
             </div>
           </div>
         </div>
@@ -759,11 +816,9 @@ export default function AdminToursPage() {
                 <thead className="bg-neutral-50">
                   <tr>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                      <input
-                        type="checkbox"
+                      <CheckboxInput
                         checked={selectedIds.size === sortedTours.length && sortedTours.length > 0}
-                        onChange={(e) => handleSelectAll(e.target.checked)}
-                        className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                        onChange={handleSelectAll}
                       />
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
@@ -806,11 +861,9 @@ export default function AdminToursPage() {
                       }}
                     >
                       <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
+                        <CheckboxInput
                           checked={selectedIds.has(tour.id)}
-                          onChange={(e) => handleSelectRow(tour.id, e.target.checked)}
-                          className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                          onChange={(checked) => handleSelectRow(tour.id, checked)}
                         />
                       </td>
                       <td className="px-6 py-4">
