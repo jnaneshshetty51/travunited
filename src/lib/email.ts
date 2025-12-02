@@ -387,13 +387,21 @@ export async function sendWelcomeEmail(
   const baseUrl = process.env.NEXTAUTH_URL || "https://travunited.com";
   
   const variables: EmailTemplateVariables = {
-    name,
+    name: name || "",
     email,
     companyName: config.emailFromGeneral?.match(/<(.+)>/)?.[1] || "Travunited",
     dashboardUrl: `${baseUrl}/dashboard`,
   };
   
-  const html = replaceTemplateVariables(template, variables);
+  let html = replaceTemplateVariables(template, variables);
+  
+  // Fix name formatting - replaceTemplateVariables adds ", Name" if name exists
+  if (name) {
+    html = html.replace(/{companyName}, {name}!/g, `${variables.companyName}, ${name}!`);
+  } else {
+    html = html.replace(/{companyName}{name}!/g, `${variables.companyName}!`);
+  }
+  
   const subject = "Welcome to Travunited!";
   
   return sendUserEmail({ to: email, role, subject, html, category: "general" });
@@ -783,12 +791,23 @@ export async function sendEmailVerificationEmail(
   
   const variables: EmailTemplateVariables = {
     email,
-    name,
+    name: name || "",
     verificationLink,
     companyName: config.emailFromGeneral?.match(/<(.+)>/)?.[1] || "Travunited",
   };
   
-  const html = replaceTemplateVariables(template, variables);
+  let html = replaceTemplateVariables(template, variables);
+  
+  // Fix name formatting - if name exists, it will be ", Name", otherwise empty
+  if (name) {
+    // Name is already formatted with comma in replaceTemplateVariables
+    html = html.replace(/Hi, {name}/g, `Hi ${name}`);
+  } else {
+    html = html.replace(/Hi{name}/g, "Hi");
+  }
+  
+  // Replace companyName placeholder again after name processing
+  html = html.replace(/{companyName}/g, variables.companyName || "Travunited");
   const subject = "Verify Your Travunited Email";
   
   return sendUserEmail({ to: email, role, subject, html, category: "general" });
@@ -825,7 +844,18 @@ export async function sendCorporateLeadAdminEmail(
     companyName: config.emailFromGeneral?.match(/<(.+)>/)?.[1] || "Travunited",
   };
   
-  const html = replaceTemplateVariables(template, variables);
+  let html = replaceTemplateVariables(template, variables);
+  
+  // Handle conditional message section
+  if (leadData.message) {
+    const messageSection = `<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+      <strong>Requirement/Message:</strong>
+      <div style="background-color: white; padding: 10px; border-radius: 3px; margin-top: 8px; white-space: pre-wrap;">${leadData.message.replace(/\n/g, "<br>")}</div>
+    </div>`;
+    html = html.replace(/{messageSection}/g, messageSection);
+  } else {
+    html = html.replace(/{messageSection}/g, "");
+  }
   const subject = `New Corporate Lead - ${leadData.companyName}`;
 
   // Send directly to admin inbox, not routed through sendUserEmail
@@ -858,7 +888,15 @@ export async function sendCorporateLeadConfirmationEmail(
     companyName: config.emailFromGeneral?.match(/<(.+)>/)?.[1] || "Travunited",
   };
   
-  const html = replaceTemplateVariables(template, variables);
+  let html = replaceTemplateVariables(template, variables);
+  
+  // Handle conditional support phone section
+  if (variables.supportPhone) {
+    const phoneSection = `<li><strong>Phone:</strong> <a href="tel:${variables.supportPhone}">${variables.supportPhone}</a></li>`;
+    html = html.replace(/{supportPhoneSection}/g, phoneSection);
+  } else {
+    html = html.replace(/{supportPhoneSection}/g, "");
+  }
   const subject = "We received your corporate request";
 
   // Send directly to user's email
@@ -888,27 +926,6 @@ export async function sendAdminWelcomeEmail(
   const roleDisplay = role === "SUPER_ADMIN" ? "Super Admin" : "Staff Admin";
   const companyName = config.emailFromGeneral?.match(/<(.+)>/)?.[1] || "Travunited";
   
-  // Handle conditional password section - replace template conditionals with actual values
-  if (tempPassword) {
-    // Replace conditional password section with actual password display
-    template = template.replace(
-      /\{tempPassword \? `<div[\s\S]*?<\/div>` : `[\s\S]*?`\}/g,
-      `<div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 15px; margin: 20px 0;">
-        <h3 style="margin-top: 0; color: #856404;">Your Temporary Password</h3>
-        <p style="font-size: 18px; font-weight: bold; color: #856404; font-family: monospace; letter-spacing: 2px; margin: 10px 0;">{tempPassword}</p>
-        <p style="margin-bottom: 0; color: #856404;"><strong>Please change this password immediately after your first login.</strong></p>
-      </div>`
-    );
-  } else {
-    // Replace conditional password section with no password message
-    template = template.replace(
-      /\{tempPassword \? `<div[\s\S]*?<\/div>` : `[\s\S]*?`\}/g,
-      `<div style="background-color: #d1ecf1; border: 1px solid #0c5460; border-radius: 5px; padding: 15px; margin: 20px 0;">
-        <p style="margin: 0; color: #0c5460;">Please use the password provided by your administrator or request a password reset.</p>
-      </div>`
-    );
-  }
-  
   const variables: EmailTemplateVariables = {
     email,
     name,
@@ -918,7 +935,22 @@ export async function sendAdminWelcomeEmail(
     companyName,
   };
   
-  const html = replaceTemplateVariables(template, variables);
+  // Handle conditional password section
+  let html = replaceTemplateVariables(template, variables);
+  
+  if (tempPassword) {
+    const passwordSection = `<div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 15px; margin: 20px 0;">
+      <h3 style="margin-top: 0; color: #856404;">Your Temporary Password</h3>
+      <p style="font-size: 18px; font-weight: bold; color: #856404; font-family: monospace; letter-spacing: 2px; margin: 10px 0;">${tempPassword}</p>
+      <p style="margin-bottom: 0; color: #856404;"><strong>Please change this password immediately after your first login.</strong></p>
+    </div>`;
+    html = html.replace(/{tempPasswordSection}/g, passwordSection);
+  } else {
+    const noPasswordSection = `<div style="background-color: #d1ecf1; border: 1px solid #0c5460; border-radius: 5px; padding: 15px; margin: 20px 0;">
+      <p style="margin: 0; color: #0c5460;">Please use the password provided by your administrator or request a password reset.</p>
+    </div>`;
+    html = html.replace(/{tempPasswordSection}/g, noPasswordSection);
+  }
   const subject = "Welcome to Travunited Admin Panel";
 
   // Send directly to admin's email (not routed through admin inbox)

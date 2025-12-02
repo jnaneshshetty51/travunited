@@ -100,6 +100,32 @@ export function replaceTemplateVariables(
     result = result.replace(new RegExp(key.replace(/[{}]/g, "\\$&"), "g"), value);
   }
   
+  // Handle conditional sections
+  // {reason} - only show if reason exists
+  if (variables.reason) {
+    result = result.replace(/{reason}/g, `<p><strong>Reason:</strong> ${variables.reason}</p>`);
+  } else {
+    result = result.replace(/{reason}/g, "");
+  }
+  
+  // {pendingBalance} - only show if pendingBalance exists
+  if (variables.pendingBalance !== undefined && variables.pendingBalance !== null) {
+    result = result.replace(/{pendingBalance}/g, `<p><strong>Pending Balance:</strong> ₹${variables.pendingBalance.toLocaleString()}</p>`);
+  } else {
+    result = result.replace(/{pendingBalance}/g, "");
+  }
+  
+  // {dueDate} - only show if dueDate exists
+  if (variables.dueDate) {
+    result = result.replace(/{dueDate}/g, `<p><strong>Due Date:</strong> ${variables.dueDate}</p>`);
+  } else {
+    result = result.replace(/{dueDate}/g, "");
+  }
+  
+  // {tempPasswordSection} - handled in sendAdminWelcomeEmail function
+  // {messageSection} - handled in sendCorporateLeadAdminEmail function
+  // {supportPhoneSection} - handled in sendCorporateLeadConfirmationEmail function
+  
   // Handle rejected documents list
   if (variables.rejectedDocs && variables.rejectedDocs.length > 0) {
     const docsList = variables.rejectedDocs
@@ -126,6 +152,13 @@ export function replaceTemplateVariables(
     result = result.replace(/{createdAt}/g, formattedDate);
   }
   
+  // Handle name formatting - add comma and space if name exists
+  if (variables.name) {
+    result = result.replace(/{name}/g, `, ${variables.name}`);
+  } else {
+    result = result.replace(/{name}/g, "");
+  }
+  
   return result;
 }
 
@@ -136,7 +169,7 @@ export function getDefaultEmailTemplate(templateKey: string): string {
   const defaults: Record<string, string> = {
     // General emails
     welcomeEmail: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-  <h1>Welcome to {companyName}{name ? `, {name}` : ""}!</h1>
+  <h1>Welcome to {companyName}{name}!</h1>
   <p>Thank you for joining {companyName}. We're here to make your travel dreams come true.</p>
   <p>You can now:</p>
   <ul>
@@ -161,7 +194,7 @@ export function getDefaultEmailTemplate(templateKey: string): string {
 
     emailVerificationEmail: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
   <h1>Verify Your Email Address</h1>
-  <p>Hi{name ? ` {name}` : ""},</p>
+  <p>Hi{name},</p>
   <p>Thank you for signing up with {companyName}! Please verify your email address by clicking the link below:</p>
   <p><a href="{verificationLink}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Verify Email</a></p>
   <p>This link will expire in 7 days.</p>
@@ -183,7 +216,7 @@ export function getDefaultEmailTemplate(templateKey: string): string {
   <h1>Payment Failed</h1>
   <p>Your payment attempt for {country} {visaType} could not be completed.</p>
   <p><strong>Amount:</strong> {amount}</p>
-  {reason ? `<p><strong>Reason:</strong> {reason}</p>` : ""}
+  {reason}
   <p>Please try again from your <a href="{applicationUrl}">application dashboard</a>. If the issue persists, contact support.</p>
   <p>Best regards,<br>The {companyName} Team</p>
 </div>`,
@@ -212,8 +245,8 @@ export function getDefaultEmailTemplate(templateKey: string): string {
 
     visaRejectedEmail: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
   <h1>Application Status Update</h1>
-  <p>Your {country} {visaType} application has been {reason ? "rejected" : "updated"}.</p>
-  {reason ? `<p><strong>Reason:</strong> {reason}</p>` : ""}
+  <p>Your {country} {visaType} application has been rejected.</p>
+  {reason}
   <p>View details in your <a href="{applicationUrl}">dashboard</a>.</p>
   <p>If you have questions, please contact our support team.</p>
   <p>Best regards,<br>The {companyName} Team</p>
@@ -224,7 +257,7 @@ export function getDefaultEmailTemplate(templateKey: string): string {
   <h1>Payment Successful!</h1>
   <p>Your payment for {tourName} has been received successfully.</p>
   <p><strong>Amount Paid:</strong> {amount}</p>
-  {isAdvance && pendingBalance ? `<p><strong>Pending Balance:</strong> {pendingBalance}</p>` : ""}
+  {pendingBalance}
   <p><strong>Booking ID:</strong> {bookingIdShort}</p>
   <p>View your booking in your <a href="{bookingUrl}">dashboard</a>.</p>
   <p>Best regards,<br>The {companyName} Team</p>
@@ -234,7 +267,7 @@ export function getDefaultEmailTemplate(templateKey: string): string {
   <h1>Payment Failed</h1>
   <p>Your payment attempt for {tourName} could not be completed.</p>
   <p><strong>Amount:</strong> {amount}</p>
-  {reason ? `<p><strong>Reason:</strong> {reason}</p>` : ""}
+  {reason}
   <p>Please try again from your <a href="{bookingUrl}">booking dashboard</a>. If the issue persists, contact support.</p>
   <p>Best regards,<br>The {companyName} Team</p>
 </div>`,
@@ -250,7 +283,7 @@ export function getDefaultEmailTemplate(templateKey: string): string {
   <h1>Payment Reminder</h1>
   <p>This is a reminder that you have a pending balance for {tourName}.</p>
   <p><strong>Pending Balance:</strong> {pendingBalance}</p>
-  {dueDate ? `<p><strong>Due Date:</strong> {dueDate}</p>` : ""}
+  {dueDate}
   <p><a href="{bookingUrl}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Pay Now</a></p>
   <p>Best regards,<br>The {companyName} Team</p>
 </div>`,
@@ -287,11 +320,7 @@ export function getDefaultEmailTemplate(templateKey: string): string {
       </tr>
     </table>
   </div>
-  {tempPassword ? `<div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 15px; margin: 20px 0;">
-    <h3 style="margin-top: 0; color: #856404;">Your Temporary Password</h3>
-    <p style="font-size: 18px; font-weight: bold; color: #856404; font-family: monospace; letter-spacing: 2px; margin: 10px 0;">{tempPassword}</p>
-    <p style="margin-bottom: 0; color: #856404;"><strong>Please change this password immediately after your first login.</strong></p>
-  </div>` : ""}
+  {tempPasswordSection}
   <p style="margin-top: 30px; text-align: center;">
     <a href="{loginUrl}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block; font-weight: bold;">Log In to Admin Panel</a>
   </p>
@@ -321,10 +350,7 @@ export function getDefaultEmailTemplate(templateKey: string): string {
         <td style="padding: 8px 0;">{createdAt}</td>
       </tr>
     </table>
-    {message ? `<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
-      <strong>Requirement/Message:</strong>
-      <div style="background-color: white; padding: 10px; border-radius: 3px; margin-top: 8px; white-space: pre-wrap;">{message}</div>
-    </div>` : ""}
+    {messageSection}
   </div>
   <p style="margin-top: 20px;">
     <a href="{dashboardUrl}/admin/corporate-leads" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View in Admin Panel</a>
@@ -339,7 +365,7 @@ export function getDefaultEmailTemplate(templateKey: string): string {
   <p>In the meantime, if you have any urgent questions, feel free to contact us directly:</p>
   <ul>
     <li><strong>Email:</strong> <a href="mailto:{supportEmail}">{supportEmail}</a></li>
-    {supportPhone ? `<li><strong>Phone:</strong> <a href="tel:{supportPhone}">{supportPhone}</a></li>` : ""}
+    {supportPhoneSection}
   </ul>
   <p>We look forward to helping your organization with its travel needs!</p>
   <p>Best regards,<br>The {companyName} Corporate Team</p>
