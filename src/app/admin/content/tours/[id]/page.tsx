@@ -215,6 +215,30 @@ const SelectInput = memo(({ value, onChange, children, className = "", required 
 });
 SelectInput.displayName = "SelectInput";
 
+const CheckboxInput = memo(({ checked, onChange, label, className = "" }: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label?: string;
+  className?: string;
+}) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.checked);
+  }, [onChange]);
+
+  return (
+    <label className={`inline-flex items-center gap-2 ${className}`}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={handleChange}
+        className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+      />
+      {label && <span className="text-sm font-medium text-neutral-700">{label}</span>}
+    </label>
+  );
+});
+CheckboxInput.displayName = "CheckboxInput";
+
 type CountryOption = { id: string; name: string };
 
 type DayState = {
@@ -1499,17 +1523,13 @@ export default function AdminTourEditorPage() {
         </label>
 
         <div className="grid md:grid-cols-2 gap-4">
-          <label className="inline-flex items-center gap-2 border border-neutral-200 rounded-lg px-3 py-2">
-            <input
-              type="checkbox"
+          <div className="border border-neutral-200 rounded-lg px-3 py-2">
+            <CheckboxInput
               checked={formData.allowAdvance}
-              onChange={(e) => updateForm("allowAdvance", e.target.checked)}
-              className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+              onChange={(checked) => updateForm("allowAdvance", checked)}
+              label="Allow advance payment"
             />
-            <span className="text-sm font-medium text-neutral-700">
-              Allow advance payment
-            </span>
-          </label>
+          </div>
           {formData.allowAdvance && (
             <label className="flex flex-col">
               <span className="text-sm font-medium text-neutral-700">
@@ -1653,24 +1673,20 @@ export default function AdminTourEditorPage() {
                 </label>
 
                 <div className="flex flex-col gap-2">
-                  <label className="inline-flex items-center gap-2 border border-neutral-200 rounded-lg px-3 py-2">
-                    <input
-                      type="checkbox"
+                  <div className="border border-neutral-200 rounded-lg px-3 py-2">
+                    <CheckboxInput
                       checked={addOn.isRequired}
-                      onChange={(e) => updateAddOn(addOn.uid, "isRequired", e.target.checked)}
-                      className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                      onChange={(checked) => updateAddOn(addOn.uid, "isRequired", checked)}
+                      label="Required"
                     />
-                    <span className="text-sm text-neutral-700">Required</span>
-                  </label>
-                  <label className="inline-flex items-center gap-2 border border-neutral-200 rounded-lg px-3 py-2">
-                    <input
-                      type="checkbox"
+                  </div>
+                  <div className="border border-neutral-200 rounded-lg px-3 py-2">
+                    <CheckboxInput
                       checked={addOn.isActive}
-                      onChange={(e) => updateAddOn(addOn.uid, "isActive", e.target.checked)}
-                      className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                      onChange={(checked) => updateAddOn(addOn.uid, "isActive", checked)}
+                      label="Active"
                     />
-                    <span className="text-sm text-neutral-700">Active</span>
-                  </label>
+                  </div>
                 </div>
               </div>
             </div>
