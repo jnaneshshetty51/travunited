@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Plus, Edit, Search, Filter, Star, RefreshCw, CheckSquare, Square, ChevronDown, Upload, Globe, Package, Tag, Eye, Trash2, Download, ArrowUpDown, X, CheckCircle, AlertCircle, FileText } from "lucide-react";
+import { Plus, Search, Filter, Star, RefreshCw, Upload, Globe, Tag, Eye, Trash2, Download, ArrowUpDown, X, CheckCircle, AlertCircle, FileText } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { ImportModal } from "@/components/admin/ImportModal";
 import { formatDate } from "@/lib/dateFormat";
