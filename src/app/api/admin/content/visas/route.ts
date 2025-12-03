@@ -167,6 +167,16 @@ export async function POST(req: Request) {
       faqs = [],
     } = body;
 
+    // Provide default values for required fields to prevent DB errors
+    const safeName = name || "Untitled Visa";
+    const safeCategory = category || "Tourist";
+    const safePriceInInr = priceInInr || 0;
+    const safeProcessingTime = processingTime || "Not specified";
+    const safeStayDuration = stayDuration || "Not specified";
+    const safeValidity = validity || "Not specified";
+    const safeOverview = overview || "No overview provided.";
+    const safeEligibility = eligibility || "No eligibility criteria provided.";
+
     // if (
     //   !countryId ||
     //   !name ||
@@ -185,7 +195,7 @@ export async function POST(req: Request) {
     // }
 
     const resolvedSlug = await ensureUniqueSlug(
-      slug?.trim() || slugify(name)
+      slug?.trim() || slugify(safeName)
     );
 
     let parsedVisaMode: VisaMode | null = null;
@@ -208,23 +218,23 @@ export async function POST(req: Request) {
     const visa = await prisma.visa.create({
       data: {
         countryId,
-        name,
+        name: safeName,
         slug: resolvedSlug,
         subtitle: subtitle || null,
-        category,
+        category: safeCategory,
         isActive: isActive ?? true,
         isFeatured: isFeatured ?? false,
-        priceInInr: Number(priceInInr),
-        processingTime,
-        stayDuration,
-        validity,
+        priceInInr: Number(safePriceInInr),
+        processingTime: safeProcessingTime,
+        stayDuration: safeStayDuration,
+        validity: safeValidity,
         entryTypeLegacy: entryType || null,
         visaMode: parsedVisaMode,
         entryType: parsedEntryType,
         stayType: parsedStayType,
         visaSubTypeLabel: visaSubTypeLabel || null,
-        overview,
-        eligibility,
+        overview: safeOverview,
+        eligibility: safeEligibility,
         importantNotes: importantNotes || null,
         rejectionReasons: rejectionReasons || null,
         whyTravunited: whyTravunited || null,
