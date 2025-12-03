@@ -49,6 +49,7 @@ export default function TeamPage() {
   const router = useRouter();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [search, setSearch] = useState("");
   const [isActiveFilter, setIsActiveFilter] = useState<string | null>(null);
   const [isFeaturedFilter, setIsFeaturedFilter] = useState<string | null>(null);
@@ -85,6 +86,7 @@ export default function TeamPage() {
       console.error("Error fetching team members:", error);
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
   }, [page, search, isActiveFilter, isFeaturedFilter]);
 
@@ -151,7 +153,7 @@ export default function TeamPage() {
     }
   };
 
-  if (status === "loading" || loading) {
+  if (status === "loading" || initialLoad) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center h-64">
@@ -258,7 +260,12 @@ export default function TeamPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden">
+        <div className="bg-white rounded-lg border border-neutral-200 overflow-hidden relative">
+          {loading && (
+            <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center backdrop-blur-sm">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-neutral-50 border-b border-neutral-200">
@@ -334,11 +341,10 @@ export default function TeamPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          member.isActive
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${member.isActive
                             ? "bg-green-100 text-green-800"
                             : "bg-red-100 text-red-800"
-                        }`}
+                          }`}
                       >
                         {member.isActive ? "Active" : "Inactive"}
                       </span>

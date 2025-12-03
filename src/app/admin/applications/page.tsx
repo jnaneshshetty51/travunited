@@ -26,6 +26,7 @@ function AdminApplicationsPageContent() {
   const searchParams = useSearchParams();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
@@ -73,6 +74,7 @@ function AdminApplicationsPageContent() {
       console.error("Error fetching applications:", error);
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
   }, [
     statusFilter,
@@ -336,7 +338,7 @@ function AdminApplicationsPageContent() {
       maximumFractionDigits: 0,
     }).format(amount);
 
-  if (loading) {
+  if (initialLoad) {
     return (
       <AdminLayout>
         <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
@@ -447,9 +449,8 @@ function AdminApplicationsPageContent() {
               <button
                 key={chip.label}
                 onClick={chip.action}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  chip.active ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                }`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${chip.active ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                  }`}
               >
                 {chip.label}
               </button>
@@ -560,11 +561,10 @@ function AdminApplicationsPageContent() {
         {/* Bulk Action Messages */}
         {bulkActionMessage && (
           <div
-            className={`mb-6 rounded-lg p-4 flex items-center space-x-2 ${
-              bulkActionMessage.type === "success"
+            className={`mb-6 rounded-lg p-4 flex items-center space-x-2 ${bulkActionMessage.type === "success"
                 ? "bg-green-50 border border-green-200 text-green-700"
                 : "bg-red-50 border border-red-200 text-red-700"
-            }`}
+              }`}
           >
             {bulkActionMessage.type === "success" ? (
               <CheckCircle size={20} className="flex-shrink-0" />
@@ -662,7 +662,12 @@ function AdminApplicationsPageContent() {
 
         {/* Applications Table */}
         {sortedApplications.length > 0 ? (
-          <div className="bg-white rounded-lg shadow-medium border border-neutral-200 overflow-hidden">
+          <div className="bg-white rounded-lg shadow-medium border border-neutral-200 overflow-hidden relative">
+            {loading && (
+              <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center backdrop-blur-sm">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+              </div>
+            )}
             <div className="flex flex-col gap-3 px-6 pt-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="text-sm text-neutral-500">
@@ -677,11 +682,10 @@ function AdminApplicationsPageContent() {
                     <button
                       key={option.field}
                       onClick={() => handleSortChange(option.field)}
-                      className={`inline-flex items-center gap-1 rounded-full border px-4 py-1.5 text-sm transition-colors ${
-                        sortField === option.field
+                      className={`inline-flex items-center gap-1 rounded-full border px-4 py-1.5 text-sm transition-colors ${sortField === option.field
                           ? "border-neutral-900 bg-neutral-900 text-white"
                           : "border-neutral-200 text-neutral-600 hover:border-neutral-400"
-                      }`}
+                        }`}
                     >
                       <ArrowUpDown size={14} />
                       {option.label}
@@ -734,8 +738,8 @@ function AdminApplicationsPageContent() {
                 </thead>
                 <tbody className="bg-white divide-y divide-neutral-200">
                   {sortedApplications.map((app) => (
-                    <tr 
-                      key={app.id} 
+                    <tr
+                      key={app.id}
                       className="hover:bg-neutral-50 cursor-pointer"
                       onClick={(e) => {
                         // Don't navigate if clicking on checkbox or button

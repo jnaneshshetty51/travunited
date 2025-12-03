@@ -41,6 +41,7 @@ function AdminBookingsPageContent() {
   const searchParams = useSearchParams();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
@@ -90,6 +91,7 @@ function AdminBookingsPageContent() {
       console.error("Error fetching bookings:", error);
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
   }, [statusFilter, tourFilter, assignedFilter, assignedAdminFilter, dateFrom, dateTo, travelDateFrom, travelDateTo, paymentStatusFilter, destinationFilter, searchQuery, searchParamsKey]);
 
@@ -302,7 +304,7 @@ function AdminBookingsPageContent() {
     return colors[status] || "bg-neutral-200 text-neutral-700";
   };
 
-  if (loading) {
+  if (initialLoad) {
     return (
       <AdminLayout>
         <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
@@ -349,13 +351,13 @@ function AdminBookingsPageContent() {
                   className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
                 >
                   <option value="ALL">All Statuses</option>
-                <option value="DRAFT">Draft</option>
-                <option value="REQUEST_RECEIVED">Request Received</option>
-                <option value="PAYMENT_PENDING">Payment Pending</option>
-                <option value="BOOKED">Booked</option>
-                <option value="CONFIRMED">Confirmed</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
+                  <option value="DRAFT">Draft</option>
+                  <option value="REQUEST_RECEIVED">Request Received</option>
+                  <option value="PAYMENT_PENDING">Payment Pending</option>
+                  <option value="BOOKED">Booked</option>
+                  <option value="CONFIRMED">Confirmed</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="CANCELLED">Cancelled</option>
                 </select>
               </div>
               <div>
@@ -487,11 +489,10 @@ function AdminBookingsPageContent() {
               </button>
             </div>
             {bulkActionMessage && (
-              <div className={`mb-3 p-2 rounded text-sm ${
-                bulkActionMessage.type === "success" 
-                  ? "bg-green-100 text-green-700" 
+              <div className={`mb-3 p-2 rounded text-sm ${bulkActionMessage.type === "success"
+                  ? "bg-green-100 text-green-700"
                   : "bg-red-100 text-red-700"
-              }`}>
+                }`}>
                 {bulkActionMessage.text}
               </div>
             )}
@@ -514,52 +515,57 @@ function AdminBookingsPageContent() {
                   </option>
                 ))}
               </select>
-                <select
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      handleBulkAction("status", e.target.value);
-                      e.target.value = "";
-                    }
-                  }}
-                  className="px-3 py-1 border border-neutral-300 rounded text-sm"
-                  disabled={bulkActionLoading}
-                >
-                  <option value="">Bulk Status Change...</option>
-                  <option value="CONFIRMED">Mark as Confirmed</option>
-                  <option value="COMPLETED">Mark as Completed</option>
-                  <option value="CANCELLED">Mark as Cancelled</option>
-                </select>
-                <button
-                  onClick={() => handleBulkAction("resend")}
-                  disabled={bulkActionLoading}
-                  className="px-3 py-1 bg-neutral-100 text-neutral-700 rounded text-sm hover:bg-neutral-200 disabled:opacity-50 flex items-center space-x-1"
-                >
-                  <Mail size={14} />
-                  <span>Resend Email</span>
-                </button>
-                <button
-                  onClick={() => handleBulkAction("export")}
-                  disabled={bulkActionLoading}
-                  className="px-3 py-1 bg-neutral-100 text-neutral-700 rounded text-sm hover:bg-neutral-200 disabled:opacity-50 flex items-center space-x-1"
-                >
-                  <Download size={14} />
-                  <span>Export CSV</span>
-                </button>
-                <button
-                  onClick={() => handleBulkAction("delete")}
-                  disabled={bulkActionLoading}
-                  className="px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200 disabled:opacity-50 flex items-center space-x-1"
-                >
-                  <Trash2 size={14} />
-                  <span>Delete</span>
-                </button>
-              </div>
+              <select
+                onChange={(e) => {
+                  if (e.target.value) {
+                    handleBulkAction("status", e.target.value);
+                    e.target.value = "";
+                  }
+                }}
+                className="px-3 py-1 border border-neutral-300 rounded text-sm"
+                disabled={bulkActionLoading}
+              >
+                <option value="">Bulk Status Change...</option>
+                <option value="CONFIRMED">Mark as Confirmed</option>
+                <option value="COMPLETED">Mark as Completed</option>
+                <option value="CANCELLED">Mark as Cancelled</option>
+              </select>
+              <button
+                onClick={() => handleBulkAction("resend")}
+                disabled={bulkActionLoading}
+                className="px-3 py-1 bg-neutral-100 text-neutral-700 rounded text-sm hover:bg-neutral-200 disabled:opacity-50 flex items-center space-x-1"
+              >
+                <Mail size={14} />
+                <span>Resend Email</span>
+              </button>
+              <button
+                onClick={() => handleBulkAction("export")}
+                disabled={bulkActionLoading}
+                className="px-3 py-1 bg-neutral-100 text-neutral-700 rounded text-sm hover:bg-neutral-200 disabled:opacity-50 flex items-center space-x-1"
+              >
+                <Download size={14} />
+                <span>Export CSV</span>
+              </button>
+              <button
+                onClick={() => handleBulkAction("delete")}
+                disabled={bulkActionLoading}
+                className="px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200 disabled:opacity-50 flex items-center space-x-1"
+              >
+                <Trash2 size={14} />
+                <span>Delete</span>
+              </button>
+            </div>
           </div>
         )}
 
         {/* Bookings Table */}
         {bookings.length > 0 ? (
-          <div className="bg-white rounded-lg shadow-medium border border-neutral-200 overflow-hidden">
+          <div className="bg-white rounded-lg shadow-medium border border-neutral-200 overflow-hidden relative">
+            {loading && (
+              <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center backdrop-blur-sm">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-neutral-200">
                 <thead className="bg-neutral-50">
@@ -615,8 +621,8 @@ function AdminBookingsPageContent() {
                 </thead>
                 <tbody className="bg-white divide-y divide-neutral-200">
                   {bookings.map((booking) => (
-                    <tr 
-                      key={booking.id} 
+                    <tr
+                      key={booking.id}
                       className="hover:bg-neutral-50 cursor-pointer"
                       onClick={(e) => {
                         // Don't navigate if clicking on checkbox or button
@@ -677,13 +683,12 @@ function AdminBookingsPageContent() {
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          booking.paymentStatus === "PAID" ? "bg-green-100 text-green-700" :
-                          booking.paymentStatus === "PARTIAL" ? "bg-yellow-100 text-yellow-700" :
-                          booking.paymentStatus === "FAILED" ? "bg-red-100 text-red-700" :
-                          booking.paymentStatus === "REFUNDED" ? "bg-purple-100 text-purple-700" :
-                          "bg-neutral-100 text-neutral-700"
-                        }`}>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${booking.paymentStatus === "PAID" ? "bg-green-100 text-green-700" :
+                            booking.paymentStatus === "PARTIAL" ? "bg-yellow-100 text-yellow-700" :
+                              booking.paymentStatus === "FAILED" ? "bg-red-100 text-red-700" :
+                                booking.paymentStatus === "REFUNDED" ? "bg-purple-100 text-purple-700" :
+                                  "bg-neutral-100 text-neutral-700"
+                          }`}>
                           {booking.paymentStatus || "UNPAID"}
                         </span>
                       </td>

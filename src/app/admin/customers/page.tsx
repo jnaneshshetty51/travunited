@@ -28,6 +28,7 @@ export default function AdminCustomersPage() {
   const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -47,6 +48,7 @@ export default function AdminCustomersPage() {
       console.error("Error fetching customers:", error);
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
   }, [statusFilter, searchQuery]);
 
@@ -88,7 +90,7 @@ export default function AdminCustomersPage() {
     }
   };
 
-  if (loading) {
+  if (initialLoad) {
     return (
       <AdminLayout>
         <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
@@ -142,7 +144,12 @@ export default function AdminCustomersPage() {
 
         {/* Customers Table */}
         {customers.length > 0 ? (
-          <div className="bg-white rounded-lg shadow-medium border border-neutral-200 overflow-hidden">
+          <div className="bg-white rounded-lg shadow-medium border border-neutral-200 overflow-hidden relative">
+            {loading && (
+              <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center backdrop-blur-sm">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-neutral-200">
                 <thead className="bg-neutral-50">
@@ -207,11 +214,10 @@ export default function AdminCustomersPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          customer.isActive
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${customer.isActive
                             ? "bg-green-100 text-green-700"
                             : "bg-red-100 text-red-700"
-                        }`}>
+                          }`}>
                           {customer.isActive ? "Active" : "Disabled"}
                         </span>
                       </td>
@@ -219,11 +225,10 @@ export default function AdminCustomersPage() {
                         <div className="flex items-center justify-end space-x-2">
                           <button
                             onClick={() => handleToggleStatus(customer.id, customer.isActive)}
-                            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                              customer.isActive
+                            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${customer.isActive
                                 ? "bg-red-100 text-red-700 hover:bg-red-200"
                                 : "bg-green-100 text-green-700 hover:bg-green-200"
-                            }`}
+                              }`}
                           >
                             {customer.isActive ? "Disable" : "Enable"}
                           </button>

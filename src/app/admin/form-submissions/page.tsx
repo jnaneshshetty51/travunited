@@ -23,6 +23,7 @@ function AdminFormSubmissionsPageContent() {
   const router = useRouter();
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [formTypeFilter, setFormTypeFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -42,6 +43,7 @@ function AdminFormSubmissionsPageContent() {
       console.error("Error fetching form submissions:", error);
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
   }, [formTypeFilter, searchQuery]);
 
@@ -95,7 +97,7 @@ function AdminFormSubmissionsPageContent() {
     return { total, contact, help, support, today };
   }, [submissions]);
 
-  if (loading) {
+  if (initialLoad) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center h-64">
@@ -278,7 +280,12 @@ function AdminFormSubmissionsPageContent() {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 relative">
+            {loading && (
+              <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center backdrop-blur-sm rounded-xl">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+              </div>
+            )}
             {submissions.map((submission, index) => {
               const FormIcon = getFormTypeIcon(submission.formType);
               return (
