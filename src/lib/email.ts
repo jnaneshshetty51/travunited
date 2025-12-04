@@ -7,6 +7,7 @@ import {
   getTourAdminEmail,
 } from "./admin-contacts";
 import { replaceTemplateVariables, getDefaultEmailTemplate, EmailTemplateVariables } from "./email-templates";
+import { sendMailSMTP, verifySmtpConnection } from "./email-smtp";
 
 export interface EmailOptions {
   to: string | string[];
@@ -101,6 +102,17 @@ async function getSESClient(
   return cachedSESClient;
 }
 
+// Helper function to determine sender email
+function determineSenderEmail(config: EmailConfig, category?: EmailCategory): string {
+  if (category === "visa") {
+    return config.emailFromVisa || config.emailFromGeneral || process.env.EMAIL_FROM || process.env.EMAIL_FROM_VISA || "";
+  }
+  if (category === "tours") {
+    return config.emailFromTours || config.emailFromGeneral || process.env.EMAIL_FROM || process.env.EMAIL_FROM_TOURS || "";
+  }
+  return config.emailFromGeneral || process.env.EMAIL_FROM || process.env.EMAIL_FROM_GENERAL || "";
+}
+
 export async function refreshEmailConfigCache() {
   emailConfigCache = null;
   emailTemplatesCache = null;
@@ -189,6 +201,47 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   const startTime = Date.now();
   lastEmailError = null;
   
+  // Check if SMTP is preferred and available
+  const emailProvider = process.env.EMAIL_PROVIDER || "smtp";
+  const hasSmtpCredentials = !!(process.env.SES_SMTP_USER && process.env.SES_SMTP_PASS);
+  
+  // Try SMTP first if configured
+  if (emailProvider === "smtp" && hasSmtpCredentials) {
+    try {
+      console.log("[Email] Using SMTP provider for email sending");
+      
+      const config = await loadEmailConfig();
+      const from = determineSenderEmail(config, options.category);
+      
+      // Convert recipients to array
+      const recipients = Array.isArray(options.to) ? options.to : [options.to];
+      
+      // Send via SMTP
+      await sendMailSMTP({
+        to: recipients,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+        from,
+        replyTo: options.replyTo,
+      });
+      
+      const duration = Date.now() - startTime;
+      console.log(`[Email] SMTP email sent successfully in ${duration}ms`, {
+        to: recipients.join(", "),
+        subject: options.subject,
+      });
+      
+      return true;
+    } catch (smtpError) {
+      console.error("[Email] SMTP send failed, will try AWS SDK fallback:", smtpError);
+      // Continue to AWS SDK fallback below
+    }
+  }
+  
+  // AWS SDK fallback (original implementation)
+  console.log("[Email] Using AWS SDK provider for email sending");
+  
   // Load config with timeout to prevent delays
   let config: EmailConfig;
   try {
@@ -209,17 +262,14 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   
   // Check if AWS credentials are configured
   if (!config.awsAccessKeyId || !config.awsSecretAccessKey || !config.awsRegion) {
-    const message = "AWS SES credentials not configured. Set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION in environment variables or admin email settings.";
+    const message = "Email credentials not configured. Set SMTP credentials (SES_SMTP_USER, SES_SMTP_PASS) or AWS credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION) in environment variables.";
     lastEmailError = message;
     console.error("[Email]", message, {
+      hasSmtpUser: !!process.env.SES_SMTP_USER,
+      hasSmtpPass: !!process.env.SES_SMTP_PASS,
       hasAccessKeyId: !!config.awsAccessKeyId,
       hasSecretAccessKey: !!config.awsSecretAccessKey,
       hasRegion: !!config.awsRegion,
-      hasEnvVars: {
-        AWS_ACCESS_KEY_ID: !!process.env.AWS_ACCESS_KEY_ID,
-        AWS_SECRET_ACCESS_KEY: !!process.env.AWS_SECRET_ACCESS_KEY,
-        AWS_REGION: !!process.env.AWS_REGION,
-      },
     });
     return false;
   }
@@ -241,21 +291,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     return false;
   }
 
-  const determineFromAddress = (category?: EmailCategory) => {
-    if (category === "visa") {
-      return config.emailFromVisa || config.emailFromGeneral;
-    }
-    if (category === "tours") {
-      return config.emailFromTours || config.emailFromGeneral;
-    }
-    return config.emailFromGeneral;
-  };
-
-  const from =
-    determineFromAddress(options.category) || 
-    process.env.EMAIL_FROM || 
-    config.emailFromGeneral || 
-    "";
+  const from = determineSenderEmail(config, options.category);
 
   if (!from) {
     const message = "Sender email not configured. Set EMAIL_FROM in environment variables or configure sender addresses in admin settings.";
