@@ -189,59 +189,8 @@ export default function EmailTemplatesPage() {
     emailCorporateLeadConfirmation: "",
   });
 
-  const fetchTemplates = useCallback(async () => {
-    try {
-      const response = await fetch("/api/admin/settings/general");
-      if (!response.ok) throw new Error("Failed to fetch templates");
-      const data = await response.json();
-      
-      setTemplates({
-        emailWelcome: data.emailWelcome || "",
-        emailPasswordReset: data.emailPasswordReset || "",
-        emailPasswordResetOTP: data.emailPasswordResetOTP || "",
-        emailVerification: data.emailVerification || "",
-        emailVisaPaymentSuccess: data.emailVisaPaymentSuccess || "",
-        emailVisaPaymentFailed: data.emailVisaPaymentFailed || "",
-        emailVisaStatusUpdate: data.emailVisaStatusUpdate || "",
-        emailVisaDocumentRejected: data.emailVisaDocumentRejected || "",
-        emailVisaApproved: data.emailVisaApproved || "",
-        emailVisaRejected: data.emailVisaRejected || "",
-        emailTourPaymentSuccess: data.emailTourPaymentSuccess || "",
-        emailTourPaymentFailed: data.emailTourPaymentFailed || "",
-        emailTourConfirmed: data.emailTourConfirmed || "",
-        emailTourPaymentReminder: data.emailTourPaymentReminder || "",
-        emailTourStatusUpdate: data.emailTourStatusUpdate || "",
-        emailTourVouchersReady: data.emailTourVouchersReady || "",
-        emailAdminWelcome: data.emailAdminWelcome || "",
-        emailCorporateLeadAdmin: data.emailCorporateLeadAdmin || "",
-        emailCorporateLeadConfirmation: data.emailCorporateLeadConfirmation || "",
-      });
-    } catch (error) {
-      console.error("Error fetching templates:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (status === "loading") return;
-    if (!session?.user) {
-      router.push("/login");
-      return;
-    }
-    if (session.user.role !== "STAFF_ADMIN" && session.user.role !== "SUPER_ADMIN") {
-      router.push("/admin");
-      return;
-    }
-    fetchTemplates();
-  }, [status, session, router, fetchTemplates]);
-
-  const updateTemplate = useCallback((key: keyof EmailTemplates, value: string) => {
-    setTemplates((prev) => ({ ...prev, [key]: value }));
-  }, []);
-
-  const resetToDefault = useCallback((key: keyof EmailTemplates) => {
-    // Map database key to template key
+  // Helper function to map database key to template key
+  const getTemplateKey = useCallback((dbKey: keyof EmailTemplates): string => {
     const keyMap: Record<string, string> = {
       emailWelcome: "welcomeEmail",
       emailPasswordReset: "passwordResetEmail",
@@ -263,10 +212,75 @@ export default function EmailTemplatesPage() {
       emailCorporateLeadAdmin: "corporateLeadAdminEmail",
       emailCorporateLeadConfirmation: "corporateLeadConfirmationEmail",
     };
-    const templateKey = keyMap[key] || key;
+    return keyMap[dbKey] || dbKey;
+  }, []);
+
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const response = await fetch("/api/admin/settings/general");
+      if (!response.ok) throw new Error("Failed to fetch templates");
+      const data = await response.json();
+      
+      // Helper to get template value or default
+      const getTemplateValue = (dbKey: keyof EmailTemplates, dbValue: string): string => {
+        if (dbValue && dbValue.trim()) {
+          return dbValue; // Use custom template if exists
+        }
+        // Return default template for editing
+        const templateKey = getTemplateKey(dbKey);
+        return getDefaultEmailTemplate(templateKey);
+      };
+      
+      setTemplates({
+        emailWelcome: getTemplateValue("emailWelcome", data.emailWelcome || ""),
+        emailPasswordReset: getTemplateValue("emailPasswordReset", data.emailPasswordReset || ""),
+        emailPasswordResetOTP: getTemplateValue("emailPasswordResetOTP", data.emailPasswordResetOTP || ""),
+        emailVerification: getTemplateValue("emailVerification", data.emailVerification || ""),
+        emailVisaPaymentSuccess: getTemplateValue("emailVisaPaymentSuccess", data.emailVisaPaymentSuccess || ""),
+        emailVisaPaymentFailed: getTemplateValue("emailVisaPaymentFailed", data.emailVisaPaymentFailed || ""),
+        emailVisaStatusUpdate: getTemplateValue("emailVisaStatusUpdate", data.emailVisaStatusUpdate || ""),
+        emailVisaDocumentRejected: getTemplateValue("emailVisaDocumentRejected", data.emailVisaDocumentRejected || ""),
+        emailVisaApproved: getTemplateValue("emailVisaApproved", data.emailVisaApproved || ""),
+        emailVisaRejected: getTemplateValue("emailVisaRejected", data.emailVisaRejected || ""),
+        emailTourPaymentSuccess: getTemplateValue("emailTourPaymentSuccess", data.emailTourPaymentSuccess || ""),
+        emailTourPaymentFailed: getTemplateValue("emailTourPaymentFailed", data.emailTourPaymentFailed || ""),
+        emailTourConfirmed: getTemplateValue("emailTourConfirmed", data.emailTourConfirmed || ""),
+        emailTourPaymentReminder: getTemplateValue("emailTourPaymentReminder", data.emailTourPaymentReminder || ""),
+        emailTourStatusUpdate: getTemplateValue("emailTourStatusUpdate", data.emailTourStatusUpdate || ""),
+        emailTourVouchersReady: getTemplateValue("emailTourVouchersReady", data.emailTourVouchersReady || ""),
+        emailAdminWelcome: getTemplateValue("emailAdminWelcome", data.emailAdminWelcome || ""),
+        emailCorporateLeadAdmin: getTemplateValue("emailCorporateLeadAdmin", data.emailCorporateLeadAdmin || ""),
+        emailCorporateLeadConfirmation: getTemplateValue("emailCorporateLeadConfirmation", data.emailCorporateLeadConfirmation || ""),
+      });
+    } catch (error) {
+      console.error("Error fetching templates:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [getTemplateKey]);
+
+  useEffect(() => {
+    if (status === "loading") return;
+    if (!session?.user) {
+      router.push("/login");
+      return;
+    }
+    if (session.user.role !== "STAFF_ADMIN" && session.user.role !== "SUPER_ADMIN") {
+      router.push("/admin");
+      return;
+    }
+    fetchTemplates();
+  }, [status, session, router, fetchTemplates]);
+
+  const updateTemplate = useCallback((key: keyof EmailTemplates, value: string) => {
+    setTemplates((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
+  const resetToDefault = useCallback((key: keyof EmailTemplates) => {
+    const templateKey = getTemplateKey(key);
     const defaultTemplate = getDefaultEmailTemplate(templateKey);
     updateTemplate(key, defaultTemplate);
-  }, [updateTemplate]);
+  }, [updateTemplate, getTemplateKey]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -455,49 +469,23 @@ export default function EmailTemplatesPage() {
                       <div
                         className="prose max-w-none"
                         dangerouslySetInnerHTML={{
-                          __html: templates[selectedTemplate] || (() => {
-                            // Map database key to template key
-                            const keyMap: Record<string, string> = {
-                              emailWelcome: "welcomeEmail",
-                              emailPasswordReset: "passwordResetEmail",
-                              emailPasswordResetOTP: "passwordResetOTPEmail",
-                              emailVerification: "emailVerificationEmail",
-                              emailVisaPaymentSuccess: "visaPaymentSuccessEmail",
-                              emailVisaPaymentFailed: "visaPaymentFailedEmail",
-                              emailVisaStatusUpdate: "visaStatusUpdateEmail",
-                              emailVisaDocumentRejected: "visaDocumentRejectedEmail",
-                              emailVisaApproved: "visaApprovedEmail",
-                              emailVisaRejected: "visaRejectedEmail",
-                              emailTourPaymentSuccess: "tourPaymentSuccessEmail",
-                              emailTourPaymentFailed: "tourPaymentFailedEmail",
-                              emailTourConfirmed: "tourConfirmedEmail",
-                              emailTourPaymentReminder: "tourPaymentReminderEmail",
-                              emailTourStatusUpdate: "tourStatusUpdateEmail",
-                              emailTourVouchersReady: "tourVouchersReadyEmail",
-                              emailAdminWelcome: "adminWelcomeEmail",
-                              emailCorporateLeadAdmin: "corporateLeadAdminEmail",
-                              emailCorporateLeadConfirmation: "corporateLeadConfirmationEmail",
-                            };
-                            return getDefaultEmailTemplate(keyMap[selectedTemplate] || selectedTemplate);
-                          })(),
+                          __html: templates[selectedTemplate] || getDefaultEmailTemplate(getTemplateKey(selectedTemplate)),
                         }}
                       />
                     </div>
                   ) : (
                     <TextareaInput
-                      value={templates[selectedTemplate] || ""}
+                      value={templates[selectedTemplate] || getDefaultEmailTemplate(getTemplateKey(selectedTemplate))}
                       onChange={(value) => updateTemplate(selectedTemplate, value)}
                       rows={20}
-                      placeholder={`Leave empty to use default template...\n\nAvailable variables: ${TEMPLATE_METADATA[selectedTemplate].variables.map((v) => `{${v}}`).join(", ")}`}
+                      placeholder={`Edit the template HTML...\n\nAvailable variables: ${TEMPLATE_METADATA[selectedTemplate].variables.map((v) => `{${v}}`).join(", ")}`}
                       className="w-full px-4 py-2 font-mono text-sm border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     />
                   )}
 
-                  {!templates[selectedTemplate] && (
-                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
-                      <strong>Note:</strong> This template is using the default. Enter custom HTML above to override it.
-                    </div>
-                  )}
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+                    <strong>Note:</strong> This is the default template. You can edit it above and save to customize it. The template will use your custom version once saved.
+                  </div>
                 </div>
               ) : (
                 <div className="bg-white rounded-lg shadow-medium border border-neutral-200 p-12 text-center">
