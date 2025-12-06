@@ -118,20 +118,24 @@ async function handleBounce(notification: SESBounceNotification): Promise<void> 
       timestamp: bounce.timestamp,
     });
 
-    // If it's a permanent bounce, you might want to mark the email as invalid
+    // If it's a permanent bounce, mark the email as invalid and prevent future emails
     if (bounce.bounceType === "Permanent") {
-      console.log(`[SES] Permanent bounce detected for ${email} - consider blocking future emails`);
+      console.log(`[SES] Permanent bounce detected for ${email} - blocking future emails`);
       
-      // TODO: Add your logic here to:
-      // 1. Mark user email as bounced in database
-      // 2. Create notification for admin
-      // 3. Update user record to prevent future emails
-      
-      // Example:
-      // await prisma.user.updateMany({
-      //   where: { email },
-      //   data: { emailBounced: true, emailBouncedAt: new Date() }
-      // });
+      try {
+        // Update user record to prevent future emails
+        await prisma.user.updateMany({
+          where: { email: email.toLowerCase() },
+          data: { 
+            isActive: false, // Deactivate account to prevent emails
+          }
+        });
+        
+        // Log to audit trail
+        console.log(`[SES] User ${email} deactivated due to permanent bounce`);
+      } catch (error) {
+        console.error(`[SES] Failed to update user for bounce:`, error);
+      }
     }
   }
 }
@@ -155,22 +159,27 @@ async function handleComplaint(notification: SESComplaintNotification): Promise<
       timestamp: complaint.timestamp,
     });
 
-    console.log(`[SES] Complaint from ${email} - should unsubscribe immediately`);
+    console.log(`[SES] Complaint from ${email} - unsubscribing immediately`);
     
-    // TODO: Add your logic here to:
-    // 1. Mark user as complained/unsubscribed
-    // 2. Create notification for admin
-    // 3. Stop all future emails to this address
-    
-    // Example:
-    // await prisma.user.updateMany({
-    //   where: { email },
-    //   data: { 
-    //     emailComplaint: true, 
-    //     emailComplaintAt: new Date(),
-    //     unsubscribed: true 
-    //   }
-    // });
+    try {
+      // Immediately deactivate user to stop all future emails
+      await prisma.user.updateMany({
+        where: { email: email.toLowerCase() },
+        data: { 
+          isActive: false, // Deactivate to prevent all future emails
+        }
+      });
+      
+      // Log to audit trail
+      console.log(`[SES] User ${email} deactivated due to spam complaint`);
+      
+      // Note: In a production system, you might want to:
+      // 1. Create an admin notification
+      // 2. Add to suppression list
+      // 3. Log to separate complaints table
+    } catch (error) {
+      console.error(`[SES] Failed to update user for complaint:`, error);
+    }
   }
 }
 

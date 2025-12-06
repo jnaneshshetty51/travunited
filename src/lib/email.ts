@@ -201,6 +201,43 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   const startTime = Date.now();
   lastEmailError = null;
   
+  // Convert recipients to array for processing
+  const recipients = Array.isArray(options.to) ? options.to : [options.to];
+  
+  // Check if any recipients are inactive (bounced/complained emails)
+  // Skip sending to inactive users to prevent bounces
+  const activeRecipients: string[] = [];
+  for (const recipient of recipients) {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: recipient.toLowerCase() },
+        select: { isActive: true },
+      });
+      
+      // Only send to active users (inactive users may have bounced/complained)
+      if (!user || user.isActive) {
+        activeRecipients.push(recipient);
+      } else {
+        console.log(`[Email] Skipping inactive user: ${recipient}`);
+      }
+    } catch (error) {
+      // If user lookup fails, still try to send (might be external email)
+      activeRecipients.push(recipient);
+    }
+  }
+  
+  // If no active recipients, skip sending
+  if (activeRecipients.length === 0) {
+    console.log(`[Email] No active recipients, skipping email send`);
+    return false;
+  }
+  
+  // Update options with active recipients only
+  const finalOptions = {
+    ...options,
+    to: activeRecipients.length === 1 ? activeRecipients[0] : activeRecipients,
+  };
+  
   // Check if SMTP is preferred and available
   const emailProvider = process.env.EMAIL_PROVIDER || "smtp";
   const hasSmtpCredentials = !!(process.env.SES_SMTP_USER && process.env.SES_SMTP_PASS);
@@ -211,25 +248,22 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       console.log("[Email] Using SMTP provider for email sending");
       
       const config = await loadEmailConfig();
-      const from = determineSenderEmail(config, options.category);
-      
-      // Convert recipients to array
-      const recipients = Array.isArray(options.to) ? options.to : [options.to];
+      const from = determineSenderEmail(config, finalOptions.category);
       
       // Send via SMTP
       await sendMailSMTP({
-        to: recipients,
-        subject: options.subject,
-        html: options.html,
-        text: options.text,
+        to: activeRecipients,
+        subject: finalOptions.subject,
+        html: finalOptions.html,
+        text: finalOptions.text,
         from,
-        replyTo: options.replyTo,
+        replyTo: finalOptions.replyTo,
       });
       
       const duration = Date.now() - startTime;
       console.log(`[Email] SMTP email sent successfully in ${duration}ms`, {
-        to: recipients.join(", "),
-        subject: options.subject,
+        to: activeRecipients.join(", "),
+        subject: finalOptions.subject,
       });
       
       return true;
@@ -291,7 +325,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     return false;
   }
 
-  const from = determineSenderEmail(config, options.category);
+  const from = determineSenderEmail(config, finalOptions.category);
 
   if (!from) {
     const message = "Sender email not configured. Set EMAIL_FROM in environment variables or configure sender addresses in admin settings.";
@@ -307,42 +341,39 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   }
   
   console.log("[Email] Sending email", {
-    to: Array.isArray(options.to) ? options.to.join(", ") : options.to,
+    to: activeRecipients.join(", "),
     from,
-    subject: options.subject,
-    category: options.category || "general",
+    subject: finalOptions.subject,
+    category: finalOptions.category || "general",
     hasCredentials: !!(config.awsAccessKeyId && config.awsSecretAccessKey),
     region: config.awsRegion,
   });
 
   try {
-    // Convert recipients to array if needed
-    const recipients = Array.isArray(options.to) ? options.to : [options.to];
-    
     // Prepare email parameters for AWS SES
     const emailParams = {
       Source: from,
       Destination: {
-        ToAddresses: recipients,
+        ToAddresses: activeRecipients,
       },
       Message: {
         Subject: {
-          Data: options.subject,
+          Data: finalOptions.subject,
           Charset: "UTF-8",
         },
         Body: {
           Html: {
-            Data: options.html,
+            Data: finalOptions.html,
             Charset: "UTF-8",
           },
           Text: {
-            Data: options.text || stripHtml(options.html),
+            Data: finalOptions.text || stripHtml(finalOptions.html),
             Charset: "UTF-8",
           },
         },
       },
-      ...(options.replyTo && {
-        ReplyToAddresses: Array.isArray(options.replyTo) ? options.replyTo : [options.replyTo],
+      ...(finalOptions.replyTo && {
+        ReplyToAddresses: Array.isArray(finalOptions.replyTo) ? finalOptions.replyTo : [finalOptions.replyTo],
       }),
     };
 
@@ -358,8 +389,8 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     const duration = Date.now() - startTime;
 
     console.log("[Email] Sent successfully", {
-      to: options.to,
-      subject: options.subject,
+      to: activeRecipients.join(", "),
+      subject: finalOptions.subject,
       messageId: result.MessageId,
       duration: `${duration}ms`,
     });
@@ -371,8 +402,8 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     console.error("[Email] Exception sending email via AWS SES:", {
       error: message,
       stack: error instanceof Error ? error.stack : undefined,
-      to: options.to,
-      subject: options.subject,
+      to: activeRecipients.join(", "),
+      subject: finalOptions.subject,
       duration: `${duration}ms`,
       sesError: error,
     });
@@ -885,8 +916,8 @@ export async function sendCorporateLeadAdminEmail(
   // Handle conditional message section
   if (leadData.message) {
     const messageSection = `<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
-      <strong>Requirement/Message:</strong>
-      <div style="background-color: white; padding: 10px; border-radius: 3px; margin-top: 8px; white-space: pre-wrap;">${leadData.message.replace(/\n/g, "<br>")}</div>
+            <strong>Requirement/Message:</strong>
+            <div style="background-color: white; padding: 10px; border-radius: 3px; margin-top: 8px; white-space: pre-wrap;">${leadData.message.replace(/\n/g, "<br>")}</div>
     </div>`;
     html = html.replace(/{messageSection}/g, messageSection);
   } else {
