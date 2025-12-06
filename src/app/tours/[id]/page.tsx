@@ -20,6 +20,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getMediaProxyUrl } from "@/lib/media";
 import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
+import { PhotoGallery } from "@/components/tours/PhotoGallery";
 
 export async function generateMetadata({
   params,
@@ -468,23 +469,7 @@ export default async function TourDetailPage({
             {/* Gallery */}
             {gallery.length > 0 && (
               <Section title="Photo Gallery">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {gallery.slice(0, 6).map((src, index) => (
-                    <div
-                      key={index}
-                      className="relative aspect-video rounded-xl overflow-hidden cursor-pointer hover:opacity-90 transition-opacity bg-neutral-100"
-                    >
-                      <ImageWithFallback
-                        src={getMediaProxyUrl(src) || src || "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=900&q=80"}
-                        alt={`${tour.name} - Image ${index + 1}`}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        fallbackSrc="https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=900&q=80"
-                      />
-                    </div>
-                  ))}
-                </div>
+                <PhotoGallery images={gallery} tourName={tour.name} />
               </Section>
             )}
           </div>

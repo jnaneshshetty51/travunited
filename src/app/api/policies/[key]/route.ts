@@ -26,7 +26,15 @@ export async function GET(
       version: policy.version,
       updatedAt: policy.updatedAt,
     });
-  } catch (error) {
+  } catch (error: any) {
+    // Handle case where SitePolicy table doesn't exist
+    if (error?.code === 'P2021' || error?.message?.includes('does not exist')) {
+      console.warn("SitePolicy table not found:", error.message);
+      return NextResponse.json(
+        { error: "Policy not found" },
+        { status: 404 }
+      );
+    }
     console.error("Error fetching policy:", error);
     return NextResponse.json(
       { error: "Internal server error" },

@@ -305,14 +305,63 @@ export async function POST(req: Request) {
     return NextResponse.json(visa);
   } catch (error) {
     console.error("Error creating visa:", error);
-    if ((error as { code?: string }).code === "P2002") {
-      return NextResponse.json(
-        { error: "Visa slug must be unique" },
-        { status: 409 }
-      );
+    
+    // Handle Prisma errors
+    if (error && typeof error === 'object' && 'code' in error) {
+      const prismaError = error as { code?: string; meta?: any; message?: string };
+      
+      if (prismaError.code === "P2002") {
+        return NextResponse.json(
+          { error: "Visa slug must be unique" },
+          { status: 409 }
+        );
+      }
+      
+      // Handle missing table/column errors
+      if (prismaError.code === "P2021" || prismaError.code === "P2019") {
+        console.error("Database schema error:", prismaError);
+        return NextResponse.json(
+          { 
+            error: "Database schema error",
+            message: prismaError.message || "A required database table or column is missing. Please run migrations.",
+            code: prismaError.code
+          },
+          { status: 500 }
+        );
+      }
+      
+      // Handle foreign key constraint errors
+      if (prismaError.code === "P2003") {
+        return NextResponse.json(
+          { 
+            error: "Invalid reference",
+            message: prismaError.message || "The selected country or related entity does not exist."
+          },
+          { status: 400 }
+        );
+      }
     }
+    
+    // Handle validation errors
+    if (error instanceof Error) {
+      // If it's a known validation error, return it
+      if (error.message.includes("must be one of")) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: 400 }
+        );
+      }
+    }
+    
+    // Generic error response with more details in development
     return NextResponse.json(
-      { error: "Internal server error" },
+      { 
+        error: "Internal server error",
+        message: process.env.NODE_ENV === 'development' && error instanceof Error 
+          ? error.message 
+          : "An unexpected error occurred while creating the visa. Please try again.",
+        ...(process.env.NODE_ENV === 'development' && { stack: error instanceof Error ? error.stack : undefined })
+      },
       { status: 500 }
     );
   }

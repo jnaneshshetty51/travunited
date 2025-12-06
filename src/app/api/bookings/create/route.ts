@@ -126,10 +126,20 @@ export async function POST(req: Request) {
     }
 
     // Validate policy versions - check both Terms & Conditions and Refund & Cancellation
-    const [refundPolicy, termsPolicy] = await Promise.all([
-      prisma.sitePolicy.findUnique({ where: { key: "refund_cancellation" } }),
-      prisma.sitePolicy.findUnique({ where: { key: "terms_conditions" } }),
-    ]);
+    // Handle gracefully if SitePolicy table doesn't exist yet
+    let refundPolicy = null;
+    let termsPolicy = null;
+    
+    try {
+      [refundPolicy, termsPolicy] = await Promise.all([
+        prisma.sitePolicy.findUnique({ where: { key: "refund_cancellation" } }),
+        prisma.sitePolicy.findUnique({ where: { key: "terms_conditions" } }),
+      ]);
+    } catch (error: any) {
+      // If table doesn't exist, log warning but allow payment to proceed
+      console.warn("SitePolicy table not found, skipping policy version validation:", error.message);
+      // Continue without policy validation
+    }
 
     // If refund policy exists, validate version
     if (refundPolicy) {
