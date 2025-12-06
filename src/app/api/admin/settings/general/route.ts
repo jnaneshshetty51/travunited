@@ -72,6 +72,7 @@ export async function GET(req: Request) {
       // General emails
       emailWelcome: (emailSnippets.emailWelcome as string) || "",
       emailPasswordReset: (emailSnippets.emailPasswordReset as string) || "",
+      emailPasswordResetOTP: (emailSnippets.emailPasswordResetOTP as string) || "",
       emailVerification: (emailSnippets.emailVerification as string) || "",
       // Visa emails
       emailVisaPaymentSuccess: (emailSnippets.emailVisaPaymentSuccess as string) || "",
@@ -148,6 +149,7 @@ export async function PUT(req: Request) {
       // General emails
       emailWelcome = "",
       emailPasswordReset = "",
+      emailPasswordResetOTP = "",
       emailVerification = "",
       // Visa emails
       emailVisaPaymentSuccess = "",
@@ -213,6 +215,7 @@ export async function PUT(req: Request) {
             // General emails
             emailWelcome,
             emailPasswordReset,
+            emailPasswordResetOTP,
             emailVerification,
             // Visa emails
             emailVisaPaymentSuccess,
@@ -240,6 +243,7 @@ export async function PUT(req: Request) {
             // General emails
             emailWelcome,
             emailPasswordReset,
+            emailPasswordResetOTP,
             emailVerification,
             // Visa emails
             emailVisaPaymentSuccess,

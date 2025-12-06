@@ -29,6 +29,7 @@ import {
   Star,
   UserCircle,
   Mail,
+  Mail,
 } from "lucide-react";
 
 const BASE_MENU_ITEMS = [
@@ -116,6 +117,12 @@ const SETTINGS_MENU_ITEMS = [
     label: "General Settings",
     href: "/admin/settings/general",
     icon: Settings,
+    roles: ["STAFF_ADMIN", "SUPER_ADMIN"],
+  },
+  {
+    label: "Email Templates",
+    href: "/admin/settings/email-templates",
+    icon: Mail,
     roles: ["STAFF_ADMIN", "SUPER_ADMIN"],
   },
   {
