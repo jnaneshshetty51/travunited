@@ -77,21 +77,45 @@ async function logEmailEvent(
   details: any
 ): Promise<void> {
   try {
-    // Create a log entry in the database
-    // You may want to create a separate table for this or use your existing notification system
-    await prisma.$executeRaw`
-      INSERT INTO email_events (type, email, details, created_at)
-      VALUES (${type}, ${email}, ${JSON.stringify(details)}::jsonb, NOW())
-      ON CONFLICT (email, type) 
-      DO UPDATE SET 
-        count = email_events.count + 1,
-        last_occurred = NOW(),
-        details = ${JSON.stringify(details)}::jsonb
-    `;
+    // Check if event already exists
+    const existing = await prisma.emailEvent.findUnique({
+      where: {
+        email_type: {
+          email: email.toLowerCase(),
+          type,
+        },
+      },
+    });
+
+    if (existing) {
+      // Update existing event
+      await prisma.emailEvent.update({
+        where: {
+          id: existing.id,
+        },
+        data: {
+          count: existing.count + 1,
+          lastOccurred: new Date(),
+          details: details as any,
+        },
+      });
+    } else {
+      // Create new event
+      await prisma.emailEvent.create({
+        data: {
+          id: `${email.toLowerCase()}-${type}-${Date.now()}`,
+          type,
+          email: email.toLowerCase(),
+          details: details as any,
+          count: 1,
+        },
+      });
+    }
     
     console.log(`[SES] ${type.toUpperCase()} logged for ${email}`);
   } catch (error) {
-    // If table doesn't exist, just log to console
+    console.error(`[SES] Failed to log ${type} for ${email}:`, error);
+    // Log to console as fallback
     console.log(`[SES] ${type.toUpperCase()} for ${email}:`, details);
   }
 }

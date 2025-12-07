@@ -39,24 +39,24 @@ enum StayType {
 }
 
 model User {
-  id                    String        @id @default(cuid())
+  id                    String          @id @default(cuid())
   name                  String?
-  email                 String        @unique
+  email                 String          @unique
   phone                 String?
   passwordHash          String
-  role                  UserRole      @default(CUSTOMER)
-  isActive              Boolean       @default(true)
-  emailVerified         Boolean       @default(false)
+  role                  UserRole        @default(CUSTOMER)
+  isActive              Boolean         @default(true)
+  emailVerified         Boolean         @default(false)
   emailVerifiedAt       DateTime?
-  passwordResetToken    String?       @unique
+  passwordResetToken    String?         @unique
   passwordResetExpires  DateTime?
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
   applications          Application[]
   bookings              Booking[]
   travellers            Traveller[]
-  processedApplications Application[] @relation("ProcessedBy")
-  processedBookings     Booking[]     @relation("ProcessedBy")
+  processedApplications Application[]   @relation("ProcessedBy")
+  processedBookings     Booking[]       @relation("ProcessedBy")
   reviews               Review[]
   auditLogs             AuditLog[]
   payments              Payment[]
@@ -67,30 +67,30 @@ model User {
 }
 
 model Application {
-  id              String                 @id @default(cuid())
-  user            User                   @relation(fields: [userId], references: [id])
-  userId          String
-  visaTypeId      String
-  country         String?
-  visaType        String?
-  visa            Visa?                  @relation(fields: [visaId], references: [id])
-  visaId          String?
-  status          String                 @default("DRAFT") // DRAFT, PAYMENT_PENDING, SUBMITTED, IN_PROCESS, APPROVED, REJECTED
-  totalAmount     Int                    @default(0)
-  currency        String                 @default("INR")
-  processedBy     User?                  @relation("ProcessedBy", fields: [processedById], references: [id])
-  processedById   String?
-  visaDocumentUrl String? // URL to approved visa document
-  invoiceUrl      String? // URL to uploaded invoice PDF
-  invoiceUploadedAt DateTime? // When invoice was uploaded
+  id                       String                 @id @default(cuid())
+  user                     User                   @relation(fields: [userId], references: [id])
+  userId                   String
+  visaTypeId               String
+  country                  String?
+  visaType                 String?
+  visa                     Visa?                  @relation(fields: [visaId], references: [id])
+  visaId                   String?
+  status                   String                 @default("DRAFT") // DRAFT, PAYMENT_PENDING, SUBMITTED, IN_PROCESS, APPROVED, REJECTED
+  totalAmount              Int                    @default(0)
+  currency                 String                 @default("INR")
+  processedBy              User?                  @relation("ProcessedBy", fields: [processedById], references: [id])
+  processedById            String?
+  visaDocumentUrl          String? // URL to approved visa document
+  invoiceUrl               String? // URL to uploaded invoice PDF
+  invoiceUploadedAt        DateTime? // When invoice was uploaded
   invoiceUploadedByAdminId String? // Admin who uploaded the invoice
-  notes           String? // Admin notes
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
-  documents       ApplicationDocument[]
-  travellers      ApplicationTraveller[]
-  reviews         Review[]
-  payments        Payment[]
+  notes                    String? // Admin notes
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  documents                ApplicationDocument[]
+  travellers               ApplicationTraveller[]
+  reviews                  Review[]
+  payments                 Payment[]
 }
 
 model ApplicationTraveller {
@@ -137,67 +137,67 @@ model Traveller {
 }
 
 model Booking {
-  id            String             @id @default(cuid())
-  user          User               @relation(fields: [userId], references: [id])
-  userId        String
-  tour          Tour?              @relation(fields: [tourId], references: [id])
-  tourId        String?
-  tourName      String?
-  status        String             @default("DRAFT") // DRAFT, PAYMENT_PENDING, BOOKED, CONFIRMED, COMPLETED
-  totalAmount   Int
-  currency      String             @default("INR")
-  travelDate    DateTime?
-  foodPreference          String?
-  foodPreferenceNotes     String?
-  languagePreference      String?
-  languagePreferenceOther String?
-  driverPreference        String?
-  specialRequests         String?
-  policyAccepted          Boolean            @default(false)
-  policyAcceptedAt        DateTime?
-  policyAcceptedByUserId  String?
-  policyVersion           String?
-  policyAcceptedIp        String?
-  policyAcceptedUserAgent String?
-  documents               Json?              // Booking-level documents: { travellerId: [{ type, key, status, rejectionReason }], booking: [...] }
-  processedBy   User?              @relation("ProcessedBy", fields: [processedById], references: [id])
-  processedById String?
-  voucherUrl    String? // URL to tour voucher
-  invoiceUrl    String? // URL to uploaded invoice PDF
-  invoiceUploadedAt DateTime? // When invoice was uploaded
+  id                       String             @id @default(cuid())
+  user                     User               @relation(fields: [userId], references: [id])
+  userId                   String
+  tour                     Tour?              @relation(fields: [tourId], references: [id])
+  tourId                   String?
+  tourName                 String?
+  status                   String             @default("DRAFT") // DRAFT, PAYMENT_PENDING, BOOKED, CONFIRMED, COMPLETED
+  totalAmount              Int
+  currency                 String             @default("INR")
+  travelDate               DateTime?
+  foodPreference           String?
+  foodPreferenceNotes      String?
+  languagePreference       String?
+  languagePreferenceOther  String?
+  driverPreference         String?
+  specialRequests          String?
+  policyAccepted           Boolean            @default(false)
+  policyAcceptedAt         DateTime?
+  policyAcceptedByUserId   String?
+  policyVersion            String?
+  policyAcceptedIp         String?
+  policyAcceptedUserAgent  String?
+  documents                Json? // Booking-level documents: { travellerId: [{ type, key, status, rejectionReason }], booking: [...] }
+  processedBy              User?              @relation("ProcessedBy", fields: [processedById], references: [id])
+  processedById            String?
+  voucherUrl               String? // URL to tour voucher
+  invoiceUrl               String? // URL to uploaded invoice PDF
+  invoiceUploadedAt        DateTime? // When invoice was uploaded
   invoiceUploadedByAdminId String? // Admin who uploaded the invoice
-  notes         String? // Admin notes
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  travellers    BookingTraveller[]
-  addOns        BookingAddOn[]
-  reviews       Review[]
-  payments      Payment[]
-  bookingDocuments BookingDocument[]
+  notes                    String? // Admin notes
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+  travellers               BookingTraveller[]
+  addOns                   BookingAddOn[]
+  reviews                  Review[]
+  payments                 Payment[]
+  bookingDocuments         BookingDocument[]
 }
 
 model BookingTraveller {
-  id                     String     @id @default(cuid())
-  booking                Booking    @relation(fields: [bookingId], references: [id])
+  id                     String            @id @default(cuid())
+  booking                Booking           @relation(fields: [bookingId], references: [id])
   bookingId              String
-  traveller              Traveller? @relation(fields: [travellerId], references: [id])
+  traveller              Traveller?        @relation(fields: [travellerId], references: [id])
   travellerId            String?
   firstName              String
   lastName               String
   dateOfBirth            DateTime?
   age                    Int?
-  travellerType          String?    // "adult" | "child" | "infant"
+  travellerType          String? // "adult" | "child" | "infant"
   gender                 String?
   nationality            String?
   passportNumber         String?
   passportExpiry         DateTime?
   passportIssuingCountry String?
   passportFileKey        String?
-  panNumber              String?    // PAN number for Indian travellers
-  aadharFileKey          String?    // Aadhaar file upload key for Indian travellers
-  isPassportRequired     Boolean    @default(false)
-  createdAt              DateTime   @default(now())
-  updatedAt              DateTime   @updatedAt
+  panNumber              String? // PAN number for Indian travellers
+  aadharFileKey          String? // Aadhaar file upload key for Indian travellers
+  isPassportRequired     Boolean           @default(false)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
   documents              BookingDocument[]
 }
 
@@ -289,7 +289,7 @@ model VisaSubType {
   visa      Visa     @relation(fields: [visaId], references: [id], onDelete: Cascade)
   visaId    String
   label     String
-  code      String?  // Optional internal code
+  code      String? // Optional internal code
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -327,11 +327,11 @@ model VisaType {
 }
 
 model Tour {
-  id                   String    @id @default(cuid())
-  country              Country?  @relation(fields: [countryId], references: [id])
+  id                   String      @id @default(cuid())
+  country              Country?    @relation(fields: [countryId], references: [id])
   countryId            String?
   name                 String
-  slug                 String?   @unique
+  slug                 String?     @unique
   subtitle             String?
   destination          String
   duration             String
@@ -341,7 +341,7 @@ model Tour {
   description          String?
   shortDescription     String?
   originalPrice        Int?
-  currency             String?   @default("INR")
+  currency             String?     @default("INR")
   durationDays         Int?
   durationNights       Int?
   destinationCountry   String?
@@ -357,20 +357,20 @@ model Tour {
   groupSizeMax         Int?
   availableDates       String? // JSON string array
   bookingDeadline      DateTime?
-  status               String?   @default("active") // active, inactive, draft
-  isActive             Boolean   @default(true)
-  isFeatured           Boolean   @default(false)
+  status               String?     @default("active") // active, inactive, draft
+  isActive             Boolean     @default(true)
+  isFeatured           Boolean     @default(false)
   categoryId           String?
   imageUrl             String?
   heroImageUrl         String?
   galleryImageUrls     String?
-  allowAdvance         Boolean   @default(false)
+  allowAdvance         Boolean     @default(false)
   advancePercentage    Int?
-  requiresPassport     Boolean   @default(false)
-  requiredDocuments    Json?    // Tour-level override: ["passport","insurance"] or ["adhar","pan"]
-  childPricingType     String?  // "percent" | "fixed" | "none"
-  childPricingValue     Int?     // percent or fixed amount (in cents/paise)
-  childAgeLimit         Int?     @default(12)
+  requiresPassport     Boolean     @default(false)
+  requiredDocuments    Json? // Tour-level override: ["passport","insurance"] or ["adhar","pan"]
+  childPricingType     String? // "percent" | "fixed" | "none"
+  childPricingValue    Int? // percent or fixed amount (in cents/paise)
+  childAgeLimit        Int?        @default(12)
   metaTitle            String?
   metaDescription      String?
   metaKeywords         String?
@@ -398,42 +398,42 @@ model Tour {
   primaryDestination   String?
   regionTags           String? // JSON string array
   themes               String? // JSON string array
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
   days                 TourDay[]
   bookings             Booking[]
   addOns               TourAddOn[]
 }
 
 model TourAddOn {
-  id             String   @id @default(cuid())
-  tour           Tour     @relation(fields: [tourId], references: [id])
-  tourId         String
-  name           String
-  description    String?
-  price          Int      @default(0)
-  pricingType    String   @default("PER_BOOKING") // PER_PERSON or PER_BOOKING
-  isRequired     Boolean  @default(false)
-  isActive       Boolean  @default(true)
-  sortOrder      Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  bookingAddOns  BookingAddOn[]
+  id            String         @id @default(cuid())
+  tour          Tour           @relation(fields: [tourId], references: [id])
+  tourId        String
+  name          String
+  description   String?
+  price         Int            @default(0)
+  pricingType   String         @default("PER_BOOKING") // PER_PERSON or PER_BOOKING
+  isRequired    Boolean        @default(false)
+  isActive      Boolean        @default(true)
+  sortOrder     Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  bookingAddOns BookingAddOn[]
 }
 
 model BookingAddOn {
-  id          String   @id @default(cuid())
-  booking     Booking  @relation(fields: [bookingId], references: [id])
+  id          String     @id @default(cuid())
+  booking     Booking    @relation(fields: [bookingId], references: [id])
   bookingId   String
   addOn       TourAddOn? @relation(fields: [addOnId], references: [id])
   addOnId     String?
   name        String
   pricingType String
-  quantity    Int      @default(1)
-  unitPrice   Int      @default(0)
-  totalPrice  Int      @default(0)
+  quantity    Int        @default(1)
+  unitPrice   Int        @default(0)
+  totalPrice  Int        @default(0)
   metadata    Json?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime   @default(now())
 }
 
 model Payment {
@@ -444,11 +444,11 @@ model Payment {
   amount            Int
   currency          String   @default("INR")
   status            String // PENDING, COMPLETED, FAILED, REFUNDED
-  provider          String?  // RAZORPAY, PAYPAL, STRIPE, NONE
-  method            String?  // CARD, UPI, WALLET, NETBANKING, FREE
+  provider          String? // RAZORPAY, PAYPAL, STRIPE, NONE
+  method            String? // CARD, UPI, WALLET, NETBANKING, FREE
   razorpayOrderId   String?
   razorpayPaymentId String?
-  metadata          Json?    // Additional payment metadata
+  metadata          Json? // Additional payment metadata
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -470,15 +470,15 @@ model Review {
   comment       String
   isVisible     Boolean    @default(true)
   notes         String?
-  userId        String?    // Made optional for homepage reviews created by admins
+  userId        String? // Made optional for homepage reviews created by admins
   applicationId String?
   bookingId     String?
   // Homepage review fields
-  reviewerName  String?    // Name shown on homepage (for admin-created reviews)
-  imageKey      String?    // S3/MinIO key for reviewer image
-  imageUrl      String?    // Direct URL for reviewer image
+  reviewerName  String? // Name shown on homepage (for admin-created reviews)
+  imageKey      String? // S3/MinIO key for reviewer image
+  imageUrl      String? // Direct URL for reviewer image
   isFeatured    Boolean    @default(false) // Featured reviews shown on homepage
-  link          String?    // Optional URL to redirect when clicking review card
+  link          String? // Optional URL to redirect when clicking review card
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
@@ -628,21 +628,21 @@ enum CareerApplicationStatus {
 }
 
 model CareerApplication {
-  id            String                  @id @default(cuid())
-  name          String
-  email         String
-  phone         String
-  location      String?
-  positionTitle String // Position they're applying for
-  experience    Int? // Years of experience
+  id             String                  @id @default(cuid())
+  name           String
+  email          String
+  phone          String
+  location       String?
+  positionTitle  String // Position they're applying for
+  experience     Int? // Years of experience
   currentCompany String?
-  expectedCtc   String? // Expected CTC
-  coverNote     String? // Cover letter/notes
-  resumeUrl     String // MinIO/S3 URL to resume file
-  status        CareerApplicationStatus @default(NEW)
-  internalNotes String? // Internal admin notes
-  createdAt     DateTime                @default(now())
-  updatedAt     DateTime                @updatedAt
+  expectedCtc    String? // Expected CTC
+  coverNote      String? // Cover letter/notes
+  resumeUrl      String // MinIO/S3 URL to resume file
+  status         CareerApplicationStatus @default(NEW)
+  internalNotes  String? // Internal admin notes
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
 
   @@index([status])
   @@index([positionTitle])
@@ -669,19 +669,19 @@ enum CustomTourRequestStatus {
 }
 
 model CustomTourRequest {
-  id            String                  @id @default(cuid())
-  name          String
-  email         String
-  phone         String
-  preferredDates String?                // Start-end date range or description
-  pax           Int?                    // Number of passengers
-  budget        Int?                    // Budget in paise/cents
-  message       String?                 @db.Text
-  attachments   Json?                   // Array of file keys/URLs
-  status        CustomTourRequestStatus @default(NEW)
-  internalNotes String?                 @db.Text // Admin notes
-  createdAt     DateTime                @default(now())
-  updatedAt     DateTime                @updatedAt
+  id             String                  @id @default(cuid())
+  name           String
+  email          String
+  phone          String
+  preferredDates String? // Start-end date range or description
+  pax            Int? // Number of passengers
+  budget         Int? // Budget in paise/cents
+  message        String?                 @db.Text
+  attachments    Json? // Array of file keys/URLs
+  status         CustomTourRequestStatus @default(NEW)
+  internalNotes  String?                 @db.Text // Admin notes
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
 
   @@index([status])
   @@index([email])
@@ -689,25 +689,25 @@ model CustomTourRequest {
 }
 
 model TeamMember {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   name        String
   title       String?
-  slug        String?   @unique
-  bio         String?   @db.Text
-  email       String?   @unique
+  slug        String?  @unique
+  bio         String?  @db.Text
+  email       String?  @unique
   phone       String?
   photoKey    String?
   photoUrl    String?
   resumeKey   String?
   resumeUrl   String?
   socialLinks Json?
-  isActive    Boolean   @default(true)
-  isFeatured  Boolean   @default(false)
-  sortOrder   Int       @default(0)
+  isActive    Boolean  @default(true)
+  isFeatured  Boolean  @default(false)
+  sortOrder   Int      @default(0)
   createdBy   String?
   updatedBy   String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([isActive, isFeatured])
   @@index([sortOrder])
@@ -718,7 +718,7 @@ model SitePolicy {
   key       String   @unique // "refund_cancellation"
   title     String
   content   String   @db.Text // HTML/Markdown
-  version   String   // e.g. "refund-v1"
+  version   String // e.g. "refund-v1"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -726,18 +726,18 @@ model SitePolicy {
 }
 
 model BookingDocument {
-  id              String   @id @default(cuid())
-  booking         Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  id              String            @id @default(cuid())
+  booking         Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   bookingId       String
   traveller       BookingTraveller? @relation(fields: [travellerId], references: [id], onDelete: Cascade)
   travellerId     String?
-  type            String   // 'passport','adhar','pan','photo','insurance', etc.
-  key             String   // S3/MinIO key
+  type            String // 'passport','adhar','pan','photo','insurance', etc.
+  key             String // S3/MinIO key
   fileName        String?
-  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  status          String            @default("PENDING") // PENDING, APPROVED, REJECTED
   rejectionReason String?
-  uploadedAt      DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  uploadedAt      DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   @@index([bookingId])
   @@index([travellerId])
@@ -748,13 +748,13 @@ model PasswordReset {
   id           String    @id @default(cuid())
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId       String
-  tokenHash    String    // hashed token saved with bcrypt
+  tokenHash    String // hashed token saved with bcrypt
   expiresAt    DateTime
   used         Boolean   @default(false)
   ip           String?
   userAgent    String?
   createdAt    DateTime  @default(now())
-  otp          String?   // 6-digit OTP for password reset
+  otp          String? // 6-digit OTP for password reset
   otpExpiresAt DateTime? // OTP expiration time (usually 10 minutes)
 
   @@index([userId])
@@ -762,4 +762,20 @@ model PasswordReset {
   @@index([used])
   @@index([otp])
   @@index([otpExpiresAt])
+}
+
+model EmailEvent {
+  id           String   @id @default(cuid())
+  type         String // "bounce" | "complaint"
+  email        String
+  details      Json     @default("{}")
+  count        Int      @default(1)
+  lastOccurred DateTime @default(now()) @map("last_occurred")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([email, type], map: "email_events_email_type_key")
+  @@index([email], map: "email_events_email_idx")
+  @@index([type], map: "email_events_type_idx")
+  @@map("email_events")
 }
