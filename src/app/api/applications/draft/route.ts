@@ -58,7 +58,7 @@ export async function POST(req: Request) {
         // Generate a random password hash (user will need to reset password to access)
         const bcrypt = await import("bcryptjs");
         const randomPassword = Math.random().toString(36).slice(-12);
-        const passwordHash = await bcrypt.hash(randomPassword, 10);
+        const passwordHash = await bcrypt.default.hash(randomPassword, 10);
         
         user = await prisma.user.create({
           data: {

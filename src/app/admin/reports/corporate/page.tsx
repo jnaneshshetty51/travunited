@@ -128,9 +128,34 @@ export default function CorporateLeadsPage() {
         // For PDF, fetch as blob and download
         const response = await fetch(url);
         if (!response.ok) {
-          throw new Error(`Failed to generate PDF: ${response.statusText}`);
+          // Try to get error message from response
+          let errorMessage = response.statusText;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.details || errorData.error || errorMessage;
+          } catch {
+            // If response is not JSON, use status text
+            const text = await response.text().catch(() => "");
+            errorMessage = text || errorMessage;
+          }
+          throw new Error(`Failed to generate PDF: ${errorMessage}`);
         }
+        
+        // Check if response is actually a PDF
+        const contentType = response.headers.get("content-type");
+        if (contentType && !contentType.includes("application/pdf")) {
+          // Response might be an error JSON
+          const errorData = await response.json().catch(() => null);
+          if (errorData) {
+            throw new Error(`Failed to generate PDF: ${errorData.details || errorData.error || "Unknown error"}`);
+          }
+        }
+        
         const blob = await response.blob();
+        if (blob.size === 0) {
+          throw new Error("Failed to generate PDF: Empty PDF file received");
+        }
+        
         const downloadUrl = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = downloadUrl;
