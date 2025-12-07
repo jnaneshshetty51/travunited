@@ -580,6 +580,8 @@ export async function POST(req: Request) {
           policyVersion: data.policyVersion || null,
           policyAcceptedIp: ipAddress,
           policyAcceptedUserAgent: userAgent,
+          // documents field is optional (Json?) and will be null by default
+          // If the column doesn't exist, the migration needs to be run
         },
       });
 
