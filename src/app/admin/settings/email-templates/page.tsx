@@ -38,6 +38,7 @@ interface EmailTemplates {
   emailAdminWelcome: string;
   emailCorporateLeadAdmin: string;
   emailCorporateLeadConfirmation: string;
+  emailCareerApplicationStatus: string;
 }
 
 const TEMPLATE_METADATA: Record<keyof EmailTemplates, { label: string; description: string; variables: string[]; category: "general" | "visa" | "tours" | "admin" }> = {
@@ -155,6 +156,12 @@ const TEMPLATE_METADATA: Record<keyof EmailTemplates, { label: string; descripti
     variables: ["contactName", "companyNameLead", "supportEmail", "supportPhone", "companyName"],
     category: "admin",
   },
+  emailCareerApplicationStatus: {
+    label: "Career Application Status",
+    description: "Sent to candidates when their job application status changes",
+    variables: ["name", "positionTitle", "status", "statusColor", "statusMessage", "applicationIdShort", "nextStepsSection", "companyName"],
+    category: "admin",
+  },
 };
 
 export default function EmailTemplatesPage() {
@@ -187,6 +194,7 @@ export default function EmailTemplatesPage() {
     emailAdminWelcome: "",
     emailCorporateLeadAdmin: "",
     emailCorporateLeadConfirmation: "",
+    emailCareerApplicationStatus: "",
   });
 
   // Helper function to map database key to template key
@@ -211,6 +219,7 @@ export default function EmailTemplatesPage() {
       emailAdminWelcome: "adminWelcomeEmail",
       emailCorporateLeadAdmin: "corporateLeadAdminEmail",
       emailCorporateLeadConfirmation: "corporateLeadConfirmationEmail",
+      emailCareerApplicationStatus: "careerApplicationStatusEmail",
     };
     return keyMap[dbKey] || dbKey;
   }, []);
@@ -251,6 +260,7 @@ export default function EmailTemplatesPage() {
         emailAdminWelcome: getTemplateValue("emailAdminWelcome", data.emailAdminWelcome || ""),
         emailCorporateLeadAdmin: getTemplateValue("emailCorporateLeadAdmin", data.emailCorporateLeadAdmin || ""),
         emailCorporateLeadConfirmation: getTemplateValue("emailCorporateLeadConfirmation", data.emailCorporateLeadConfirmation || ""),
+        emailCareerApplicationStatus: getTemplateValue("emailCareerApplicationStatus", data.emailCareerApplicationStatus || ""),
       });
     } catch (error) {
       console.error("Error fetching templates:", error);

@@ -712,44 +712,54 @@ export async function POST(req: Request) {
         });
 
         // Send email to customer
-        await sendEmail({
-          to: data.primaryContact.email,
-          subject: `Custom Package Request Received - ${data.tourName || tourRecord.name}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h1>Custom Package Request Received</h1>
-              <p>Thank you for your custom package request for <strong>${data.tourName || tourRecord.name}</strong>.</p>
-              <p>Our team will review your request and get back to you with a personalized quote within 24-48 hours.</p>
-              <p><a href="${process.env.NEXTAUTH_URL}/dashboard/bookings/${booking.id}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View Request</a></p>
-              <p>Best regards,<br>The Travunited Team</p>
-            </div>
-          `,
-        });
+        try {
+          await sendEmail({
+            to: data.primaryContact.email,
+            subject: `Custom Package Request Received - ${data.tourName || tourRecord.name}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h1>Custom Package Request Received</h1>
+                <p>Thank you for your custom package request for <strong>${data.tourName || tourRecord.name}</strong>.</p>
+                <p>Our team will review your request and get back to you with a personalized quote within 24-48 hours.</p>
+                <p><a href="${process.env.NEXTAUTH_URL}/dashboard/bookings/${booking.id}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View Request</a></p>
+                <p>Best regards,<br>The Travunited Team</p>
+              </div>
+            `,
+          });
+        } catch (emailError) {
+          console.error("Error sending custom package confirmation email:", emailError);
+          // Don't fail the request if email fails
+        }
 
         // Notify admins about custom package request
         if (!tourAdminEmail) {
           console.warn("Tour admin email not configured; skipping custom package admin notification.");
         } else {
-          await sendEmail({
-            to: tourAdminEmail,
-            subject: `New Custom Package Request - ${data.tourName || tourRecord.name}`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h1>New Custom Package Request</h1>
-                <p>A new custom package request has been received:</p>
-                <ul>
-                  <li><strong>Tour:</strong> ${data.tourName || tourRecord.name}</li>
-                  <li><strong>Customer:</strong> ${data.primaryContact.name} (${data.primaryContact.email})</li>
-                  <li><strong>Travel Date:</strong> ${new Date(data.travelDate).toLocaleDateString()}</li>
-                  <li><strong>Booking ID:</strong> ${booking.id}</li>
-                </ul>
-                <p><strong>Custom Request:</strong></p>
-                <p style="background: #f5f5f5; padding: 15px; border-radius: 4px;">${data.customisedPackage?.customRequestNotes || "N/A"}</p>
-                <p><a href="${process.env.NEXTAUTH_URL}/admin/bookings/${booking.id}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Review Request</a></p>
-              </div>
-            `,
-            category: "tours",
-          });
+          try {
+            await sendEmail({
+              to: tourAdminEmail,
+              subject: `New Custom Package Request - ${data.tourName || tourRecord.name}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h1>New Custom Package Request</h1>
+                  <p>A new custom package request has been received:</p>
+                  <ul>
+                    <li><strong>Tour:</strong> ${data.tourName || tourRecord.name}</li>
+                    <li><strong>Customer:</strong> ${data.primaryContact.name} (${data.primaryContact.email})</li>
+                    <li><strong>Travel Date:</strong> ${new Date(data.travelDate).toLocaleDateString()}</li>
+                    <li><strong>Booking ID:</strong> ${booking.id}</li>
+                  </ul>
+                  <p><strong>Custom Request:</strong></p>
+                  <p style="background: #f5f5f5; padding: 15px; border-radius: 4px;">${data.customisedPackage?.customRequestNotes || "N/A"}</p>
+                  <p><a href="${process.env.NEXTAUTH_URL}/admin/bookings/${booking.id}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Review Request</a></p>
+                </div>
+              `,
+              category: "tours",
+            });
+          } catch (emailError) {
+            console.error("Error sending custom package admin notification email:", emailError);
+            // Don't fail the request if email fails
+          }
         }
       } else {
         // Regular booking - send email to user
@@ -763,61 +773,71 @@ export async function POST(req: Request) {
         });
 
         // Send email to customer
-        const { sendTourConfirmedEmail } = await import("@/lib/email");
-        const userRole = (session.user.role as "CUSTOMER" | "STAFF_ADMIN" | "SUPER_ADMIN") || "CUSTOMER";
-        await sendTourConfirmedEmail(
-          data.primaryContact.email,
-          booking.id,
-          data.tourName || tourRecord.name,
-          userRole
-        );
+        try {
+          const { sendTourConfirmedEmail } = await import("@/lib/email");
+          const userRole = (session.user.role as "CUSTOMER" | "STAFF_ADMIN" | "SUPER_ADMIN") || "CUSTOMER";
+          await sendTourConfirmedEmail(
+            data.primaryContact.email,
+            booking.id,
+            data.tourName || tourRecord.name,
+            userRole
+          );
+        } catch (emailError) {
+          console.error("Error sending tour confirmation email:", emailError);
+          // Don't fail the request if email fails
+        }
 
         // Regular booking - notify admins with document information
         if (!tourAdminEmail) {
           console.warn("Tour admin email not configured; skipping tour booking admin notification.");
         } else {
-          // Get document information
-          const documentsInfo = data.travellers.map((t, idx) => {
-            const docs = [];
-            if (t.passportFileKey) docs.push(`Passport: Uploaded`);
-            if (t.aadharFileKey) docs.push(`Aadhaar: Uploaded`);
-            return `${idx + 1}. ${t.firstName} ${t.lastName}${docs.length > 0 ? ` - Documents: ${docs.join(", ")}` : " - No documents uploaded yet"}`;
-          }).join("<br>");
+          try {
+            // Get document information
+            const documentsInfo = data.travellers.map((t, idx) => {
+              const docs = [];
+              if (t.passportFileKey) docs.push(`Passport: Uploaded`);
+              if (t.aadharFileKey) docs.push(`Aadhaar: Uploaded`);
+              return `${idx + 1}. ${t.firstName} ${t.lastName}${docs.length > 0 ? ` - Documents: ${docs.join(", ")}` : " - No documents uploaded yet"}`;
+            }).join("<br>");
 
-          const travellersList = data.travellers.map((t, idx) => 
-            `${idx + 1}. ${t.firstName} ${t.lastName} (Age: ${t.age || "N/A"}, Gender: ${t.gender || "N/A"}, Passport: ${t.passportNumber || "N/A"})`
-          ).join("<br>");
+            const travellersList = data.travellers.map((t, idx) => 
+              `${idx + 1}. ${t.firstName} ${t.lastName} (Age: ${t.age || "N/A"}, Gender: ${t.gender || "N/A"}, Passport: ${t.passportNumber || "N/A"})`
+            ).join("<br>");
 
-          await sendEmail({
-            to: tourAdminEmail,
-            subject: `New Tour Booking - ${data.tourName || tourRecord.name}`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h1>New Tour Booking</h1>
-                <p>A new tour booking has been created:</p>
-                <ul>
-                  <li><strong>Tour:</strong> ${data.tourName || tourRecord.name}</li>
-                  <li><strong>Customer:</strong> ${data.primaryContact.name} (${data.primaryContact.email})</li>
-                  <li><strong>Phone:</strong> ${data.primaryContact.phone || "N/A"}</li>
-                  <li><strong>Travel Date:</strong> ${new Date(data.travelDate).toLocaleDateString()}</li>
-                  <li><strong>Total Amount:</strong> ₹${finalTotalAmount.toLocaleString()}</li>
-                  <li><strong>Payment Type:</strong> ${data.paymentType === "full" ? "Full Payment" : `Advance Payment (${data.advancePercentage || 0}%)`}</li>
-                  <li><strong>Booking ID:</strong> ${booking.id}</li>
-                  <li><strong>Status:</strong> ${initialStatus}</li>
-                  <li><strong>Number of Travellers:</strong> ${data.travellers.length} (${adultCount} adults, ${childCount} children)</li>
-                </ul>
-                <h3>Travellers:</h3>
-                <p>${travellersList}</p>
-                <h3>Documents:</h3>
-                <p>${documentsInfo || "No documents uploaded yet"}</p>
-                ${data.preferences?.specialRequests ? `<p><strong>Special Requests:</strong> ${data.preferences.specialRequests}</p>` : ""}
-                ${data.preferences?.foodPreference ? `<p><strong>Food Preference:</strong> ${data.preferences.foodPreference}</p>` : ""}
-                <p><a href="${process.env.NEXTAUTH_URL || "https://travunited.in"}/admin/bookings/${booking.id}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View Booking</a></p>
-                <p>Best regards,<br>Travunited System</p>
-              </div>
-            `,
-            category: "tours",
-          });
+            await sendEmail({
+              to: tourAdminEmail,
+              subject: `New Tour Booking - ${data.tourName || tourRecord.name}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h1>New Tour Booking</h1>
+                  <p>A new tour booking has been created:</p>
+                  <ul>
+                    <li><strong>Tour:</strong> ${data.tourName || tourRecord.name}</li>
+                    <li><strong>Customer:</strong> ${data.primaryContact.name} (${data.primaryContact.email})</li>
+                    <li><strong>Phone:</strong> ${data.primaryContact.phone || "N/A"}</li>
+                    <li><strong>Travel Date:</strong> ${new Date(data.travelDate).toLocaleDateString()}</li>
+                    <li><strong>Total Amount:</strong> ₹${finalTotalAmount.toLocaleString()}</li>
+                    <li><strong>Payment Type:</strong> ${data.paymentType === "full" ? "Full Payment" : `Advance Payment (${data.advancePercentage || 0}%)`}</li>
+                    <li><strong>Booking ID:</strong> ${booking.id}</li>
+                    <li><strong>Status:</strong> ${initialStatus}</li>
+                    <li><strong>Number of Travellers:</strong> ${data.travellers.length} (${adultCount} adults, ${childCount} children)</li>
+                  </ul>
+                  <h3>Travellers:</h3>
+                  <p>${travellersList}</p>
+                  <h3>Documents:</h3>
+                  <p>${documentsInfo || "No documents uploaded yet"}</p>
+                  ${data.preferences?.specialRequests ? `<p><strong>Special Requests:</strong> ${data.preferences.specialRequests}</p>` : ""}
+                  ${data.preferences?.foodPreference ? `<p><strong>Food Preference:</strong> ${data.preferences.foodPreference}</p>` : ""}
+                  <p><a href="${process.env.NEXTAUTH_URL || "https://travunited.in"}/admin/bookings/${booking.id}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View Booking</a></p>
+                  <p>Best regards,<br>Travunited System</p>
+                </div>
+              `,
+              category: "tours",
+            });
+          } catch (emailError) {
+            console.error("Error sending tour booking admin notification email:", emailError);
+            // Don't fail the request if email fails
+          }
         }
       }
     } catch (notifyError) {

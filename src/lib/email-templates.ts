@@ -51,6 +51,13 @@ export interface EmailTemplateVariables {
   role?: string;
   tempPassword?: string;
   loginUrl?: string;
+  
+  // Career application variables
+  positionTitle?: string;
+  statusColor?: string;
+  statusMessage?: string;
+  applicationIdShort?: string;
+  nextStepsSection?: string;
 }
 
 /**
@@ -407,6 +414,40 @@ export function getDefaultEmailTemplate(templateKey: string): string {
   </ul>
   <p>We look forward to helping your organization with its travel needs!</p>
   <p>Best regards,<br>The {companyName} Corporate Team</p>
+</div>`,
+
+    careerApplicationStatusEmail: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+    <h1 style="margin: 0; font-size: 28px;">Application Status Update</h1>
+  </div>
+  <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+    <p>Dear {name},</p>
+    
+    <div style="background: white; padding: 20px; border-left: 4px solid {statusColor}; margin: 20px 0;">
+      <p style="margin: 0;">{statusMessage}</p>
+    </div>
+
+    <div style="text-align: center; margin: 30px 0;">
+      <span style="display: inline-block; padding: 8px 16px; border-radius: 20px; color: white; font-weight: bold; background-color: {statusColor};">{status}</span>
+    </div>
+
+    <div style="background: white; padding: 15px; border-radius: 5px; margin: 20px 0;">
+      <p style="margin: 5px 0;"><strong>Position:</strong> {positionTitle}</p>
+      <p style="margin: 5px 0;"><strong>Application ID:</strong> {applicationIdShort}</p>
+      <p style="margin: 5px 0;"><strong>Status:</strong> {status}</p>
+    </div>
+
+    {nextStepsSection}
+
+    <p>If you have any questions, please feel free to reach out to us at <a href="mailto:careers@travunited.in">careers@travunited.in</a>.</p>
+
+    <p>Thank you for your interest in joining {companyName}!</p>
+
+    <div style="text-align: center; color: #666; font-size: 12px; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+      <p><strong>{companyName}</strong> - Making travel easier</p>
+      <p>This is an automated email. Please do not reply directly to this message.</p>
+    </div>
+  </div>
 </div>`,
   };
   

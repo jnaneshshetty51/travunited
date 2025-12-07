@@ -65,72 +65,92 @@ export async function PUT(
     });
 
     // Send email notifications and in-app notifications
-    if (status === "APPROVED") {
-      await sendVisaApprovedEmail(
-        application.user.email,
-        application.id,
-        application.country || "",
-        application.visaType || ""
-      );
-      await notify({
-        userId: application.userId,
-        type: "VISA_STATUS_CHANGED",
-        title: "Visa Application Approved",
-        message: `Good news! Your visa application for ${application.country || ""} ${application.visaType || ""} has been approved.`,
-        link: `/dashboard/applications/${application.id}`,
-        data: {
-          applicationId: application.id,
-          status: "APPROVED",
-          country: application.country,
-          visaType: application.visaType,
-        },
-        sendEmail: false, // Email already sent above
-      });
-    } else if (status === "REJECTED") {
-      await sendVisaRejectedEmail(
-        application.user.email,
-        application.id,
-        application.country || "",
-        application.visaType || "",
-        rejectionReason || ""
-      );
-      await notify({
-        userId: application.userId,
-        type: "VISA_STATUS_CHANGED",
-        title: "Visa Application Rejected",
-        message: `Unfortunately, your visa application for ${application.country || ""} ${application.visaType || ""} was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`,
-        link: `/dashboard/applications/${application.id}`,
-        data: {
-          applicationId: application.id,
-          status: "REJECTED",
-          country: application.country,
-          visaType: application.visaType,
-          reason: rejectionReason,
-        },
-        sendEmail: false, // Email already sent above
-      });
-    } else {
-      await sendVisaStatusUpdateEmail(
-        application.user.email,
-        application.id,
-        application.country || "",
-        application.visaType || "",
-        status
-      );
-      await notify({
-        userId: application.userId,
-        type: "VISA_STATUS_CHANGED",
-        title: "Visa Application Status Updated",
-        message: `Your visa application for ${application.country || ""} ${application.visaType || ""} is now ${status}.`,
-        link: `/dashboard/applications/${application.id}`,
-        data: {
-          applicationId: application.id,
-          status,
-          country: application.country,
-          visaType: application.visaType,
-        },
-        sendEmail: false, // Email already sent above
-      });
+    try {
+      if (status === "APPROVED") {
+        try {
+          await sendVisaApprovedEmail(
+            application.user.email,
+            application.id,
+            application.country || "",
+            application.visaType || ""
+          );
+        } catch (emailError) {
+          console.error("Error sending visa approved email:", emailError);
+          // Continue with notification even if email fails
+        }
+        await notify({
+          userId: application.userId,
+          type: "VISA_STATUS_CHANGED",
+          title: "Visa Application Approved",
+          message: `Good news! Your visa application for ${application.country || ""} ${application.visaType || ""} has been approved.`,
+          link: `/dashboard/applications/${application.id}`,
+          data: {
+            applicationId: application.id,
+            status: "APPROVED",
+            country: application.country,
+            visaType: application.visaType,
+          },
+          sendEmail: false, // Email already sent above
+        });
+      } else if (status === "REJECTED") {
+        try {
+          await sendVisaRejectedEmail(
+            application.user.email,
+            application.id,
+            application.country || "",
+            application.visaType || "",
+            rejectionReason || ""
+          );
+        } catch (emailError) {
+          console.error("Error sending visa rejected email:", emailError);
+          // Continue with notification even if email fails
+        }
+        await notify({
+          userId: application.userId,
+          type: "VISA_STATUS_CHANGED",
+          title: "Visa Application Rejected",
+          message: `Unfortunately, your visa application for ${application.country || ""} ${application.visaType || ""} was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ""}`,
+          link: `/dashboard/applications/${application.id}`,
+          data: {
+            applicationId: application.id,
+            status: "REJECTED",
+            country: application.country,
+            visaType: application.visaType,
+            reason: rejectionReason,
+          },
+          sendEmail: false, // Email already sent above
+        });
+      } else {
+        try {
+          await sendVisaStatusUpdateEmail(
+            application.user.email,
+            application.id,
+            application.country || "",
+            application.visaType || "",
+            status
+          );
+        } catch (emailError) {
+          console.error("Error sending visa status update email:", emailError);
+          // Continue with notification even if email fails
+        }
+        await notify({
+          userId: application.userId,
+          type: "VISA_STATUS_CHANGED",
+          title: "Visa Application Status Updated",
+          message: `Your visa application for ${application.country || ""} ${application.visaType || ""} is now ${status}.`,
+          link: `/dashboard/applications/${application.id}`,
+          data: {
+            applicationId: application.id,
+            status,
+            country: application.country,
+            visaType: application.visaType,
+          },
+          sendEmail: false, // Email already sent above
+        });
+      }
+    } catch (notificationError) {
+      console.error("Error sending notifications:", notificationError);
+      // Don't fail the status update if notifications fail
     }
 
     await logAuditEvent({

@@ -316,32 +316,37 @@ export async function POST(req: Request) {
           `${idx + 1}. ${t.firstName} ${t.lastName} (DOB: ${t.dateOfBirth}, Passport: ${t.passportNumber || "N/A"})`
         ).join("<br>");
 
-        await sendEmail({
-          to: visaAdminEmail,
-          subject: `New Visa Application - ${application.country || ""} ${application.visaType || ""}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h1>New Visa Application Received</h1>
-              <p>A new visa application has been created:</p>
-              <ul>
-                <li><strong>Application ID:</strong> ${application.id}</li>
-                <li><strong>Country:</strong> ${application.country || "N/A"}</li>
-                <li><strong>Visa Type:</strong> ${application.visaType || "N/A"}</li>
-                <li><strong>Customer:</strong> ${data.primaryContact.name} (${data.primaryContact.email})</li>
-                <li><strong>Phone:</strong> ${data.primaryContact.phone || "N/A"}</li>
-                <li><strong>Travel Date:</strong> ${data.travelDate ? new Date(data.travelDate).toLocaleDateString() : "Not specified"}</li>
-                <li><strong>Total Amount:</strong> ₹${(data.totalAmount || 0).toLocaleString()}</li>
-                <li><strong>Number of Travellers:</strong> ${data.travellers.length}</li>
-              </ul>
-              <h3>Travellers:</h3>
-              <p>${travellersList}</p>
-              <p><strong>Note:</strong> Documents will be uploaded separately. Please check the application dashboard for document uploads.</p>
-              <p><a href="${process.env.NEXTAUTH_URL || "https://travunited.in"}/admin/applications/${application.id}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View Application</a></p>
-              <p>Best regards,<br>Travunited System</p>
-            </div>
-          `,
-          category: "visa",
-        });
+        try {
+          await sendEmail({
+            to: visaAdminEmail,
+            subject: `New Visa Application - ${application.country || ""} ${application.visaType || ""}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h1>New Visa Application Received</h1>
+                <p>A new visa application has been created:</p>
+                <ul>
+                  <li><strong>Application ID:</strong> ${application.id}</li>
+                  <li><strong>Country:</strong> ${application.country || "N/A"}</li>
+                  <li><strong>Visa Type:</strong> ${application.visaType || "N/A"}</li>
+                  <li><strong>Customer:</strong> ${data.primaryContact.name} (${data.primaryContact.email})</li>
+                  <li><strong>Phone:</strong> ${data.primaryContact.phone || "N/A"}</li>
+                  <li><strong>Travel Date:</strong> ${data.travelDate ? new Date(data.travelDate).toLocaleDateString() : "Not specified"}</li>
+                  <li><strong>Total Amount:</strong> ₹${(data.totalAmount || 0).toLocaleString()}</li>
+                  <li><strong>Number of Travellers:</strong> ${data.travellers.length}</li>
+                </ul>
+                <h3>Travellers:</h3>
+                <p>${travellersList}</p>
+                <p><strong>Note:</strong> Documents will be uploaded separately. Please check the application dashboard for document uploads.</p>
+                <p><a href="${process.env.NEXTAUTH_URL || "https://travunited.in"}/admin/applications/${application.id}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">View Application</a></p>
+                <p>Best regards,<br>Travunited System</p>
+              </div>
+            `,
+            category: "visa",
+          });
+        } catch (adminEmailError) {
+          console.error("Error sending admin notification email for new application:", adminEmailError);
+          // Continue even if admin email fails
+        }
 
         // Notify admins in-app (email already sent above)
         const adminIds = await getAdminUserIds();
