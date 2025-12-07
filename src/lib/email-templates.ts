@@ -107,7 +107,6 @@ export function replaceTemplateVariables(
     "{positionTitle}": variables.positionTitle || "",
     "{statusColor}": variables.statusColor || "#6b7280",
     "{statusMessage}": variables.statusMessage || "",
-    "{applicationIdShort}": variables.applicationIdShort || "",
     "{nextStepsSection}": variables.nextStepsSection || "",
   };
   
