@@ -50,20 +50,35 @@ export default function ForgotPasswordPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setResetId(data.resetId || "");
-        setStep("otp");
-        setResendCooldown(60); // 60 second cooldown
+        // Check if email was actually sent
+        if (data.emailSent === false) {
+          // Email sending failed - show warning but still allow OTP entry
+          // (in case email was sent but status wasn't properly returned)
+          setError(
+            "We encountered an issue sending the email. Please check your spam folder, or try resending the OTP. " +
+            (data.error ? `Error: ${data.error}` : "")
+          );
+          // Still proceed to OTP step in case email was actually sent
+        }
         
-        // Start countdown timer
-        const timer = setInterval(() => {
-          setResendCooldown((prev) => {
-            if (prev <= 1) {
-              clearInterval(timer);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
+        if (data.resetId) {
+          setResetId(data.resetId);
+          setStep("otp");
+          setResendCooldown(60); // 60 second cooldown
+          
+          // Start countdown timer
+          const timer = setInterval(() => {
+            setResendCooldown((prev) => {
+              if (prev <= 1) {
+                clearInterval(timer);
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        } else {
+          setError("Failed to initiate password reset. Please try again.");
+        }
       } else {
         setError(data.error || "Failed to send OTP. Please try again.");
       }
@@ -91,19 +106,31 @@ export default function ForgotPasswordPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setResetId(data.resetId || "");
-        setResendCooldown(60);
+        // Check if email was actually sent
+        if (data.emailSent === false) {
+          setError(
+            "We encountered an issue sending the email. Please check your spam folder, or try again. " +
+            (data.error ? `Error: ${data.error}` : "")
+          );
+        } else {
+          setError(""); // Clear any previous errors if email was sent successfully
+        }
         
-        // Start countdown timer
-        const timer = setInterval(() => {
-          setResendCooldown((prev) => {
-            if (prev <= 1) {
-              clearInterval(timer);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
+        if (data.resetId) {
+          setResetId(data.resetId);
+          setResendCooldown(60);
+          
+          // Start countdown timer
+          const timer = setInterval(() => {
+            setResendCooldown((prev) => {
+              if (prev <= 1) {
+                clearInterval(timer);
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        }
       } else {
         setError(data.error || "Failed to resend OTP. Please try again.");
       }

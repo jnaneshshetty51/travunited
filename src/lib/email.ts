@@ -536,12 +536,29 @@ export async function sendPasswordResetOTPEmail(
   role?: UserRole | "CUSTOMER" | "STAFF_ADMIN" | "SUPER_ADMIN" | null
 ) {
   try {
+    console.log("[Email] sendPasswordResetOTPEmail called", {
+      email,
+      otpLength: otp.length,
+      role: role || "not provided",
+    });
+    
     const subject = "Your Password Reset OTP";
     const templates = await loadEmailTemplates();
     const template = getEmailTemplate("passwordResetOTPEmail", templates.emailPasswordResetOTP);
     
+    console.log("[Email] Password Reset OTP template loaded", {
+      hasTemplate: !!template,
+      templateLength: template?.length || 0,
+      hasCustomTemplate: !!templates.emailPasswordResetOTP,
+      customTemplateLength: templates.emailPasswordResetOTP?.length || 0,
+    });
+    
     if (!template || !template.trim()) {
-      console.error("[Email] Password Reset OTP template is empty");
+      console.error("[Email] Password Reset OTP template is empty", {
+        templateKey: "passwordResetOTPEmail",
+        hasCustomTemplate: !!templates.emailPasswordResetOTP,
+        customTemplateValue: templates.emailPasswordResetOTP || "undefined",
+      });
       return false;
     }
     
@@ -552,22 +569,48 @@ export async function sendPasswordResetOTPEmail(
     
     const html = replaceTemplateVariables(template, variables);
     
+    console.log("[Email] Password Reset OTP HTML generated", {
+      htmlLength: html?.length || 0,
+      hasHtml: !!html && html.trim().length > 0,
+    });
+    
     if (!html || !html.trim()) {
-      console.error("[Email] Generated HTML for Password Reset OTP is empty");
+      console.error("[Email] Generated HTML for Password Reset OTP is empty", {
+        templateLength: template.length,
+        variables,
+      });
       return false;
     }
     
     // Password reset OTP emails should ALWAYS go to the user's actual email address
     // Bypass active check to ensure password reset emails are sent even if user is inactive
-    return await sendEmail({
+    console.log("[Email] Calling sendEmail for Password Reset OTP", {
+      to: email,
+      subject,
+      category: "general",
+      bypassActiveCheck: true,
+    });
+    
+    const result = await sendEmail({
       to: email,
       subject,
       html,
       category: "general",
       bypassActiveCheck: true, // Always send password reset emails, even to inactive users
     });
+    
+    console.log("[Email] sendEmail result for Password Reset OTP", {
+      success: result,
+      email,
+    });
+    
+    return result;
   } catch (error) {
-    console.error("[Email] Error in sendPasswordResetOTPEmail:", error);
+    console.error("[Email] Error in sendPasswordResetOTPEmail:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      email,
+    });
     return false;
   }
 }

@@ -239,12 +239,22 @@ export async function POST(req: Request) {
       });
     }
 
-    // In production, still return success even if email failed (security best practice)
-    // But log the error for admin investigation
-    return NextResponse.json({
-      message: "If an account exists with this email, an OTP has been sent.",
+    // Return success with emailSent status so frontend can show appropriate message
+    // Still return resetId even if email failed (user might have received it)
+    const responseData: any = {
+      message: emailSent 
+        ? "If an account exists with this email, an OTP has been sent."
+        : "If an account exists with this email, an OTP has been sent. Please check your spam folder or try again.",
       resetId: passwordReset.id, // Return resetId for OTP verification
-    });
+      emailSent, // Include emailSent status for frontend handling
+    };
+    
+    // Include error in development for debugging
+    if (process.env.NODE_ENV !== "production" && !emailSent) {
+      responseData.error = getLastEmailError();
+    }
+    
+    return NextResponse.json(responseData);
   } catch (error) {
     if (error instanceof z.ZodError) {
       // Still return generic success to avoid email enumeration
