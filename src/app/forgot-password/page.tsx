@@ -76,10 +76,21 @@ export default function ForgotPasswordPage() {
             message: data.message,
             error: data.error,
           });
-          setError(
-            "We couldn't process your request. This might happen if the email doesn't exist in our system. " +
-            "Please check your email address and try again, or contact support if the problem persists."
-          );
+          
+          // Show a more helpful error message
+          // If there's a server error in development, show it
+          if (data.error && (process.env.NODE_ENV === "development" || window.location.hostname === "localhost")) {
+            setError(
+              `We encountered an issue processing your request: ${data.error}. ` +
+              "Please try again or contact support if the problem persists."
+            );
+          } else {
+            // Generic message for production - don't mention email existence to avoid confusion
+            setError(
+              "We couldn't process your request at this time. " +
+              "Please try again in a moment, or contact support if the problem persists."
+            );
+          }
           return;
         }
         

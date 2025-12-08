@@ -144,6 +144,11 @@ export async function POST(req: Request) {
     // Create password reset record with OTP
     let passwordReset;
     try {
+      console.log("[Password Reset] Creating password reset record", {
+        userId: user.id,
+        userEmail: user.email,
+      });
+      
       passwordReset = await prisma.passwordReset.create({
         data: {
           userId: user.id,
@@ -155,16 +160,44 @@ export async function POST(req: Request) {
           userAgent: userAgent || undefined,
         },
       });
+      
+      console.log("[Password Reset] Password reset record created successfully", {
+        resetId: passwordReset.id,
+        userId: user.id,
+        userEmail: user.email,
+      });
     } catch (dbError) {
       console.error("[Password Reset] Failed to create password reset record", {
         userId: user.id,
         userEmail: user.email,
         error: dbError instanceof Error ? dbError.message : String(dbError),
         stack: dbError instanceof Error ? dbError.stack : undefined,
+        errorName: dbError instanceof Error ? dbError.name : typeof dbError,
       });
-      // Still return success to avoid revealing user existence
+      // Return error response with details for debugging (but still generic message to user)
+      // This should not happen in normal operation - if it does, it's a database issue
       return NextResponse.json(
-        { message: "If an account exists with this email, a reset link has been sent." },
+        { 
+          message: "If an account exists with this email, a reset link has been sent.",
+          error: process.env.NODE_ENV !== "production" ? "Database error creating reset record" : undefined,
+        },
+        { status: 200 }
+      );
+    }
+    
+    // Verify password reset record was created with an ID
+    if (!passwordReset || !passwordReset.id) {
+      console.error("[Password Reset] Password reset record created but missing ID", {
+        userId: user.id,
+        userEmail: user.email,
+        passwordReset: passwordReset ? JSON.stringify(passwordReset) : "null",
+      });
+      // This should never happen, but handle it gracefully
+      return NextResponse.json(
+        { 
+          message: "If an account exists with this email, a reset link has been sent.",
+          error: process.env.NODE_ENV !== "production" ? "Reset record missing ID" : undefined,
+        },
         { status: 200 }
       );
     }
@@ -237,8 +270,25 @@ export async function POST(req: Request) {
 
       // Send OTP email - await it to ensure it's sent before responding
       // This ensures we catch errors and can log them properly
+      // Note: We pass the user's actual email and role, but sendPasswordResetOTPEmail
+      // uses bypassActiveCheck: true and sends directly to the email (not routed through admin inbox)
+      console.log("[Password Reset] Attempting to send OTP email", {
+        userId: user.id,
+        userEmail: user.email,
+        userRole: user.role,
+        resetId: passwordReset.id,
+        otp: otp,
+      });
+      
       try {
         emailSent = await sendPasswordResetOTPEmail(user.email, otp, user.role);
+        
+        console.log("[Password Reset] sendPasswordResetOTPEmail returned", {
+          emailSent,
+          userId: user.id,
+          userEmail: user.email,
+          resetId: passwordReset.id,
+        });
 
         if (emailSent) {
           console.log("[Password Reset] OTP email sent successfully", {
@@ -286,6 +336,8 @@ export async function POST(req: Request) {
         if (lastError) {
           console.error("[Password Reset] Last email error:", lastError);
         }
+        // Don't set emailSent = false here, it's already false by default
+        // But we should still continue to return resetId
       }
     }
 
@@ -319,25 +371,33 @@ export async function POST(req: Request) {
       );
     }
     
+    // Ensure emailSent is a boolean (not undefined)
+    const finalEmailSent = emailSent === true;
+    
     const responseData: any = {
-      message: emailSent 
+      message: finalEmailSent 
         ? "If an account exists with this email, an OTP has been sent."
         : "If an account exists with this email, an OTP has been sent. Please check your spam folder or try again.",
       resetId: passwordReset.id, // Return resetId for OTP verification
-      emailSent, // Include emailSent status for frontend handling
+      emailSent: finalEmailSent, // Include emailSent status for frontend handling (always boolean)
     };
     
     // Include error in development for debugging
-    if (process.env.NODE_ENV !== "production" && !emailSent) {
-      responseData.error = getLastEmailError();
+    if (process.env.NODE_ENV !== "production" && !finalEmailSent) {
+      const lastError = getLastEmailError();
+      if (lastError) {
+        responseData.error = lastError;
+      }
     }
     
     console.log("[Password Reset] Returning response", {
       hasResetId: !!responseData.resetId,
       resetId: responseData.resetId,
       emailSent: responseData.emailSent,
+      emailSentType: typeof responseData.emailSent,
       userId: user.id,
       userEmail: user.email,
+      passwordResetId: passwordReset.id,
     });
     
     return NextResponse.json(responseData);
