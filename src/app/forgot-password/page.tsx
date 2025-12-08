@@ -50,6 +50,20 @@ export default function ForgotPasswordPage() {
       const data = await response.json();
 
       if (response.ok) {
+        // Check if resetId is present (required for OTP verification)
+        if (!data.resetId) {
+          // This could mean:
+          // 1. User doesn't exist (security: we don't reveal this)
+          // 2. Database error creating reset record
+          // 3. Other server error
+          console.error("Password reset response missing resetId", { data });
+          setError(
+            "We couldn't process your request. This might happen if the email doesn't exist in our system. " +
+            "Please check your email address and try again, or contact support if the problem persists."
+          );
+          return;
+        }
+        
         // Check if email was actually sent
         if (data.emailSent === false) {
           // Email sending failed - show warning but still allow OTP entry
@@ -59,26 +73,25 @@ export default function ForgotPasswordPage() {
             (data.error ? `Error: ${data.error}` : "")
           );
           // Still proceed to OTP step in case email was actually sent
+        } else {
+          // Clear any previous errors if email was sent successfully
+          setError("");
         }
         
-        if (data.resetId) {
-          setResetId(data.resetId);
-          setStep("otp");
-          setResendCooldown(60); // 60 second cooldown
-          
-          // Start countdown timer
-          const timer = setInterval(() => {
-            setResendCooldown((prev) => {
-              if (prev <= 1) {
-                clearInterval(timer);
-                return 0;
-              }
-              return prev - 1;
-            });
-          }, 1000);
-        } else {
-          setError("Failed to initiate password reset. Please try again.");
-        }
+        setResetId(data.resetId);
+        setStep("otp");
+        setResendCooldown(60); // 60 second cooldown
+        
+        // Start countdown timer
+        const timer = setInterval(() => {
+          setResendCooldown((prev) => {
+            if (prev <= 1) {
+              clearInterval(timer);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
       } else {
         setError(data.error || "Failed to send OTP. Please try again.");
       }

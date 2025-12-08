@@ -86,17 +86,32 @@ export async function POST(req: Request) {
     const userAgent = req.headers.get("user-agent") || undefined;
 
     // Create password reset record with OTP
-    const passwordReset = await prisma.passwordReset.create({
-      data: {
+    let passwordReset;
+    try {
+      passwordReset = await prisma.passwordReset.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt,
+          otp,
+          otpExpiresAt,
+          ip: ip || undefined,
+          userAgent: userAgent || undefined,
+        },
+      });
+    } catch (dbError) {
+      console.error("[Password Reset] Failed to create password reset record", {
         userId: user.id,
-        tokenHash,
-        expiresAt,
-        otp,
-        otpExpiresAt,
-        ip: ip || undefined,
-        userAgent: userAgent || undefined,
-      },
-    });
+        userEmail: user.email,
+        error: dbError instanceof Error ? dbError.message : String(dbError),
+        stack: dbError instanceof Error ? dbError.stack : undefined,
+      });
+      // Still return success to avoid revealing user existence
+      return NextResponse.json(
+        { message: "If an account exists with this email, a reset link has been sent." },
+        { status: 200 }
+      );
+    }
 
     console.log("[Password Reset] Generated OTP", {
       userId: user.id,
@@ -110,6 +125,8 @@ export async function POST(req: Request) {
 
     // Validate email configuration before attempting to send
     const emailServiceConfig = await getEmailServiceConfig();
+    let emailSent = false;
+    
     if (!emailServiceConfig.awsAccessKeyId || !emailServiceConfig.awsSecretAccessKey || !emailServiceConfig.awsRegion) {
       const errorMsg = "Email service not configured - AWS SES credentials missing. Configure it in Admin → Settings → Email Service Configuration or set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION environment variables.";
       console.error("[Password Reset]", errorMsg, {
@@ -133,13 +150,8 @@ export async function POST(req: Request) {
           emailFromGeneral: emailServiceConfig.emailFromGeneral ? "SET" : "MISSING",
         },
       });
-      // Still return success to user (security best practice - don't reveal if account exists)
-      return NextResponse.json({
-        message: "If an account exists with this email, a reset link has been sent.",
-      });
-    }
-
-    if (!emailServiceConfig.emailFromGeneral) {
+      // Continue to return response with resetId even though email failed
+    } else if (!emailServiceConfig.emailFromGeneral) {
       const errorMsg = "Email service not configured - Sender email missing. Configure it in Admin → Settings → Email Service Configuration or set EMAIL_FROM environment variable.";
       console.error("[Password Reset]", errorMsg, {
         userId: user.id,
@@ -154,47 +166,63 @@ export async function POST(req: Request) {
           emailFromGeneral: emailServiceConfig.emailFromGeneral ? "SET" : "MISSING",
         },
       });
-      // Still return success to user (security best practice - don't reveal if account exists)
-      return NextResponse.json({
-        message: "If an account exists with this email, a reset link has been sent.",
+      // Continue to return response with resetId even though email failed
+    } else {
+
+      console.log("[Password Reset] Email configuration validated", {
+        userId: user.id,
+        userEmail: user.email,
+        resetId: passwordReset.id,
+        hasAWSCredentials: !!(emailServiceConfig.awsAccessKeyId && emailServiceConfig.awsSecretAccessKey),
+        hasRegion: !!emailServiceConfig.awsRegion,
+        hasEmailFrom: !!emailServiceConfig.emailFromGeneral,
+        emailFrom: emailServiceConfig.emailFromGeneral?.substring(0, 50) + "...",
       });
-    }
 
-    console.log("[Password Reset] Email configuration validated", {
-      userId: user.id,
-      userEmail: user.email,
-      resetId: passwordReset.id,
-      hasAWSCredentials: !!(emailServiceConfig.awsAccessKeyId && emailServiceConfig.awsSecretAccessKey),
-      hasRegion: !!emailServiceConfig.awsRegion,
-      hasEmailFrom: !!emailServiceConfig.emailFromGeneral,
-      emailFrom: emailServiceConfig.emailFromGeneral?.substring(0, 50) + "...",
-    });
+      // Send OTP email - await it to ensure it's sent before responding
+      // This ensures we catch errors and can log them properly
+      try {
+        emailSent = await sendPasswordResetOTPEmail(user.email, otp, user.role);
 
-    // Send OTP email - await it to ensure it's sent before responding
-    // This ensures we catch errors and can log them properly
-    let emailSent = false;
-    try {
-      emailSent = await sendPasswordResetOTPEmail(user.email, otp, user.role);
-
-      if (emailSent) {
-        console.log("[Password Reset] OTP email sent successfully", {
+        if (emailSent) {
+          console.log("[Password Reset] OTP email sent successfully", {
+            userId: user.id,
+            userEmail: user.email,
+            resetId: passwordReset.id,
+            timestamp: new Date().toISOString(),
+          });
+        } else {
+          console.error("[Password Reset] FAILED to send OTP email", {
+            userId: user.id,
+            userEmail: user.email,
+            resetId: passwordReset.id,
+            error: "sendPasswordResetOTPEmail returned false",
+            checkEnvVars: {
+              AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID ? "SET" : "MISSING",
+              AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY ? "SET" : "MISSING",
+              AWS_REGION: process.env.AWS_REGION || "MISSING",
+              EMAIL_FROM: process.env.EMAIL_FROM || "MISSING",
+              NEXTAUTH_URL: process.env.NEXTAUTH_URL || "MISSING",
+            },
+          });
+          // Log the last email error if available
+          const lastError = getLastEmailError();
+          if (lastError) {
+            console.error("[Password Reset] Last email error:", lastError);
+          }
+        }
+      } catch (emailError) {
+        console.error("[Password Reset] Exception sending email", {
           userId: user.id,
           userEmail: user.email,
           resetId: passwordReset.id,
-          timestamp: new Date().toISOString(),
-        });
-      } else {
-        console.error("[Password Reset] FAILED to send OTP email", {
-          userId: user.id,
-          userEmail: user.email,
-          resetId: passwordReset.id,
-          error: "sendPasswordResetOTPEmail returned false",
+          error: emailError instanceof Error ? emailError.message : String(emailError),
+          stack: emailError instanceof Error ? emailError.stack : undefined,
           checkEnvVars: {
             AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID ? "SET" : "MISSING",
             AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY ? "SET" : "MISSING",
             AWS_REGION: process.env.AWS_REGION || "MISSING",
             EMAIL_FROM: process.env.EMAIL_FROM || "MISSING",
-            NEXTAUTH_URL: process.env.NEXTAUTH_URL || "MISSING",
           },
         });
         // Log the last email error if available
@@ -202,25 +230,6 @@ export async function POST(req: Request) {
         if (lastError) {
           console.error("[Password Reset] Last email error:", lastError);
         }
-      }
-    } catch (emailError) {
-      console.error("[Password Reset] Exception sending email", {
-        userId: user.id,
-        userEmail: user.email,
-        resetId: passwordReset.id,
-        error: emailError instanceof Error ? emailError.message : String(emailError),
-        stack: emailError instanceof Error ? emailError.stack : undefined,
-        checkEnvVars: {
-          AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID ? "SET" : "MISSING",
-          AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY ? "SET" : "MISSING",
-          AWS_REGION: process.env.AWS_REGION || "MISSING",
-          EMAIL_FROM: process.env.EMAIL_FROM || "MISSING",
-        },
-      });
-      // Log the last email error if available
-      const lastError = getLastEmailError();
-      if (lastError) {
-        console.error("[Password Reset] Last email error:", lastError);
       }
     }
 
