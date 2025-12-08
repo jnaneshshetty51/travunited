@@ -42,9 +42,11 @@ export async function POST(req: Request) {
     // Persist message
     await prisma.contactMessage.create({
       data: {
+        name: data.name,
         email: data.email,
-        subject: `[Contact Form] ${data.subject}`,
-        message: `Name: ${data.name}\n${data.phone ? `Phone: ${data.phone}\n` : ""}Email: ${data.email}\n\nMessage:\n${data.message}`,
+        phone: data.phone || null,
+        subject: data.subject,
+        message: data.message,
       },
     });
 

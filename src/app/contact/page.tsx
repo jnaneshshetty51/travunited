@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Mail, Phone, MapPin, Clock, Building2, Globe } from "lucide-react";
 
@@ -34,6 +35,10 @@ const OTHER_CHANNELS = [
 const FUTURE_OFFICES = ["Riyadh, Saudi Arabia", "Delaware, United States", "Berlin, Germany"];
 
 export default function ContactPage() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -192,6 +197,9 @@ export default function ContactPage() {
               className="space-y-6"
               onSubmit={async (e) => {
                 e.preventDefault();
+                setSuccessMessage(null);
+                setErrorMessage(null);
+                setIsSubmitting(true);
                 const formData = new FormData(e.currentTarget);
                 const name = formData.get("name") as string;
                 const email = formData.get("email") as string;
@@ -212,53 +220,36 @@ export default function ContactPage() {
                     }),
                   });
 
-                  // Check if response is OK first
-                  if (!response.ok) {
-                    // Response status is not OK (4xx or 5xx)
-                    let errorMessage = "Failed to send message. Please try again.";
-                    try {
-                      const errorResult = await response.json();
-                      errorMessage = errorResult.error || errorMessage;
-                    } catch {
-                      // If JSON parsing fails, use default message
-                    }
-                    alert(errorMessage);
-                    return;
+                  const result = await response.json().catch(() => ({}));
+                  if (!response.ok || result?.success === false) {
+                    throw new Error(result?.error || "Failed to send message. Please try again.");
                   }
 
-                  // Response is OK (200-299), parse JSON
-                  let result;
-                  try {
-                    result = await response.json();
-                  } catch (parseError) {
-                    // If JSON parsing fails but response was OK, assume success
-                    console.warn("Could not parse response JSON, but response was OK:", parseError);
-                    alert("Thank you for your message! We'll get back to you soon.");
-                    e.currentTarget.reset();
-                    return;
-                  }
-
-                  // Check success flag - if response is OK, treat as success
-                  if (result.success === true || result.ok === true || response.status === 200) {
-                    alert("Thank you for your message! We'll get back to you soon.");
-                    e.currentTarget.reset();
-                  } else {
-                    // Response was OK but success flag is false - still show success since data was saved
-                    alert("Thank you for your message! We'll get back to you soon.");
-                    e.currentTarget.reset();
-                  }
-                } catch (error) {
-                  // Network error or other exception
+                  setSuccessMessage("Thank you! We've received your message.");
+                  e.currentTarget.reset();
+                } catch (error: any) {
                   console.error("Error submitting contact form:", error);
-                  // Only show error if it's a real network/connection issue
-                  if (error instanceof TypeError && error.message.includes("fetch")) {
-                    alert("Network error. Please check your connection and try again.");
-                  } else {
-                    alert("An error occurred. Please try again or contact us directly.");
-                  }
+                  const friendly =
+                    error?.message === "Failed to fetch"
+                      ? "Network error. Please check your connection and try again."
+                      : "Something went wrong while sending your message. Please try again or contact us directly.";
+                  setErrorMessage(friendly);
+                } finally {
+                  setIsSubmitting(false);
                 }
               }}
             >
+              {(successMessage || errorMessage) && (
+                <div
+                  className={`rounded-lg px-4 py-3 text-sm ${
+                    successMessage
+                      ? "bg-green-50 text-green-800 border border-green-200"
+                      : "bg-red-50 text-red-800 border border-red-200"
+                  }`}
+                >
+                  {successMessage || errorMessage}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-2">
                   Your Name *
@@ -320,9 +311,10 @@ export default function ContactPage() {
               </div>
               <button
                 type="submit"
-                className="w-full bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors"
+                disabled={isSubmitting}
+                className="w-full bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Send Message
+                {isSubmitting ? "Sending..." : "Send Message"}
               </button>
             </form>
           </div>
