@@ -55,8 +55,20 @@ export async function POST(req: Request) {
       },
     });
 
+    // Log user lookup result for debugging
+    console.log("[Password Reset] User lookup", {
+      normalizedEmail,
+      userFound: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+      isActive: user?.isActive,
+    });
+
     // Don't reveal if user exists or not (security best practice)
     if (!user) {
+      console.log("[Password Reset] User not found, returning generic success", {
+        normalizedEmail,
+      });
       return NextResponse.json(
         { message: "If an account exists with this email, a reset link has been sent." },
         { status: 200 }

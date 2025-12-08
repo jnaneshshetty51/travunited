@@ -58,7 +58,8 @@ export default function ForgotPasswordPage() {
         emailSent: data.emailSent,
         message: data.message,
         error: data.error,
-        fullResponse: data,
+        fullResponse: JSON.stringify(data, null, 2),
+        keys: Object.keys(data),
       });
 
       if (response.ok) {
@@ -70,8 +71,10 @@ export default function ForgotPasswordPage() {
           // 3. Other server error
           console.error("[Forgot Password] Response missing resetId", { 
             status: response.status,
-            data,
-            responseText: await response.text().catch(() => "Could not read response"),
+            data: JSON.stringify(data, null, 2),
+            dataKeys: Object.keys(data),
+            message: data.message,
+            error: data.error,
           });
           setError(
             "We couldn't process your request. This might happen if the email doesn't exist in our system. " +
