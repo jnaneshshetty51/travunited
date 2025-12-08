@@ -137,7 +137,8 @@ export default async function Home() {
     entryTypeLegacy: visa.entryTypeLegacy,
     stayType: visa.stayType,
     visaSubTypeLabel: visa.visaSubTypeLabel,
-    image: getMediaProxyUrl(visa.sampleVisaImageUrl || visa.heroImageUrl),
+    // Use hero image for cards; do not fall back to sample to avoid thumbnailing
+    image: getMediaProxyUrl(visa.heroImageUrl),
   }));
 
   // Transform tours data for component

@@ -1094,11 +1094,12 @@ export default function AdminApplicationDetailPage() {
                             if (response.ok) {
                               await fetchApplication();
                             } else {
-                              const error = await response.json();
-                              alert(error.error || "Failed to upload invoice");
+                                const error = await response.json().catch(() => ({}));
+                                alert(error.error || "Failed to upload invoice (PDF only, max 10MB)");
                             }
                           } catch (error) {
-                            alert("An error occurred while uploading invoice");
+                            console.error("Error uploading invoice:", error);
+                            alert("An error occurred while uploading invoice (check network or try a smaller PDF under 10MB)");
                           } finally {
                             setUploadingInvoice(false);
                             if (e.target) e.target.value = "";
@@ -1165,11 +1166,12 @@ export default function AdminApplicationDetailPage() {
                             if (response.ok) {
                               await fetchApplication();
                             } else {
-                              const error = await response.json();
-                              alert(error.error || "Failed to upload invoice");
+                                const error = await response.json().catch(() => ({}));
+                                alert(error.error || "Failed to upload invoice (PDF only, max 10MB)");
                             }
                           } catch (error) {
-                            alert("An error occurred while uploading invoice");
+                            console.error("Error uploading invoice:", error);
+                            alert("An error occurred while uploading invoice (check network or try a smaller PDF under 10MB)");
                           } finally {
                             setUploadingInvoice(false);
                             if (e.target) e.target.value = "";
