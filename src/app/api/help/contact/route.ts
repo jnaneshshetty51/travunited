@@ -9,7 +9,9 @@ import { getSupportAdminEmail } from "@/lib/admin-contacts";
 export const dynamic = "force-dynamic";
 
 const contactSchema = z.object({
+  name: z.string().min(1, "Name is required"),
   email: z.string().email(),
+  phone: z.string().min(5, "Phone must be at least 5 characters").optional(),
   subject: z.string().min(1),
   message: z.string().min(1),
 });
@@ -34,7 +36,9 @@ export async function POST(req: Request) {
       // Handle URL-encoded form data as fallback
       const formData = await req.formData();
       body = {
+        name: formData.get("name"),
         email: formData.get("email"),
+        phone: formData.get("phone") || undefined,
         subject: formData.get("subject"),
         message: formData.get("message"),
       };
@@ -51,7 +55,9 @@ export async function POST(req: Request) {
     // Save to database
     const contactMessage = await prisma.contactMessage.create({
       data: {
+        name: data.name,
         email: data.email,
+        phone: data.phone || null,
         subject: data.subject,
         message: data.message,
       },
@@ -66,7 +72,9 @@ export async function POST(req: Request) {
         action: AuditAction.CREATE,
         description: `New help/support message from ${data.email}: ${data.subject}`,
         metadata: {
+          name: data.name,
           email: data.email,
+          phone: data.phone,
           subject: data.subject,
         },
       });
@@ -84,6 +92,15 @@ export async function POST(req: Request) {
         <div style="background-color: #f5f5f5; padding: 20px; border-radius: 5px; margin: 20px 0;">
           <h2 style="margin-top: 0; color: #333;">Message Details</h2>
           <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; width: 120px;">Name:</td>
+              <td style="padding: 8px 0;">${data.name}</td>
+            </tr>
+            ${data.phone ? `
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold;">Phone:</td>
+              <td style="padding: 8px 0;">${data.phone}</td>
+            </tr>` : ""}
             <tr>
               <td style="padding: 8px 0; font-weight: bold; width: 120px;">From:</td>
               <td style="padding: 8px 0;"><a href="mailto:${data.email}">${data.email}</a></td>
