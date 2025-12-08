@@ -368,7 +368,7 @@ function AdminBookingsPageContent() {
                   className="w-full px-4 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 text-sm"
                 >
                   <option value="ALL">All</option>
-                  <option value="UNPAID">Unpaid</option>
+                  <option value="PENDING">Pending</option>
                   <option value="PARTIAL">Partial</option>
                   <option value="PAID">Paid</option>
                   <option value="FAILED">Failed</option>
@@ -689,7 +689,7 @@ function AdminBookingsPageContent() {
                                 booking.paymentStatus === "REFUNDED" ? "bg-purple-100 text-purple-700" :
                                   "bg-neutral-100 text-neutral-700"
                           }`}>
-                          {booking.paymentStatus || "UNPAID"}
+                          {booking.paymentStatus || "PENDING"}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

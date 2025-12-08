@@ -179,7 +179,7 @@ export async function GET(req: Request) {
       const pendingBalance = booking.totalAmount - amountPaid;
       
       // Determine payment status
-      let paymentStatus = "UNPAID";
+      let paymentStatus = "PENDING";
       if (amountRefunded > 0) {
         paymentStatus = "REFUNDED";
       } else if (amountPaid >= booking.totalAmount) {
