@@ -507,26 +507,29 @@ export async function sendPasswordResetEmail(
   const subject = "Reset Your Travunited Password";
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h1>Password Reset Request</h1>
-      <p>You requested to reset your password. Click the link below to set a new password:</p>
-      <p><a href="${resetLink}" style="background: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Reset Password</a></p>
-      <p style="margin-top: 20px; font-size: 12px; color: #666;">If the button doesn't work, copy and paste this link into your browser:</p>
-      <p style="font-size: 11px; color: #999; word-break: break-all;">${resetLink}</p>
-      <p>This link will expire in 24 hours.</p>
-      <p>If you didn't request this, please ignore this email.</p>
-      <p>Best regards,<br>The Travunited Team</p>
+      <h1 style="color: #0066cc;">Password Reset</h1>
+      <p>You requested to reset your password. Click the button below to set a new password:</p>
+      <p style="margin: 20px 0;">
+        <a href="${resetLink}" style="background: #0066cc; color: #fff; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Reset Password</a>
+      </p>
+      <p style="margin-top: 12px; font-size: 13px; color: #444;">If the button doesn’t work, copy and paste this link into your browser:</p>
+      <p style="font-size: 12px; color: #555; word-break: break-all;">${resetLink}</p>
+      <p style="margin-top: 12px; font-size: 12px; color: #666;">This link will expire in 1 hour.</p>
+      <p style="margin-top: 20px; font-size: 12px; color: #666;">If you didn’t request this, you can safely ignore this email.</p>
+      <p style="margin-top: 20px;">Best regards,<br/>The Travunited Team</p>
     </div>
   `;
-  
-  // Password reset emails should ALWAYS go to the user's actual email address
-  // Never route to admin inbox, even for admin users
-  // Bypass active check to ensure password reset emails are sent even if user is inactive
+
+  const text = `Reset your Travunited password: ${resetLink}\n\nThis link expires in 1 hour. If you didn't request this, ignore this email.`;
+
+  // Password reset emails must always go to the user and skip active checks, same path as contact sendEmail
   return sendEmail({
     to: email,
     subject,
     html,
+    text,
     category: "general",
-    bypassActiveCheck: true, // Always send password reset emails, even to inactive users
+    bypassActiveCheck: true,
   });
 }
 
