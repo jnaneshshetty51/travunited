@@ -530,6 +530,18 @@ export async function sendPasswordResetEmail(
   });
 }
 
+// Fallback simple OTP email template (used if template loading fails)
+const FALLBACK_OTP_TEMPLATE = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <h1 style="color: #667eea;">Password Reset OTP</h1>
+  <p>You requested to reset your password. Use the OTP below to verify your identity:</p>
+  <div style="background: #f0f0f0; border: 2px solid #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0;">
+    <p style="font-size: 36px; font-weight: bold; color: #667eea; margin: 0; letter-spacing: 8px; font-family: 'Courier New', monospace;">{otp}</p>
+  </div>
+  <p><strong>Important:</strong> This OTP is valid for 10 minutes only. Do not share this OTP with anyone.</p>
+  <p>If you didn't request this, please ignore this email.</p>
+  <p>Best regards,<br>The Travunited Team</p>
+</div>`;
+
 export async function sendPasswordResetOTPEmail(
   email: string,
   otp: string,
@@ -543,23 +555,42 @@ export async function sendPasswordResetOTPEmail(
     });
     
     const subject = "Your Password Reset OTP";
-    const templates = await loadEmailTemplates();
-    const template = getEmailTemplate("passwordResetOTPEmail", templates.emailPasswordResetOTP);
     
-    console.log("[Email] Password Reset OTP template loaded", {
-      hasTemplate: !!template,
-      templateLength: template?.length || 0,
-      hasCustomTemplate: !!templates.emailPasswordResetOTP,
-      customTemplateLength: templates.emailPasswordResetOTP?.length || 0,
-    });
-    
-    if (!template || !template.trim()) {
-      console.error("[Email] Password Reset OTP template is empty", {
-        templateKey: "passwordResetOTPEmail",
+    // Load templates and ensure we have a valid template
+    let template: string;
+    try {
+      const templates = await loadEmailTemplates();
+      const loadedTemplate = getEmailTemplate("passwordResetOTPEmail", templates.emailPasswordResetOTP);
+      
+      console.log("[Email] Password Reset OTP template loaded", {
+        hasTemplate: !!loadedTemplate,
+        templateLength: loadedTemplate?.length || 0,
         hasCustomTemplate: !!templates.emailPasswordResetOTP,
-        customTemplateValue: templates.emailPasswordResetOTP || "undefined",
+        customTemplateLength: templates.emailPasswordResetOTP?.length || 0,
       });
-      return false;
+      
+      // If template is empty or invalid, force use default
+      if (!loadedTemplate || !loadedTemplate.trim()) {
+        console.warn("[Email] Custom template is empty, forcing default template", {
+          templateKey: "passwordResetOTPEmail",
+        });
+        template = getDefaultEmailTemplate("passwordResetOTPEmail");
+      } else {
+        template = loadedTemplate;
+      }
+    } catch (templateError) {
+      console.error("[Email] Error loading template, using default", {
+        error: templateError instanceof Error ? templateError.message : String(templateError),
+      });
+      template = getDefaultEmailTemplate("passwordResetOTPEmail");
+    }
+    
+    // Final safety check - if still empty, use hardcoded fallback
+    if (!template || !template.trim()) {
+      console.error("[Email] ❌ Password Reset OTP template is still empty after fallback, using hardcoded fallback", {
+        templateKey: "passwordResetOTPEmail",
+      });
+      template = FALLBACK_OTP_TEMPLATE;
     }
     
     const variables: EmailTemplateVariables = {
@@ -572,12 +603,14 @@ export async function sendPasswordResetOTPEmail(
     console.log("[Email] Password Reset OTP HTML generated", {
       htmlLength: html?.length || 0,
       hasHtml: !!html && html.trim().length > 0,
+      templateUsed: template.substring(0, 50) + "...", // First 50 chars for debugging
     });
     
     if (!html || !html.trim()) {
-      console.error("[Email] Generated HTML for Password Reset OTP is empty", {
+      console.error("[Email] ❌ Generated HTML for Password Reset OTP is empty", {
         templateLength: template.length,
         variables,
+        templatePreview: template.substring(0, 100),
       });
       return false;
     }
@@ -589,6 +622,7 @@ export async function sendPasswordResetOTPEmail(
       subject,
       category: "general",
       bypassActiveCheck: true,
+      htmlLength: html.length,
     });
     
     const result = await sendEmail({
@@ -602,14 +636,16 @@ export async function sendPasswordResetOTPEmail(
     console.log("[Email] sendEmail result for Password Reset OTP", {
       success: result,
       email,
+      lastError: result ? null : getLastEmailError(),
     });
     
     return result;
   } catch (error) {
-    console.error("[Email] Error in sendPasswordResetOTPEmail:", {
+    console.error("[Email] ❌ Exception in sendPasswordResetOTPEmail:", {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
       email,
+      otpLength: otp?.length || 0,
     });
     return false;
   }

@@ -71,32 +71,53 @@ export async function POST(req: Request) {
 
     // 5) Send email (non-blocking of overall flow)
     let emailSent = false;
+    let emailError: string | undefined = undefined;
     try {
+      console.log("[Password Reset] Attempting to send OTP email", {
+        userId: user.id,
+        userEmail: user.email,
+        resetId: reset.id,
+        otp: otp, // Log OTP for debugging (remove in production if needed)
+      });
+      
       emailSent = await sendPasswordResetOTPEmail(user.email, otp, user.role);
+      
       if (!emailSent) {
         const lastError = getLastEmailError();
-        console.error("[Password Reset] sendPasswordResetOTPEmail returned false", {
+        emailError = lastError || "Email sending returned false without specific error";
+        console.error("[Password Reset] ❌ sendPasswordResetOTPEmail returned false", {
           userId: user.id,
           userEmail: user.email,
           resetId: reset.id,
-          lastEmailError: lastError || "unknown",
+          lastEmailError: emailError,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        console.log("[Password Reset] ✅ OTP email sent successfully", {
+          userId: user.id,
+          userEmail: user.email,
+          resetId: reset.id,
+          timestamp: new Date().toISOString(),
         });
       }
     } catch (err) {
       const lastError = getLastEmailError();
-      console.error("[Password Reset] Exception sending OTP email", {
+      emailError = err instanceof Error ? err.message : String(err);
+      console.error("[Password Reset] ❌ Exception sending OTP email", {
         userId: user.id,
         userEmail: user.email,
         resetId: reset.id,
-        error: err instanceof Error ? err.message : String(err),
+        error: emailError,
         stack: err instanceof Error ? err.stack : undefined,
         lastEmailError: lastError || null,
+        timestamp: new Date().toISOString(),
       });
       emailSent = false;
     }
 
     // 6) Return resetId (even if email failed), plus emailSent flag
-    return respond(reset.id, emailSent, getLastEmailError() || undefined);
+    // Always include error in response for debugging (even in production for now)
+    return respond(reset.id, emailSent, emailError || getLastEmailError() || undefined);
   } catch (error) {
     if (error instanceof z.ZodError) return respond();
     console.error("[Password Reset] Unexpected error", {
