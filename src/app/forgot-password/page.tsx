@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Mail, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
+import { Mail, ArrowRight, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { shouldShowErrors } from "@/lib/client-config";
 
 export default function ForgotPasswordPage() {
@@ -12,8 +12,10 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [step, setStep] = useState<"email" | "sent">("email");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [emailValid, setEmailValid] = useState(true);
 
   // Suppress harmless browser extension errors
   useEffect(() => {
@@ -34,32 +36,41 @@ export default function ForgotPasswordPage() {
     };
   }, []);
 
+  // Email validation
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleSendLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
+    
+    // Validate email format
+    if (!email.trim()) {
+      setError("Please enter your email address");
+      setEmailValid(false);
+      return;
+    }
+    
+    if (!validateEmail(email)) {
+      setError("Please enter a valid email address");
+      setEmailValid(false);
+      return;
+    }
+    
+    setEmailValid(true);
     setLoading(true);
 
     try {
       const response = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
 
       const data = await response.json();
-      
-      // Log the response for debugging
-      console.log("[Forgot Password] API Response", {
-        status: response.status,
-        ok: response.ok,
-        hasResetId: !!data.resetId,
-        hasEmailSent: typeof data.emailSent !== "undefined",
-        emailSent: data.emailSent,
-        message: data.message,
-        error: data.error,
-        fullResponse: JSON.stringify(data, null, 2),
-        keys: Object.keys(data),
-      });
 
       if (response.ok) {
         if (data.emailSent === false && shouldShowErrors()) {
@@ -69,6 +80,7 @@ export default function ForgotPasswordPage() {
           );
         } else {
           setError("");
+          setSuccess("Reset link sent successfully!");
         }
         setStep("sent");
         setResendCooldown(60);
@@ -161,10 +173,25 @@ export default function ForgotPasswordPage() {
               </div>
 
               {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-2 text-red-700 mb-6">
-                  <AlertCircle size={20} />
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-2 text-red-700 mb-6"
+                >
+                  <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
                   <span className="text-sm">{error}</span>
-                </div>
+                </motion.div>
+              )}
+
+              {success && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start space-x-2 text-green-700 mb-6"
+                >
+                  <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
+                  <span className="text-sm">{success}</span>
+                </motion.div>
               )}
 
               <form onSubmit={handleSendLink} className="space-y-6">
@@ -173,27 +200,36 @@ export default function ForgotPasswordPage() {
                     Email Address
                   </label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" size={20} />
+                    <Mail className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${emailValid ? 'text-neutral-400' : 'text-red-400'}`} size={20} />
                     <input
                       type="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        setEmailValid(true);
+                        setError("");
+                      }}
                       required
                       disabled={loading}
-                      className="w-full pl-10 pr-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50"
+                      className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 transition-colors ${
+                        !emailValid ? 'border-red-300 focus:ring-red-500' : 'border-neutral-300'
+                      }`}
                       placeholder="your.email@example.com"
                     />
                   </div>
+                  {!emailValid && (
+                    <p className="mt-1 text-sm text-red-600">Please enter a valid email address</p>
+                  )}
                 </div>
 
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !email.trim()}
                   className="w-full bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   {loading ? (
                     <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <Loader2 className="animate-spin" size={20} />
                       <span>Sending link...</span>
                     </>
                   ) : (
@@ -222,11 +258,14 @@ export default function ForgotPasswordPage() {
               <h1 className="text-3xl font-bold text-neutral-900 mb-2">
                 Check your email
               </h1>
-              <p className="text-neutral-600">
-                We sent a magic reset link to <strong>{email}</strong>. Click the link to reset your password.
+              <p className="text-neutral-600 mb-2">
+                We sent a magic reset link to <strong className="text-neutral-900">{email}</strong>.
+              </p>
+              <p className="text-sm text-neutral-500">
+                Click the link in your email to reset your password. The link will expire in 1 hour.
               </p>
               <p className="text-sm text-neutral-500 mt-3">
-                Didn’t get it? Check your spam folder or resend below.
+                Didn't receive it? Check your spam folder or resend below.
               </p>
 
               {error && (
