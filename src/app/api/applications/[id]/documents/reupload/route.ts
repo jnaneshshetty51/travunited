@@ -116,7 +116,6 @@ export async function POST(
         status: "PENDING",
         rejectionReason: null, // Clear rejection reason on re-upload
         updatedAt: new Date(),
-        // @ts-expect-error regenerate Prisma client after adding fileSize
         fileSize: file.size,
       },
     });
