@@ -41,6 +41,7 @@ interface Document {
   updatedAt: string;
   rejectionReason?: string;
   requirement?: DocumentRequirementMeta | null;
+  fileSize?: number | null;
   traveller?: {
     id: string;
     firstName: string;
@@ -1274,6 +1275,15 @@ function DocumentCard({
   const currentComment = documentStatusUpdates[doc.id]?.comment || doc.rejectionReason || "";
   const hasChanges = currentStatus !== doc.status || currentComment !== (doc.rejectionReason || "");
 
+  const formatFileSize = (size?: number | null) => {
+    if (!size && size !== 0) return null;
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const sizeLabel = formatFileSize(doc.fileSize ?? null);
+
   return (
     <div
       className={`border rounded-lg p-4 ${
@@ -1324,6 +1334,11 @@ function DocumentCard({
           <Download size={16} />
           Download
         </a>
+        {sizeLabel && (
+          <span className="text-xs text-neutral-500">
+            {sizeLabel}
+          </span>
+        )}
       </div>
       
       {/* Document Status & Comment Controls */}

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 const resetPasswordSchema = z.object({
   resetId: z.string().min(1, "Reset ID is required"),
-  otp: z.string().regex(/^\d{6}$/, "OTP must be 6 digits"),
+  token: z.string().min(1, "Token is required"),
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { resetId, otp, password } = resetPasswordSchema.parse(body);
+    const { resetId, token, password } = resetPasswordSchema.parse(body);
 
     // Find password reset record
     const passwordReset = await prisma.passwordReset.findUnique({
@@ -69,41 +69,30 @@ export async function POST(req: Request) {
       );
     }
 
-    // Verify OTP
-    if (!passwordReset.otp) {
-      console.error("[Password Reset] No OTP found", { resetId });
-      return NextResponse.json(
-        { error: "Invalid reset request" },
-        { status: 400 }
-      );
-    }
-
-    // Check if OTP is expired
-    if (!passwordReset.otpExpiresAt || new Date() > passwordReset.otpExpiresAt) {
-      console.error("[Password Reset] OTP expired", {
+    // Check if expired
+    if (new Date() > passwordReset.expiresAt) {
+      console.error("[Password Reset] Link expired", {
         resetId,
-        otpExpiresAt: passwordReset.otpExpiresAt,
+        expiresAt: passwordReset.expiresAt,
       });
       return NextResponse.json(
-        { error: "OTP has expired. Please request a new one." },
+        { error: "Reset link has expired. Please request a new one." },
         { status: 400 }
       );
     }
 
-    // Verify OTP (case-sensitive exact match)
-    if (passwordReset.otp !== otp) {
-      console.error("[Password Reset] Invalid OTP", {
+    // Verify token hash
+    const tokenMatches = await bcrypt.compare(token, passwordReset.tokenHash);
+    if (!tokenMatches) {
+      console.error("[Password Reset] Invalid token", {
         resetId,
-        providedOtp: otp,
-        expectedOtp: passwordReset.otp,
+        tokenPrefix: token.slice(0, 6) + "...",
       });
       return NextResponse.json(
-        { error: "Invalid OTP. Please check and try again." },
+        { error: "Invalid reset link. Please request a new one." },
         { status: 400 }
       );
     }
-
-    // OTP verified successfully - proceed with password reset
 
     // Hash new password
     const passwordHash = await bcrypt.hash(password, 10);

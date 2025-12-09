@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Lock, CheckCircle, AlertCircle, ArrowRight } from "lucide-react";
@@ -9,8 +10,8 @@ import { Lock, CheckCircle, AlertCircle, ArrowRight } from "lucide-react";
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const resetId = searchParams.get("resetId");
-  const otp = searchParams.get("otp");
+  const resetId = searchParams.get("id") || searchParams.get("resetId");
+  const token = searchParams.get("token");
   
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -18,48 +19,48 @@ function ResetPasswordContent() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(true);
-  const [otpValid, setOtpValid] = useState(false);
+  const [tokenValid, setTokenValid] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    // Validate OTP on mount
-    const validateOTP = async () => {
-      if (!resetId || !otp) {
-        setError("Invalid reset link. Missing reset ID or OTP.");
+    // Validate magic link token on mount
+    const validateToken = async () => {
+      if (!resetId || !token) {
+        setError("Invalid reset link. Missing reset ID or token.");
         setValidating(false);
         return;
       }
 
       try {
-        const response = await fetch("/api/auth/verify-otp", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ resetId, otp }),
-        });
+        const response = await fetch(
+          `/api/auth/validate-reset-token?id=${encodeURIComponent(resetId)}&token=${encodeURIComponent(token)}`
+        );
 
         const data = await response.json();
 
-        if (response.ok && data.success) {
-          setOtpValid(true);
+        if (response.ok && data.valid) {
+          setTokenValid(true);
+          setEmail(data.email || null);
         } else {
-          setError(data.error || "Invalid or expired OTP. Please request a new one.");
+          setError(data.error || "Invalid or expired reset link. Please request a new one.");
         }
       } catch (err) {
-        console.error("Error validating OTP:", err);
+        console.error("Error validating reset link:", err);
         setError("An error occurred. Please try again.");
       } finally {
         setValidating(false);
       }
     };
 
-    validateOTP();
-  }, [resetId, otp]);
+    validateToken();
+  }, [resetId, token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!resetId || !otp) {
-      setError("Invalid reset session. Please request a new OTP.");
+    if (!resetId || !token) {
+      setError("Invalid reset session. Please request a new link.");
       return;
     }
 
@@ -79,16 +80,27 @@ function ResetPasswordContent() {
       const response = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resetId, otp, password }),
+        body: JSON.stringify({ resetId, token, password }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
         setSuccess(true);
-        setTimeout(() => {
-          router.push("/login");
-        }, 3000);
+        if (email) {
+          try {
+            await signIn("credentials", {
+              redirect: true,
+              email,
+              password,
+              callbackUrl: "/",
+            });
+          } catch {
+            setTimeout(() => router.push("/login"), 2000);
+          }
+        } else {
+          setTimeout(() => router.push("/login"), 2000);
+        }
       } else {
         setError(data.error || "Failed to reset password. Please try again.");
       }
@@ -105,13 +117,13 @@ function ResetPasswordContent() {
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-neutral-600">Validating OTP...</p>
+          <p className="text-neutral-600">Validating reset link...</p>
         </div>
       </div>
     );
   }
 
-  if (!otpValid || !resetId || !otp) {
+  if (!tokenValid || !resetId || !token) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-large p-8 text-center">
@@ -119,16 +131,16 @@ function ResetPasswordContent() {
             <AlertCircle size={32} className="text-red-600" />
           </div>
           <h1 className="text-2xl font-bold text-neutral-900 mb-2">
-            Invalid Reset Request
+            Invalid Reset Link
           </h1>
           <p className="text-neutral-600 mb-6">
-            {error || "This password reset request is invalid or has expired."}
+            {error || "This password reset link is invalid or has expired."}
           </p>
           <Link
             href="/forgot-password"
             className="text-primary-600 hover:text-primary-700 font-medium"
           >
-            Request a new OTP
+            Request a new link
           </Link>
         </div>
       </div>

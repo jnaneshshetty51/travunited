@@ -27,6 +27,11 @@ export async function GET(req: Request) {
     // Find password reset record
     const passwordReset = await prisma.passwordReset.findUnique({
       where: { id: resetId },
+      include: {
+        user: {
+          select: { email: true },
+        },
+      },
     });
 
     if (!passwordReset) {
@@ -98,6 +103,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       valid: true,
+      email: passwordReset.user?.email || null,
     });
   } catch (error) {
     console.error("[Password Reset] Exception validating token:", {

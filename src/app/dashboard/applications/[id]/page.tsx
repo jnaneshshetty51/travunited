@@ -370,6 +370,9 @@ export default function ApplicationDetailPage() {
                                   }}
                                   disabled={uploading === doc.id}
                                 />
+                                <p className="text-xs text-neutral-500 mt-1">
+                                  Accepted: PDF, JPG, PNG up to 20MB
+                                </p>
                                 <button
                                   type="button"
                                   disabled={uploading === doc.id}

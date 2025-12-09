@@ -116,6 +116,7 @@ export async function POST(
         status: "PENDING",
         rejectionReason: null, // Clear rejection reason on re-upload
         updatedAt: new Date(),
+        fileSize: file.size,
       },
     });
 

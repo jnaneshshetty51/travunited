@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { sendPasswordResetOTPEmail, getLastEmailError } from "@/lib/email";
+import { sendPasswordResetEmail, getLastEmailError } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -47,12 +47,10 @@ export async function POST(req: Request) {
     });
     if (!user) return respond(); // silent success
 
-    // 3) Generate OTP and token
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+    // 3) Generate magic link token (no OTP)
     const rawToken = crypto.randomBytes(32).toString("hex");
     const tokenHash = await bcrypt.hash(rawToken, 10);
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour expiry
 
     // 4) Create reset record
     const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || undefined;
@@ -62,30 +60,36 @@ export async function POST(req: Request) {
         userId: user.id,
         tokenHash,
         expiresAt,
-        otp,
-        otpExpiresAt,
+        otp: null,
+        otpExpiresAt: null,
         ip: ip || undefined,
         userAgent: userAgent || undefined,
       },
     });
 
-    // 5) Send email (non-blocking of overall flow)
+    // 5) Build magic link and send email
+    const baseUrl =
+      process.env.NEXTAUTH_URL ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      "https://travunited.in";
+    const magicLink = `${baseUrl}/reset-password?id=${reset.id}&token=${encodeURIComponent(rawToken)}`;
+
     let emailSent = false;
     let emailError: string | undefined = undefined;
     try {
-      console.log("[Password Reset] Attempting to send OTP email", {
+      console.log("[Password Reset] Attempting to send magic link email", {
         userId: user.id,
         userEmail: user.email,
         resetId: reset.id,
-        otp: otp, // Log OTP for debugging (remove in production if needed)
+        magicLinkPreview: magicLink.slice(0, 60) + "...",
       });
       
-      emailSent = await sendPasswordResetOTPEmail(user.email, otp, user.role);
+      emailSent = await sendPasswordResetEmail(user.email, magicLink, user.role);
       
       if (!emailSent) {
         const lastError = getLastEmailError();
         emailError = lastError || "Email sending returned false without specific error";
-        console.error("[Password Reset] ❌ sendPasswordResetOTPEmail returned false", {
+        console.error("[Password Reset] ❌ sendPasswordResetEmail returned false", {
           userId: user.id,
           userEmail: user.email,
           resetId: reset.id,
@@ -93,7 +97,7 @@ export async function POST(req: Request) {
           timestamp: new Date().toISOString(),
         });
       } else {
-        console.log("[Password Reset] ✅ OTP email sent successfully", {
+        console.log("[Password Reset] ✅ Magic link email sent successfully", {
           userId: user.id,
           userEmail: user.email,
           resetId: reset.id,
@@ -103,7 +107,7 @@ export async function POST(req: Request) {
     } catch (err) {
       const lastError = getLastEmailError();
       emailError = err instanceof Error ? err.message : String(err);
-      console.error("[Password Reset] ❌ Exception sending OTP email", {
+      console.error("[Password Reset] ❌ Exception sending magic link email", {
         userId: user.id,
         userEmail: user.email,
         resetId: reset.id,
@@ -116,7 +120,6 @@ export async function POST(req: Request) {
     }
 
     // 6) Return resetId (even if email failed), plus emailSent flag
-    // Always include error in response for debugging (even in production for now)
     return respond(reset.id, emailSent, emailError || getLastEmailError() || undefined);
   } catch (error) {
     if (error instanceof z.ZodError) return respond();
