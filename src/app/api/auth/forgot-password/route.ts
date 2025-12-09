@@ -77,7 +77,7 @@ export async function POST(req: Request) {
     let emailSent = false;
     let emailError: string | undefined = undefined;
     
-    // Send email using the same reliable method as contact form
+    // Send email using the exact same pattern as contact form
     try {
       console.log("[Password Reset] 📧 Attempting to send magic link email", {
         userId: user.id,
@@ -88,12 +88,19 @@ export async function POST(req: Request) {
         timestamp: new Date().toISOString(),
       });
       
-      // Use the same sendEmail function that contact form uses
+      // Call sendPasswordResetEmail (which calls sendEmail - same as contact form)
       emailSent = await sendPasswordResetEmail(user.email, magicLink, user.role);
       
-      if (!emailSent) {
+      if (emailSent) {
+        console.log("[Password Reset] ✅ Magic link email sent successfully", {
+          userId: user.id,
+          userEmail: user.email,
+          resetId: reset.id,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
         const lastError = getLastEmailError();
-        emailError = lastError || "Email sending returned false without specific error";
+        emailError = lastError || "Email sending returned false";
         console.error("[Password Reset] ❌ Email sending failed", {
           userId: user.id,
           userEmail: user.email,
@@ -101,17 +108,11 @@ export async function POST(req: Request) {
           lastEmailError: emailError,
           timestamp: new Date().toISOString(),
         });
-      } else {
-        console.log("[Password Reset] ✅ Magic link email sent successfully", {
-          userId: user.id,
-          userEmail: user.email,
-          resetId: reset.id,
-          timestamp: new Date().toISOString(),
-        });
       }
     } catch (err) {
       const lastError = getLastEmailError();
       emailError = err instanceof Error ? err.message : String(err);
+      emailSent = false;
       console.error("[Password Reset] ❌ Exception sending magic link email", {
         userId: user.id,
         userEmail: user.email,
@@ -121,7 +122,6 @@ export async function POST(req: Request) {
         lastEmailError: lastError || null,
         timestamp: new Date().toISOString(),
       });
-      emailSent = false;
     }
 
     // 6) Return resetId (even if email failed), plus emailSent flag
