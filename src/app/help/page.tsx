@@ -228,7 +228,9 @@ export default function HelpPage() {
                   setSubmitting(true);
                   
                   const formData = new FormData(e.currentTarget);
+                  const name = formData.get("name") as string;
                   const email = formData.get("email") as string;
+                  const phone = formData.get("phone") as string;
                   const subject = formData.get("subject") as string;
                   const message = formData.get("message") as string;
                   
@@ -239,7 +241,9 @@ export default function HelpPage() {
                         "Content-Type": "application/json",
                       },
                       body: JSON.stringify({
+                        name,
                         email,
+                        phone: phone || undefined,
                         subject,
                         message,
                       }),
@@ -277,6 +281,18 @@ export default function HelpPage() {
               >
                 <div>
                   <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Your Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    required
+                    className="w-full px-4 py-3 rounded-lg border border-neutral-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    placeholder="John Doe"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
                     Your Email *
                   </label>
                   <input
@@ -285,6 +301,17 @@ export default function HelpPage() {
                     required
                     className="w-full px-4 py-3 rounded-lg border border-neutral-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     placeholder="your.email@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    className="w-full px-4 py-3 rounded-lg border border-neutral-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    placeholder="+91 63603 92398"
                   />
                 </div>
                 <div>
