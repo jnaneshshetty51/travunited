@@ -109,44 +109,10 @@ export async function GET(req: Request) {
       console.log("[Files API] No ownerId found, checking CareerApplication for key:", key);
       try {
         // Try exact match first
-        let careerApp = await prisma.careerApplication.findFirst({
+        const careerApp = await prisma.careerApplication.findFirst({
           where: { resumeUrl: key },
           select: { id: true, resumeUrl: true },
         });
-
-        // If not found, try case-insensitive search (in case of encoding issues)
-        if (!careerApp) {
-          console.log("[Files API] Exact match not found, trying case-insensitive search");
-          careerApp = await prisma.careerApplication.findFirst({
-            where: { 
-              resumeUrl: {
-                equals: key,
-                mode: "insensitive",
-              },
-            },
-            select: { id: true, resumeUrl: true },
-          });
-        }
-
-        // If still not found, try searching for partial match (in case key has extra encoding)
-        if (!careerApp) {
-          console.log("[Files API] Case-insensitive match not found, trying contains search");
-          const allCareerApps = await prisma.careerApplication.findMany({
-            where: {
-              resumeUrl: {
-                contains: key.split("/").pop() || key, // Try matching just the filename
-              },
-            },
-            select: { id: true, resumeUrl: true },
-          });
-          
-          // Find the best match
-          careerApp = allCareerApps.find(app => 
-            app.resumeUrl === key || 
-            app.resumeUrl.includes(key) || 
-            key.includes(app.resumeUrl)
-          ) || null;
-        }
 
         console.log("[Files API] CareerApplication query result:", { 
           found: !!careerApp, 
@@ -167,7 +133,6 @@ export async function GET(req: Request) {
             );
           }
           // Admin can access, continue to generate signed URL
-          // Use the stored resumeUrl from database (might be slightly different)
           const actualKey = careerApp.resumeUrl || key;
           
           if (!actualKey || actualKey.trim() === "") {
@@ -179,24 +144,17 @@ export async function GET(req: Request) {
           }
           
           // Set a flag so we know this is a career resume (no ownerId needed for admins)
-          ownerId = "CAREER_RESUME"; // Special flag for career resumes
-          // Update key to use the actual stored value
-          const originalKey = key;
-          // Use the stored resumeUrl if it's different (for MinIO lookup)
-          if (actualKey !== key) {
-            console.log("[Files API] Key mismatch detected, using stored resumeUrl:", actualKey);
-            // We'll use actualKey for MinIO but keep original key for logging
-          }
+          ownerId = "CAREER_RESUME";
           console.log("[Files API] Career resume found, setting ownerId flag, will use key:", actualKey);
         } else {
           console.log("[Files API] CareerApplication not found for key:", key);
-          // Try to list all resume URLs for debugging
+          // Try to list sample resume URLs for debugging
           try {
             const sampleApps = await prisma.careerApplication.findMany({
-              take: 5,
+              take: 3,
               select: { id: true, resumeUrl: true },
             });
-            console.log("[Files API] Sample resume URLs in database:", sampleApps.map(a => a.resumeUrl));
+            console.log("[Files API] Sample resume URLs in database:", sampleApps.map(a => ({ id: a.id, url: a.resumeUrl })));
           } catch (e) {
             console.error("[Files API] Error fetching sample apps:", e);
           }
@@ -208,10 +166,17 @@ export async function GET(req: Request) {
       } catch (careerError) {
         console.error("[Files API] Error querying CareerApplication:", careerError);
         const errorMessage = careerError instanceof Error ? careerError.message : String(careerError);
-        console.error("[Files API] CareerApplication error details:", { message: errorMessage, error: careerError });
-        // If table doesn't exist or other error, return file not found
+        const errorStack = careerError instanceof Error ? careerError.stack : undefined;
+        console.error("[Files API] CareerApplication error details:", { 
+          message: errorMessage, 
+          stack: errorStack,
+          error: careerError 
+        });
         return NextResponse.json(
-          { error: "File not found", details: process.env.NODE_ENV === "development" ? errorMessage : undefined },
+          { 
+            error: "File not found", 
+            details: process.env.NODE_ENV === "development" ? errorMessage : undefined 
+          },
           { status: 404 }
         );
       }
@@ -226,27 +191,9 @@ export async function GET(req: Request) {
     }
 
     try {
-      // For career resumes, use the stored resumeUrl from the database if we found a match
-      let keyToUse = key;
-      if (ownerId === "CAREER_RESUME") {
-        // Re-fetch to get the exact stored value
-        try {
-          const careerApp = await prisma.careerApplication.findFirst({
-            where: { resumeUrl: { contains: key.split("/").pop() || key } },
-            select: { resumeUrl: true },
-          });
-          if (careerApp?.resumeUrl) {
-            keyToUse = careerApp.resumeUrl;
-            console.log("[Files API] Using stored resumeUrl for MinIO:", keyToUse);
-          }
-        } catch (e) {
-          console.error("[Files API] Error fetching career app for key:", e);
-        }
-      }
-      
-      console.log("[Files API] Generating signed URL for key:", keyToUse, "ownerId:", ownerId);
-      const signedUrl = await getSignedDocumentUrl(keyToUse, 60);
-      console.log("[Files API] Signed URL generated successfully");
+      console.log("[Files API] Generating signed URL for key:", key, "ownerId:", ownerId);
+      const signedUrl = await getSignedDocumentUrl(key, 60);
+      console.log("[Files API] Signed URL generated successfully, length:", signedUrl.length);
       return NextResponse.redirect(signedUrl);
     } catch (error) {
       console.error("Error generating signed URL for file:", key, error);
