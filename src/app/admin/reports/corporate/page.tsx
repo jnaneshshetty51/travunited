@@ -120,54 +120,11 @@ export default function CorporateLeadsPage() {
     }
   }, [fetchReport, status, session?.user?.role]);
 
-  const handleExport = async (format: "xlsx" | "csv" | "pdf") => {
+  const handleExport = async (format: "xlsx" | "csv") => {
     try {
       const url = buildExportUrl("/api/admin/reports/corporate", filters, format);
-      
-      if (format === "pdf") {
-        // For PDF, fetch as blob and download
-        const response = await fetch(url);
-        if (!response.ok) {
-          // Try to get error message from response
-          let errorMessage = response.statusText;
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.details || errorData.error || errorMessage;
-          } catch {
-            // If response is not JSON, use status text
-            const text = await response.text().catch(() => "");
-            errorMessage = text || errorMessage;
-          }
-          throw new Error(`Failed to generate PDF: ${errorMessage}`);
-        }
-        
-        // Check if response is actually a PDF
-        const contentType = response.headers.get("content-type");
-        if (contentType && !contentType.includes("application/pdf")) {
-          // Response might be an error JSON
-          const errorData = await response.json().catch(() => null);
-          if (errorData) {
-            throw new Error(`Failed to generate PDF: ${errorData.details || errorData.error || "Unknown error"}`);
-          }
-        }
-        
-        const blob = await response.blob();
-        if (blob.size === 0) {
-          throw new Error("Failed to generate PDF: Empty PDF file received");
-        }
-        
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = downloadUrl;
-        a.download = `corporate-leads-${new Date().toISOString().split("T")[0]}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(downloadUrl);
-        document.body.removeChild(a);
-      } else {
-        // For CSV/XLSX, open in new tab (works for these formats)
-        window.open(url, "_blank");
-      }
+      // For CSV/XLSX, open in new tab (works for these formats)
+      window.open(url, "_blank");
     } catch (error) {
       console.error("Export error:", error);
       alert(`Failed to export ${format.toUpperCase()}: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -244,13 +201,6 @@ export default function CorporateLeadsPage() {
           >
             <Download size={16} />
             Export CSV
-          </button>
-          <button
-            onClick={() => handleExport("pdf")}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
-          >
-            <FileText size={16} />
-            Export PDF
           </button>
         </div>
 

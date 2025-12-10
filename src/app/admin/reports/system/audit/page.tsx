@@ -76,29 +76,11 @@ export default function AuditLogPage() {
     }
   }, [session?.user?.role, status, router, fetchReport]);
 
-  const handleExport = async (format: "xlsx" | "csv" | "pdf") => {
+  const handleExport = async (format: "xlsx" | "csv") => {
     try {
       const url = buildExportUrl("/api/admin/reports/system/audit", filters, format);
-      
-      if (format === "pdf") {
-        // For PDF, fetch as blob and download
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`Failed to generate PDF: ${response.statusText}`);
-        }
-        const blob = await response.blob();
-        const downloadUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = downloadUrl;
-        a.download = `audit-log-${new Date().toISOString().split("T")[0]}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(downloadUrl);
-        document.body.removeChild(a);
-      } else {
-        // For CSV/XLSX, open in new tab (works for these formats)
-        window.open(url, "_blank");
-      }
+      // For CSV/XLSX, open in new tab (works for these formats)
+      window.open(url, "_blank");
     } catch (error) {
       console.error("Export error:", error);
       alert(`Failed to export ${format.toUpperCase()}: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -149,13 +131,6 @@ export default function AuditLogPage() {
           >
             <Download size={16} />
             Export CSV
-          </button>
-          <button
-            onClick={() => handleExport("pdf")}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700"
-          >
-            <FileText size={16} />
-            Export PDF
           </button>
         </div>
 
