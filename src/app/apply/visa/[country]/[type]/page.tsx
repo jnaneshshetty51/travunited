@@ -35,6 +35,7 @@ interface VisaDetailsResponse {
   validity: string;
   entryType: string;
   overview: string;
+  visaSubTypeLabel?: string | null;
   country: {
     id: string;
     code: string;
