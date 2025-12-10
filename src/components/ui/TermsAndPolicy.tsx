@@ -211,11 +211,37 @@ export default function TermsAndPolicy({
                       {termsPolicyHtml ? (
                         <div dangerouslySetInnerHTML={{ __html: termsPolicyHtml }} />
                       ) : termsPolicyUrl ? (
-                        <iframe
-                          src={termsPolicyUrl}
-                          title="Terms and Conditions"
-                          className="h-[70vh] w-full border rounded"
-                        />
+                        <div className="space-y-4">
+                          <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-6 text-center">
+                            <p className="text-neutral-700 mb-4">
+                              Please review our Terms & Conditions to proceed with your booking.
+                            </p>
+                            <a
+                              href={termsPolicyUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+                            >
+                              Open Terms & Conditions in New Tab
+                              <svg
+                                className="ml-2 w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                                />
+                              </svg>
+                            </a>
+                          </div>
+                          <div className="text-sm text-neutral-500 text-center">
+                            Or view it here: <a href={termsPolicyUrl} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-700 underline">{termsPolicyUrl}</a>
+                          </div>
+                        </div>
                       ) : (
                         <div className="text-neutral-600">Terms & Conditions content not available.</div>
                       )}
@@ -225,11 +251,34 @@ export default function TermsAndPolicy({
                       {refundPolicyHtml ? (
                         <div dangerouslySetInnerHTML={{ __html: refundPolicyHtml }} />
                       ) : refundPolicyUrl ? (
-                        <iframe
-                          src={refundPolicyUrl}
-                          title="Refund and Cancellation Policy"
-                          className="h-[70vh] w-full border rounded"
-                        />
+                        <div className="space-y-4">
+                          <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-6 text-center">
+                            <p className="text-neutral-700 mb-4">
+                              Please review our Refund & Cancellation Policy to proceed with your booking.
+                            </p>
+                            <a
+                              href={refundPolicyUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+                            >
+                              Open Refund & Cancellation Policy in New Tab
+                              <svg
+                                className="ml-2 w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                                />
+                              </svg>
+                            </a>
+                          </div>
+                        </div>
                       ) : (
                         <div className="text-neutral-600">Refund & Cancellation Policy content not available.</div>
                       )}

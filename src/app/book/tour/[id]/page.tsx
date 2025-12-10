@@ -294,6 +294,17 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
         if (termsResponse && termsResponse.ok) {
           const termsData = await termsResponse.json();
           setTermsPolicy(termsData);
+        } else {
+          // Fallback: fetch static terms content if database doesn't have it
+          try {
+            const fallbackResponse = await fetch("/api/policies/terms-content");
+            if (fallbackResponse.ok) {
+              const fallbackData = await fallbackResponse.json();
+              setTermsPolicy(fallbackData);
+            }
+          } catch (fallbackError) {
+            console.error("Failed to load fallback terms content:", fallbackError);
+          }
         }
       } catch (error) {
         console.error("Failed to load policies:", error);
@@ -2001,7 +2012,9 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
                   <div className="border border-neutral-200 rounded-lg p-4 bg-white mb-6">
                     <TermsAndPolicy
                       termsPolicyHtml={termsPolicy?.content}
+                      termsPolicyUrl={!termsPolicy?.content ? "/terms" : undefined}
                       refundPolicyHtml={refundPolicy?.content}
+                      refundPolicyUrl={!refundPolicy?.content ? "/refund" : undefined}
                       termsPolicyVersion={termsPolicy?.version}
                       refundPolicyVersion={refundPolicy?.version}
                       required={true}

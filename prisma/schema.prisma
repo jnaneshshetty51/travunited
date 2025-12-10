@@ -75,6 +75,8 @@ model Application {
   visaType                 String?
   visa                     Visa?                  @relation(fields: [visaId], references: [id])
   visaId                   String?
+  visaSubType              VisaSubType?           @relation(fields: [visaSubTypeId], references: [id])
+  visaSubTypeId            String? // Selected visa subtype ID
   status                   String                 @default("DRAFT") // DRAFT, PAYMENT_PENDING, SUBMITTED, IN_PROCESS, APPROVED, REJECTED
   totalAmount              Int                    @default(0)
   currency                 String                 @default("INR")
@@ -287,14 +289,15 @@ model VisaFaq {
 }
 
 model VisaSubType {
-  id        String   @id @default(cuid())
-  visa      Visa     @relation(fields: [visaId], references: [id], onDelete: Cascade)
-  visaId    String
-  label     String
-  code      String? // Optional internal code
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String        @id @default(cuid())
+  visa         Visa          @relation(fields: [visaId], references: [id], onDelete: Cascade)
+  visaId       String
+  label        String
+  code         String? // Optional internal code
+  sortOrder    Int           @default(0)
+  applications Application[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
   @@index([visaId])
 }

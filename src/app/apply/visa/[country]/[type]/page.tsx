@@ -88,6 +88,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
     country: params.country,
     visaType: params.type,
     visaId: undefined,
+    selectedSubTypeId: undefined,
     primaryContact: {
       name: "",
       email: "",
@@ -645,6 +646,14 @@ export default function VisaApplicationPage({ params }: { params: { country: str
 
   const nextStep = () => {
     // Validation before proceeding
+    if (currentStep === 1) {
+      // Validate subtype selection if subtypes exist
+      if (visaInfo?.subTypes && visaInfo.subTypes.length > 0 && !formData.selectedSubTypeId) {
+        alert("Please select a visa subtype to continue");
+        return;
+      }
+    }
+    
     if (currentStep === 2) {
       if (!formData.primaryContact?.name || !formData.primaryContact?.email) {
         alert("Please fill in all required contact information");
@@ -831,6 +840,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
            totalAmount,
           travelDate: formData.travelDate,
           tripType: formData.tripType,
+          selectedSubTypeId: formData.selectedSubTypeId,
           primaryContact: formData.primaryContact,
           travellers: formData.travellers?.map(({ id, ...rest }) => rest) || [],
         }),
@@ -1103,6 +1113,29 @@ export default function VisaApplicationPage({ params }: { params: { country: str
               </div>
             </div>
             <div className="space-y-4">
+              {visaInfo?.subTypes && visaInfo.subTypes.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Visa Subtype {visaInfo.visaSubTypeLabel ? `(${visaInfo.visaSubTypeLabel})` : ""} *
+                  </label>
+                  <select
+                    value={formData.selectedSubTypeId || ""}
+                    onChange={(e) => setFormData({ ...formData, selectedSubTypeId: e.target.value || undefined })}
+                    required
+                    className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Select a subtype</option>
+                    {visaInfo.subTypes.map((subtype) => (
+                      <option key={subtype.id} value={subtype.id}>
+                        {subtype.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    Please select the visa subtype that best matches your travel requirements.
+                  </p>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-2">
                   Travel Date (Optional)

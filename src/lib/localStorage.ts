@@ -6,6 +6,7 @@ export interface VisaDraft {
   country?: string;
   visaType?: string;
   visaId?: string;
+  selectedSubTypeId?: string;
   applicationId?: string;
   travelDate?: string;
   tripType?: string;
