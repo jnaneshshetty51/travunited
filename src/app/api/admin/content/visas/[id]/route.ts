@@ -165,6 +165,18 @@ export async function PUT(
     }
 
     const body = await req.json();
+    
+    // Debug logging for entryType issues
+    if (body.entryType !== undefined || body.structuredEntryType !== undefined) {
+      console.log("EntryType debug:", {
+        entryType: body.entryType,
+        structuredEntryType: body.structuredEntryType,
+        entryTypeType: typeof body.entryType,
+        structuredEntryTypeType: typeof body.structuredEntryType,
+        existingEntryType: existingVisa.entryType,
+        existingEntryTypeLegacy: existingVisa.entryTypeLegacy,
+      });
+    }
 
     // Merge with existing values, but only use provided values (not undefined)
     // For required fields, treat empty strings as "not provided" to allow partial updates
@@ -194,7 +206,12 @@ export async function PUT(
     const validity = (body.validity !== undefined && body.validity !== null && body.validity !== "")
       ? body.validity
       : existingVisa.validity;
-    const entryType = body.entryType !== undefined ? body.entryType : existingVisa.entryTypeLegacy;
+    // Only use body.entryType if it's explicitly provided as a non-empty string
+    // If it's null, undefined, or empty string, use existing value (but don't use empty string from existing)
+    const entryTypeFromRequest = (body.entryType !== undefined && body.entryType !== null && typeof body.entryType === "string" && body.entryType.trim() !== "")
+      ? body.entryType
+      : null;
+    const entryType = entryTypeFromRequest || (existingVisa.entryTypeLegacy && existingVisa.entryTypeLegacy.trim() !== "" ? existingVisa.entryTypeLegacy : null);
     const overview = (body.overview !== undefined && body.overview !== null && body.overview !== "")
       ? body.overview
       : existingVisa.overview;
@@ -212,9 +229,16 @@ export async function PUT(
     const stayDurationDays = body.stayDurationDays !== undefined ? body.stayDurationDays : existingVisa.stayDurationDays;
     const validityDays = body.validityDays !== undefined ? body.validityDays : existingVisa.validityDays;
     const currency = body.currency !== undefined ? body.currency : existingVisa.currency;
-    const visaMode = body.visaMode !== undefined ? body.visaMode : existingVisa.visaMode;
-    const structuredEntryType = body.structuredEntryType !== undefined ? body.structuredEntryType : null;
-    const stayType = body.stayType !== undefined ? body.stayType : existingVisa.stayType;
+    // Only use body values if they're non-empty strings, otherwise use existing values
+    const visaMode = (body.visaMode !== undefined && body.visaMode !== null && body.visaMode !== "")
+      ? body.visaMode
+      : existingVisa.visaMode;
+    const structuredEntryType = (body.structuredEntryType !== undefined && body.structuredEntryType !== null && body.structuredEntryType !== "")
+      ? body.structuredEntryType
+      : null;
+    const stayType = (body.stayType !== undefined && body.stayType !== null && body.stayType !== "")
+      ? body.stayType
+      : existingVisa.stayType;
     const visaSubTypeLabel = body.visaSubTypeLabel !== undefined ? body.visaSubTypeLabel : existingVisa.visaSubTypeLabel;
     const requirements = body.requirements !== undefined ? body.requirements : [];
     const faqs = body.faqs !== undefined ? body.faqs : [];
@@ -309,19 +333,28 @@ export async function PUT(
         parsedVisaMode = existingVisa.visaMode as VisaMode | null;
       }
       
-      // Only normalize entryType if it's actually being updated
-      // Check if structuredEntryType or entryType is explicitly provided in the request
-      const isEntryTypeUpdated = body.structuredEntryType !== undefined || body.entryType !== undefined;
-      if (isEntryTypeUpdated) {
-        const enumEntrySource = structuredEntryType ?? entryType;
-        if (enumEntrySource !== undefined && enumEntrySource !== null && enumEntrySource !== "") {
-          parsedEntryType = normalizeEnumInput(enumEntrySource, Object.values(EntryType), "entryType");
-        } else {
-          // If explicitly set to empty/null, set to null
-          parsedEntryType = null;
-        }
+      // Only normalize entryType if it's actually being updated with a non-empty value
+      // Check if structuredEntryType or entryType is explicitly provided with a non-empty string value
+      const hasStructuredEntryType = body.structuredEntryType !== undefined && 
+                                     body.structuredEntryType !== null && 
+                                     typeof body.structuredEntryType === "string" &&
+                                     body.structuredEntryType.trim() !== "";
+      const hasEntryType = body.entryType !== undefined && 
+                          body.entryType !== null && 
+                          typeof body.entryType === "string" &&
+                          body.entryType.trim() !== "";
+      
+      // Only normalize entryType if a non-empty value is explicitly provided
+      // Skip normalization entirely if no valid value is provided
+      if (hasStructuredEntryType) {
+        // structuredEntryType takes precedence - it's already validated as non-empty string
+        parsedEntryType = normalizeEnumInput(structuredEntryType, Object.values(EntryType), "entryType");
+      } else if (hasEntryType) {
+        // Use entryType from body - it's already validated as non-empty string
+        parsedEntryType = normalizeEnumInput(body.entryType, Object.values(EntryType), "entryType");
       } else {
-        // Use existing entryType if not being updated
+        // Neither field was provided with a non-empty value - use existing value or null
+        // Don't try to normalize - just use the existing enum value directly or null
         parsedEntryType = existingVisa.entryType as EntryType | null;
       }
       
@@ -355,7 +388,7 @@ export async function PUT(
           processingTime,
           stayDuration,
           validity,
-          entryTypeLegacy: entryType || undefined,
+          entryTypeLegacy: (entryType && entryType.trim() !== "") ? entryType : undefined,
           visaMode: parsedVisaMode ?? undefined,
           entryType: parsedEntryType ?? undefined,
           stayType: parsedStayType ?? undefined,
@@ -476,6 +509,13 @@ export async function PUT(
       return NextResponse.json(
         { error: "Visa slug must be unique" },
         { status: 409 }
+      );
+    }
+    // Return the actual error message if it's a validation error
+    if (error instanceof Error && error.message.includes("must be one of")) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
       );
     }
     return NextResponse.json(

@@ -88,6 +88,13 @@ export async function GET(
             },
           },
         },
+        visaSubType: {
+          select: {
+            id: true,
+            label: true,
+            code: true,
+          },
+        },
       },
     });
 

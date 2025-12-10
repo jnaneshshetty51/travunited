@@ -463,11 +463,12 @@ export default function AdminVisaEditorPage() {
 
       const payload = {
         ...restFormData,
-        entryType: entryTypeLegacy || null,
-        structuredEntryType: entryType || null,
-        visaMode: visaMode || null,
-        stayType: stayType || null,
-        visaSubTypeLabel: visaSubTypeLabel || null,
+        // Only include entryType/structuredEntryType if they have non-empty values
+        ...(entryTypeLegacy && entryTypeLegacy.trim() !== "" ? { entryType: entryTypeLegacy } : {}),
+        ...(entryType && entryType.trim() !== "" ? { structuredEntryType: entryType } : {}),
+        ...(visaMode && visaMode.trim() !== "" ? { visaMode } : {}),
+        ...(stayType && stayType.trim() !== "" ? { stayType } : {}),
+        ...(visaSubTypeLabel && visaSubTypeLabel.trim() !== "" ? { visaSubTypeLabel } : {}),
         sampleVisaImageUrl: formData.sampleVisaImageUrl ? formData.sampleVisaImageUrl : null,
         priceInInr: Number(formData.priceInInr),
         // Ensure SEO fields are always included, even if empty

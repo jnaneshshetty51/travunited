@@ -39,6 +39,22 @@ export async function GET(req: Request) {
             status: true,
           },
         },
+        visaSubType: {
+          select: {
+            id: true,
+            label: true,
+            code: true,
+          },
+        },
+        visa: {
+          select: {
+            id: true,
+            name: true,
+            visaSubTypeLabel: true,
+            entryType: true,
+            entryTypeLegacy: true,
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",

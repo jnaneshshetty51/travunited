@@ -248,6 +248,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
               country: data.country || prev.country,
               visaType: data.visaType || prev.visaType,
               visaId: data.visa?.id || prev.visaId,
+              selectedSubTypeId: data.visaSubTypeId || data.visaSubType?.id || prev.selectedSubTypeId,
               primaryContact: {
                 name: data.user?.name || prev.primaryContact?.name || "",
                 email: data.user?.email || prev.primaryContact?.email || "",
@@ -1704,6 +1705,11 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                 <h3 className="font-semibold mb-2">Visa Details</h3>
                 <p>{visaName}</p>
                 <p className="text-sm text-neutral-600">{params.country.toUpperCase()}</p>
+                {formData.selectedSubTypeId && visaInfo?.subTypes && (
+                  <p className="text-sm text-neutral-600">
+                    Subtype: {visaInfo.subTypes.find(st => st.id === formData.selectedSubTypeId)?.label || "N/A"}
+                  </p>
+                )}
                 {formData.travelDate && (
                   <p className="text-sm text-neutral-600">Travel Date: {formatDate(formData.travelDate)}</p>
                 )}

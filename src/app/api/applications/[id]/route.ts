@@ -51,6 +51,13 @@ export async function GET(
             country: true,
           },
         },
+        visaSubType: {
+          select: {
+            id: true,
+            label: true,
+            code: true,
+          },
+        },
       },
     });
 

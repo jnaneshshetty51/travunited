@@ -34,6 +34,11 @@ const formatEnumLabel = (
 };
 
 const buildEntrySummary = (visa: any) => {
+  // If subtypes exist, show them
+  if (visa.subTypes && visa.subTypes.length > 0) {
+    return visa.subTypes.map((st: { label: string }) => st.label).join(", ");
+  }
+  // Fallback to legacy label
   if (visa.visaSubTypeLabel) return visa.visaSubTypeLabel;
   const entryLabel = formatEnumLabel(visa.entryType, entryTypeLabels);
   const stayLabel = formatEnumLabel(visa.stayType, stayTypeLabels);
@@ -53,6 +58,11 @@ export default async function CountryVisasPage({
     include: {
       visas: {
         where: { isActive: true },
+        include: {
+          subTypes: {
+            orderBy: { sortOrder: "asc" },
+          },
+        },
         orderBy: [
           { isFeatured: "desc" },
           { priceInInr: "asc" },

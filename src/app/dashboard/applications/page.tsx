@@ -21,6 +21,18 @@ interface Application {
   visaDocumentUrl: string | null;
   invoiceUrl: string | null;
   documents?: Array<{ status: string }>;
+  visaSubType?: {
+    id: string;
+    label: string;
+    code: string | null;
+  } | null;
+  visa?: {
+    id: string;
+    name: string;
+    visaSubTypeLabel: string | null;
+    entryType: string | null;
+    entryTypeLegacy: string | null;
+  } | null;
 }
 
 const statusGroups = {
@@ -255,6 +267,11 @@ export default function ApplicationsPage() {
                           <div className="flex-1">
                             <h3 className="text-lg font-semibold text-neutral-900 mb-2">
                               {app.country} - {app.visaType}
+                              {app.visaSubType && (
+                                <span className="text-sm font-normal text-neutral-600 ml-2">
+                                  ({app.visaSubType.label})
+                                </span>
+                              )}
                             </h3>
                             <div className="flex items-center space-x-4 text-sm text-neutral-600">
                               <span>Applied: {formatDate(app.createdAt)}</span>

@@ -127,6 +127,11 @@ interface Application {
     };
   } | null;
   timeline?: TimelineEvent[];
+  visaSubType?: {
+    id: string;
+    label: string;
+    code: string | null;
+  } | null;
 }
 
 export default function AdminApplicationDetailPage() {
@@ -489,6 +494,11 @@ export default function AdminApplicationDetailPage() {
                 <div>
                   <h1 className="text-2xl font-bold text-neutral-900">
                     {application.visa?.country?.name || application.country} - {application.visaType}
+                    {application.visaSubType && (
+                      <span className="text-lg font-normal text-neutral-600 ml-2">
+                        ({application.visaSubType.label})
+                      </span>
+                    )}
                   </h1>
                   <p className="text-sm text-neutral-600 mt-1">
                     Reference: <span className="font-mono font-semibold">{application.referenceNumber || `TRV-${new Date(application.createdAt).getFullYear()}-${application.id.slice(-5).toUpperCase()}`}</span>
@@ -600,7 +610,14 @@ export default function AdminApplicationDetailPage() {
                 </div>
                 <div>
                   <div className="text-sm text-neutral-600 mb-1">Visa Type</div>
-                  <div className="font-medium text-neutral-900">{application.visaType || "N/A"}</div>
+                  <div className="font-medium text-neutral-900">
+                    {application.visaType || "N/A"}
+                    {application.visaSubType && (
+                      <span className="text-sm text-neutral-600 ml-2">
+                        ({application.visaSubType.label})
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {application.visa?.processingTime && (
                   <div>

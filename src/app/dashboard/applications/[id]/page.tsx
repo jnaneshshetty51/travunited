@@ -41,6 +41,11 @@ interface Application {
       lastName: string;
     };
   }>;
+  visaSubType?: {
+    id: string;
+    label: string;
+    code: string | null;
+  } | null;
 }
 
 export default function ApplicationDetailPage() {
@@ -183,6 +188,11 @@ export default function ApplicationDetailPage() {
             <div>
               <h1 className="text-3xl font-bold text-neutral-900">
                 {application.country} - {application.visaType}
+                {application.visaSubType && (
+                  <span className="text-lg font-normal text-neutral-600 ml-2">
+                    ({application.visaSubType.label})
+                  </span>
+                )}
               </h1>
               <p className="text-neutral-600 mt-1">
                 Application ID: {application.id.slice(0, 8)}...
@@ -245,7 +255,14 @@ export default function ApplicationDetailPage() {
                 </div>
                 <div>
                   <div className="text-sm text-neutral-600">Visa Type</div>
-                  <div className="font-medium text-neutral-900">{application.visaType}</div>
+                  <div className="font-medium text-neutral-900">
+                    {application.visaType}
+                    {application.visaSubType && (
+                      <span className="text-sm text-neutral-600 ml-2">
+                        ({application.visaSubType.label})
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <div className="text-sm text-neutral-600">Applied Date</div>
