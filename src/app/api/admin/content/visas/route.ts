@@ -269,72 +269,82 @@ export async function POST(req: Request) {
         stayDurationDays: stayDurationDays !== undefined && stayDurationDays !== null ? Number(stayDurationDays) : null,
         validityDays: validityDays !== undefined && validityDays !== null ? Number(validityDays) : null,
         currency: currency || "INR",
-        requirements: requirements.length
+        requirements: requirements && requirements.length > 0
           ? {
-            create: requirements.map(
-              (req: {
-                name: string;
-                description?: string;
-                scope: DocScope;
-                isRequired?: boolean;
-                category?: string;
-                sortOrder?: number;
-              }, index: number) => ({
-                name: req.name,
-                description: req.description || null,
-                scope: req.scope || DocScope.PER_APPLICATION,
-                isRequired: req.isRequired ?? true,
-                category: req.category || null,
-                sortOrder:
-                  typeof req.sortOrder === "number"
-                    ? req.sortOrder
-                    : index,
-              })
-            ),
-          }
-          : undefined,
-        faqs: faqs.length
-          ? {
-            create: faqs.map(
-              (
-                faq: {
+            create: requirements
+              .filter((req: any) => req && req.name && typeof req.name === "string" && req.name.trim() !== "")
+              .map(
+                (req: {
+                  name: string;
+                  description?: string;
+                  scope: DocScope;
+                  isRequired?: boolean;
                   category?: string;
-                  question: string;
-                  answer: string;
                   sortOrder?: number;
-                },
-                index: number
-              ) => ({
-                category: faq.category || null,
-                question: faq.question,
-                answer: faq.answer,
-                sortOrder:
-                  typeof faq.sortOrder === "number"
-                    ? faq.sortOrder
-                    : index,
-              })
-            ),
+                }, index: number) => ({
+                  name: req.name.trim(),
+                  description: (req.description && typeof req.description === "string" && req.description.trim() !== "") ? req.description.trim() : null,
+                  scope: req.scope || DocScope.PER_APPLICATION,
+                  isRequired: req.isRequired ?? true,
+                  category: (req.category && typeof req.category === "string" && req.category.trim() !== "") ? req.category.trim() : null,
+                  sortOrder:
+                    typeof req.sortOrder === "number"
+                      ? req.sortOrder
+                      : index,
+                })
+              ),
           }
           : undefined,
-        subTypes: subTypes.length
+        faqs: faqs && faqs.length > 0
           ? {
-            create: subTypes.map(
-              (
-                subtype: {
-                  label: string;
-                  code?: string;
-                  sortOrder?: number;
-                },
-                index: number
-              ) => ({
-                label: subtype.label,
-                code: subtype.code || null,
-                sortOrder:
-                  typeof subtype.sortOrder === "number"
-                    ? subtype.sortOrder
-                    : index,
-              })
-            ),
+            create: faqs
+              .filter((faq: any) => 
+                faq && 
+                faq.question && typeof faq.question === "string" && faq.question.trim() !== "" &&
+                faq.answer && typeof faq.answer === "string" && faq.answer.trim() !== ""
+              )
+              .map(
+                (
+                  faq: {
+                    category?: string;
+                    question: string;
+                    answer: string;
+                    sortOrder?: number;
+                  },
+                  index: number
+                ) => ({
+                  category: (faq.category && typeof faq.category === "string" && faq.category.trim() !== "") ? faq.category.trim() : null,
+                  question: faq.question.trim(),
+                  answer: faq.answer.trim(),
+                  sortOrder:
+                    typeof faq.sortOrder === "number"
+                      ? faq.sortOrder
+                      : index,
+                })
+              ),
+          }
+          : undefined,
+        subTypes: subTypes && subTypes.length > 0
+          ? {
+            create: subTypes
+              .filter((subtype: any) => subtype && subtype.label && typeof subtype.label === "string" && subtype.label.trim() !== "")
+              .map(
+                (
+                  subtype: {
+                    label: string;
+                    code?: string;
+                    sortOrder?: number;
+                  },
+                  index: number
+                ) => ({
+                  label: subtype.label.trim(),
+                  code: (subtype.code && typeof subtype.code === "string" && subtype.code.trim() !== "") ? subtype.code.trim() : null,
+                  sortOrder:
+                    typeof subtype.sortOrder === "number"
+                      ? subtype.sortOrder
+                      : index,
+                })
+              ),
           }
           : undefined,
       },
@@ -349,14 +359,26 @@ export async function POST(req: Request) {
     return NextResponse.json(visa);
   } catch (error) {
     console.error("Error creating visa:", error);
+    
+    // Log detailed error information
     if (error instanceof Error) {
       console.error("Error message:", error.message);
       console.error("Error stack:", error.stack);
     }
     
+    if (error && typeof error === 'object') {
+      try {
+        console.error("Error object:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      } catch {
+        console.error("Error object (stringify failed):", error);
+      }
+    }
+    
     // Handle Prisma errors
     if (error && typeof error === 'object' && 'code' in error) {
       const prismaError = error as { code?: string; meta?: any; message?: string };
+      console.error("Prisma error code:", prismaError.code);
+      console.error("Prisma error meta:", prismaError.meta);
       
       if (prismaError.code === "P2002") {
         return NextResponse.json(
@@ -380,12 +402,26 @@ export async function POST(req: Request) {
       
       // Handle foreign key constraint errors
       if (prismaError.code === "P2003") {
+        const fieldName = prismaError.meta?.field_name || "reference";
         return NextResponse.json(
           { 
             error: "Invalid reference",
-            message: prismaError.message || "The selected country or related entity does not exist."
+            message: `Invalid ${fieldName}. ${prismaError.message || "The selected country or related entity does not exist."}`
           },
           { status: 400 }
+        );
+      }
+      
+      // Handle other Prisma errors with detailed message
+      if (prismaError.code) {
+        return NextResponse.json(
+          { 
+            error: "Database error",
+            message: prismaError.message || "A database error occurred",
+            code: prismaError.code,
+            ...(process.env.NODE_ENV === 'development' && { meta: prismaError.meta })
+          },
+          { status: 500 }
         );
       }
     }
@@ -393,7 +429,7 @@ export async function POST(req: Request) {
     // Handle validation errors
     if (error instanceof Error) {
       // If it's a known validation error, return it
-      if (error.message.includes("must be one of")) {
+      if (error.message.includes("must be one of") || error.message.includes("must be a string")) {
         return NextResponse.json(
           { error: error.message },
           { status: 400 }
@@ -401,14 +437,16 @@ export async function POST(req: Request) {
       }
     }
     
-    // Generic error response with more details in development
+    // Generic error response with actual error message
+    const errorMessage = error instanceof Error ? error.message : (error as any)?.message || "Unknown error";
     return NextResponse.json(
       { 
         error: "Internal server error",
-        message: process.env.NODE_ENV === 'development' && error instanceof Error 
-          ? error.message 
-          : "An unexpected error occurred while creating the visa. Please try again.",
-        ...(process.env.NODE_ENV === 'development' && { stack: error instanceof Error ? error.stack : undefined })
+        message: errorMessage || "An unexpected error occurred while creating the visa. Please try again.",
+        ...(process.env.NODE_ENV === 'development' && error instanceof Error && { 
+          stack: error.stack,
+          details: errorMessage
+        })
       },
       { status: 500 }
     );
