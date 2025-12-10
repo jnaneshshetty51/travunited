@@ -103,28 +103,39 @@ export async function GET(req: Request) {
 
     // Check for career application resume
     if (!ownerId) {
-      const careerApp = await prisma.careerApplication.findFirst({
-        where: { resumeUrl: key },
-        select: { id: true, resumeUrl: true },
-      });
+      try {
+        const careerApp = await prisma.careerApplication.findFirst({
+          where: { resumeUrl: key },
+          select: { id: true, resumeUrl: true },
+        });
 
-      if (careerApp) {
-        // Career resumes are accessible to admins only
-        if (!isAdmin) {
+        if (careerApp) {
+          // Career resumes are accessible to admins only
+          if (!isAdmin) {
+            return NextResponse.json(
+              { error: "Forbidden" },
+              { status: 403 }
+            );
+          }
+          // Admin can access, continue to generate signed URL
+          // Check if resumeUrl is valid
+          if (!careerApp.resumeUrl || careerApp.resumeUrl.trim() === "") {
+            return NextResponse.json(
+              { error: "Resume not available" },
+              { status: 404 }
+            );
+          }
+          // Set a flag so we know this is a career resume (no ownerId needed for admins)
+          ownerId = "CAREER_RESUME"; // Special flag for career resumes
+        } else {
           return NextResponse.json(
-            { error: "Forbidden" },
-            { status: 403 }
-          );
-        }
-        // Admin can access, continue to generate signed URL
-        // Check if resumeUrl is valid
-        if (!careerApp.resumeUrl || careerApp.resumeUrl.trim() === "") {
-          return NextResponse.json(
-            { error: "Resume not available" },
+            { error: "File not found" },
             { status: 404 }
           );
         }
-      } else {
+      } catch (careerError) {
+        console.error("Error querying CareerApplication:", careerError);
+        // If table doesn't exist or other error, return file not found
         return NextResponse.json(
           { error: "File not found" },
           { status: 404 }
@@ -132,7 +143,8 @@ export async function GET(req: Request) {
       }
     }
 
-    if (!isAdmin && ownerId !== session.user.id) {
+    // Skip ownership check for career resumes (admins only)
+    if (ownerId !== "CAREER_RESUME" && !isAdmin && ownerId !== session.user.id) {
       return NextResponse.json(
         { error: "Forbidden" },
         { status: 403 }
@@ -145,16 +157,20 @@ export async function GET(req: Request) {
     } catch (error) {
       console.error("Error generating signed URL for file:", key, error);
       // Check if it's a career application and provide a better error message
-      const careerApp = await prisma.careerApplication.findFirst({
-        where: { resumeUrl: key },
-        select: { id: true },
-      });
-      
-      if (careerApp) {
-        return NextResponse.json(
-          { error: "Resume file not available. The file may have been deleted or moved." },
-          { status: 404 }
-        );
+      try {
+        const careerApp = await prisma.careerApplication.findFirst({
+          where: { resumeUrl: key },
+          select: { id: true },
+        });
+        
+        if (careerApp) {
+          return NextResponse.json(
+            { error: "Resume file not available. The file may have been deleted or moved." },
+            { status: 404 }
+          );
+        }
+      } catch (careerQueryError) {
+        console.error("Error querying CareerApplication in error handler:", careerQueryError);
       }
       
       return NextResponse.json(
@@ -163,9 +179,19 @@ export async function GET(req: Request) {
       );
     }
   } catch (error) {
-    console.error("Error generating signed URL:", error);
+    console.error("Error in /api/files route:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("Error details:", {
+      message: errorMessage,
+      stack: errorStack,
+      error,
+    });
     return NextResponse.json(
-      { error: "Internal server error" },
+      { 
+        error: "Internal server error",
+        message: process.env.NODE_ENV === "development" ? errorMessage : undefined
+      },
       { status: 500 }
     );
   }
