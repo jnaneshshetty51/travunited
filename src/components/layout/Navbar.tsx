@@ -4,7 +4,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { Menu, X, User, ChevronDown, LogOut, Shield } from "lucide-react";
+import { Menu, X, User, ChevronDown, LogOut, Shield, Home, FileText, Plane, BookOpen, Building2, HelpCircle, Mail } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 
@@ -16,14 +17,14 @@ export function Navbar() {
   
   const isAdmin = session?.user?.role === "STAFF_ADMIN" || session?.user?.role === "SUPER_ADMIN";
 
-  const navLinks = [
-    { href: "/", label: "Home" },
-    { href: "/visas", label: "Visas" },
-    { href: "/tours", label: "Holidays" },
-    { href: "/blog", label: "Blog" },
-    { href: "/corporate", label: "Corporate" },
-    { href: "/help", label: "Help/Support" },
-    { href: "/contact", label: "Contact" },
+  const navLinks: { href: string; label: string; icon: LucideIcon }[] = [
+    { href: "/", label: "Home", icon: Home },
+    { href: "/visas", label: "Visas", icon: FileText },
+    { href: "/tours", label: "Holidays", icon: Plane },
+    { href: "/blog", label: "Blog", icon: BookOpen },
+    { href: "/corporate", label: "Corporate", icon: Building2 },
+    { href: "/help", label: "Help/Support", icon: HelpCircle },
+    { href: "/contact", label: "Contact", icon: Mail },
   ];
 
   return (
@@ -43,16 +44,20 @@ export function Navbar() {
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-neutral-700 hover:text-primary-600 font-medium transition-colors duration-200"
-              >
-                {link.label}
-              </Link>
-            ))}
+          <div className="hidden md:flex items-center space-x-6">
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="flex items-center space-x-1.5 text-neutral-700 hover:text-primary-600 font-medium transition-colors duration-200"
+                >
+                  <Icon size={18} />
+                  <span>{link.label}</span>
+                </Link>
+              );
+            })}
           </div>
 
           {/* Auth Buttons */}
@@ -138,17 +143,21 @@ export function Navbar() {
             exit={{ opacity: 0, height: 0 }}
             className="md:hidden bg-white border-t border-neutral-200"
           >
-            <div className="px-4 py-4 space-y-4">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="block text-neutral-700 hover:text-primary-600 font-medium py-2"
-                  onClick={() => setIsOpen(false)}
-                >
-                  {link.label}
-                </Link>
-              ))}
+            <div className="px-4 py-4 space-y-2">
+              {navLinks.map((link) => {
+                const Icon = link.icon;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="flex items-center space-x-3 text-neutral-700 hover:text-primary-600 font-medium py-2 px-2 rounded-lg hover:bg-neutral-50 transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <Icon size={20} />
+                    <span>{link.label}</span>
+                  </Link>
+                );
+              })}
               <div className="pt-4 border-t border-neutral-200 space-y-2">
                 <Link
                   href="/login"
