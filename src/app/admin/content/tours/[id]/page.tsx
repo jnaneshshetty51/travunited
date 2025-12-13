@@ -2212,25 +2212,42 @@ const ItineraryTab = memo(({ days, addDay, updateDay, removeDay, onImportCSV }: 
     try {
       // Parse CSV text using PapaParse
       const Papa = (await import("papaparse")).default;
-      const parsed = Papa.parse(pastedCSV, {
+      const parsed = Papa.parse(pastedCSV.trim(), {
         header: true,
         skipEmptyLines: true,
+        transformHeader: (header) => header.trim(),
+        transform: (value) => value.trim(),
       });
 
+      console.log("Parsed CSV:", parsed);
+
       if (!parsed.data || parsed.data.length === 0) {
-        alert("Pasted CSV is empty or invalid.");
+        console.error("CSV parsing resulted in empty data. Errors:", parsed.errors);
+        alert(`Pasted CSV is empty or invalid. Please check the format.\n\nExpected format:\nDay Number,Title,Description,Activities,Meals,Accommodation`);
         setImporting(false);
         return;
       }
 
-      await processCSVRows(parsed.data as any[]);
+      // Filter out completely empty rows
+      const validRows = parsed.data.filter((row: any) => {
+        const hasData = Object.values(row).some((val: any) => val && String(val).trim().length > 0);
+        return hasData;
+      });
+
+      if (validRows.length === 0) {
+        alert("No valid rows found in the CSV. Please check your data.");
+        setImporting(false);
+        return;
+      }
+
+      await processCSVRows(validRows as any[]);
       
       // Clear pasted content
       setPastedCSV("");
       setShowPasteMode(false);
     } catch (error: any) {
       console.error("CSV paste import error:", error);
-      alert(`Failed to import pasted CSV: ${error.message || "Unknown error"}`);
+      alert(`Failed to import pasted CSV: ${error.message || "Unknown error"}\n\nPlease check the CSV format and try again.`);
     } finally {
       setImporting(false);
     }
