@@ -250,6 +250,9 @@ type DayState = {
   dayIndex: number;
   title: string;
   content: string;
+  activities: string[];
+  meals: string[];
+  accommodation: string;
 };
 
 type AddOnForm = {
@@ -617,14 +620,46 @@ export default function AdminTourEditorPage() {
       twitterTitle: data.twitterTitle ?? "",
       twitterDescription: data.twitterDescription ?? "",
     });
-    setDays(
-      (data.days || []).map((day: any, index: number) => ({
-        uid: uid(),
-        dayIndex: day.dayIndex ?? index + 1,
-        title: day.title ?? "",
-        content: day.content ?? "",
-      }))
-    );
+    // Try to load from itinerary JSON first (new format), fallback to days array (old format)
+    let itineraryDays: any[] = [];
+    if (data.itinerary) {
+      try {
+        const parsed = typeof data.itinerary === "string" ? JSON.parse(data.itinerary) : data.itinerary;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          itineraryDays = parsed;
+        }
+      } catch (e) {
+        console.error("Error parsing itinerary JSON:", e);
+      }
+    }
+    
+    if (itineraryDays.length > 0) {
+      // Use itinerary JSON format (new format with activities, meals, accommodation)
+      setDays(
+        itineraryDays.map((day: any, index: number) => ({
+          uid: uid(),
+          dayIndex: day.day ?? day.dayIndex ?? index + 1,
+          title: day.title ?? "",
+          content: day.description ?? day.content ?? "",
+          activities: Array.isArray(day.activities) ? day.activities : [],
+          meals: Array.isArray(day.meals) ? day.meals : [],
+          accommodation: day.accommodation ?? "",
+        }))
+      );
+    } else {
+      // Fallback to days array format (old format)
+      setDays(
+        (data.days || []).map((day: any, index: number) => ({
+          uid: uid(),
+          dayIndex: day.dayIndex ?? index + 1,
+          title: day.title ?? "",
+          content: day.content ?? "",
+          activities: Array.isArray(day.activities) ? day.activities : [],
+          meals: Array.isArray(day.meals) ? day.meals : [],
+          accommodation: day.accommodation ?? "",
+        }))
+      );
+    }
     setAddOns(
       (data.addOns || []).map((addOn: any, index: number) => ({
         uid: addOn.id ?? uid(),
@@ -684,11 +719,11 @@ export default function AdminTourEditorPage() {
   const addDay = useCallback(() => {
     setDays((prev) => [
       ...prev,
-      { uid: uid(), dayIndex: prev.length + 1, title: "", content: "" },
+      { uid: uid(), dayIndex: prev.length + 1, title: "", content: "", activities: [], meals: [], accommodation: "" },
     ]);
   }, []);
 
-  const updateDay = useCallback((uidValue: string, key: keyof DayState, value: string | number) => {
+  const updateDay = useCallback((uidValue: string, key: keyof DayState, value: string | number | string[]) => {
     setDays((prev) =>
       prev.map((day) => (day.uid === uidValue ? { ...day, [key]: value } : day))
     );
@@ -873,7 +908,18 @@ export default function AdminTourEditorPage() {
           dayIndex: day.dayIndex || index + 1,
           title: day.title,
           content: day.content,
+          activities: day.activities || [],
+          meals: day.meals || [],
+          accommodation: day.accommodation || "",
         })),
+        itinerary: JSON.stringify(days.map((day, index) => ({
+          day: day.dayIndex || index + 1,
+          title: day.title,
+          description: day.content,
+          activities: day.activities || [],
+          meals: day.meals || [],
+          accommodation: day.accommodation || "",
+        }))),
       };
 
       const response = await fetch(
@@ -1953,22 +1999,31 @@ const ItineraryTab = memo(({ days, addDay, updateDay, removeDay, onImportCSV }: 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleDownloadTemplate = () => {
-    const headers = ["Day Number", "Title", "Description"];
+    const headers = ["Day Number", "Title", "Description", "Activities", "Meals", "Accommodation"];
     const exampleRows = [
       {
         "Day Number": "1",
         "Title": "Arrival & Welcome",
-        "Description": "Arrive at the airport and transfer to hotel. Welcome dinner and briefing."
+        "Description": "Arrive at the airport and transfer to hotel. Welcome dinner and briefing.",
+        "Activities": "Airport pickup; Hotel check-in; Welcome briefing",
+        "Meals": "Dinner",
+        "Accommodation": "Hotel Name"
       },
       {
         "Day Number": "2",
         "Title": "City Tour",
-        "Description": "Morning city tour including main attractions. Afternoon free for exploration."
+        "Description": "Morning city tour including main attractions. Afternoon free for exploration.",
+        "Activities": "Guided city tour; Visit main attractions; Free time for exploration",
+        "Meals": "Breakfast; Lunch",
+        "Accommodation": "Hotel Name"
       },
       {
         "Day Number": "3",
         "Title": "Cultural Experience",
-        "Description": "Visit local museums and cultural sites. Traditional lunch included."
+        "Description": "Visit local museums and cultural sites. Traditional lunch included.",
+        "Activities": "Museum visit; Cultural site tour; Traditional performance",
+        "Meals": "Breakfast; Lunch",
+        "Accommodation": ""
       }
     ];
 
@@ -2000,7 +2055,7 @@ const ItineraryTab = memo(({ days, addDay, updateDay, removeDay, onImportCSV }: 
       return;
     }
 
-    const headers = ["Day Number", "Title", "Description"];
+    const headers = ["Day Number", "Title", "Description", "Activities", "Meals", "Accommodation"];
     const csv = [
       headers.join(","),
       ...days.map(day => 
@@ -2009,8 +2064,11 @@ const ItineraryTab = memo(({ days, addDay, updateDay, removeDay, onImportCSV }: 
           if (h === "Day Number") val = String(day.dayIndex);
           else if (h === "Title") val = day.title;
           else if (h === "Description") val = day.content;
+          else if (h === "Activities") val = Array.isArray(day.activities) ? day.activities.join("; ") : "";
+          else if (h === "Meals") val = Array.isArray(day.meals) ? day.meals.join("; ") : "";
+          else if (h === "Accommodation") val = day.accommodation || "";
 
-          if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+          if (val.includes(",") || val.includes('"') || val.includes("\n") || val.includes(";")) {
             return `"${String(val).replace(/"/g, '""')}"`;
           }
           return val;
@@ -2039,6 +2097,9 @@ const ItineraryTab = memo(({ days, addDay, updateDay, removeDay, onImportCSV }: 
       const dayNum = row["Day Number"] || row["day number"] || row["Day"] || row["day"] || row["DayNumber"] || row["dayNumber"];
       const title = row["Title"] || row["title"] || row["Day Title"] || row["day title"];
       const description = row["Description"] || row["description"] || row["Content"] || row["content"] || row["Day Description"] || row["day description"];
+      const activitiesStr = row["Activities"] || row["activities"] || row["Activity"] || row["activity"] || "";
+      const mealsStr = row["Meals"] || row["meals"] || row["Meal"] || row["meal"] || "";
+      const accommodation = row["Accommodation"] || row["accommodation"] || row["Hotel"] || row["hotel"] || "";
 
       if (!dayNum && !title && !description) {
         return; // Skip empty rows
@@ -2055,11 +2116,30 @@ const ItineraryTab = memo(({ days, addDay, updateDay, removeDay, onImportCSV }: 
         return;
       }
 
+      // Parse activities (semicolon-separated)
+      const activities: string[] = activitiesStr
+        ? String(activitiesStr)
+            .split(";")
+            .map(a => a.trim())
+            .filter(a => a.length > 0)
+        : [];
+
+      // Parse meals (semicolon-separated)
+      const meals: string[] = mealsStr
+        ? String(mealsStr)
+            .split(";")
+            .map(m => m.trim())
+            .filter(m => m.length > 0)
+        : [];
+
       importedDays.push({
         uid: `${Date.now()}-${index}`,
         dayIndex,
         title: String(title).trim(),
         content: description ? String(description).trim() : "",
+        activities,
+        meals,
+        accommodation: accommodation ? String(accommodation).trim() : "",
       });
     });
 
@@ -2233,15 +2313,15 @@ const ItineraryTab = memo(({ days, addDay, updateDay, removeDay, onImportCSV }: 
             <textarea
               value={pastedCSV}
               onChange={(e) => setPastedCSV(e.target.value)}
-              placeholder={`Day Number,Title,Description
-1,Arrival & Welcome,Arrive at the airport and transfer to hotel
-2,City Tour,Morning city tour including main attractions
-3,Cultural Experience,Visit local museums and cultural sites`}
+              placeholder={`Day Number,Title,Description,Activities,Meals,Accommodation
+1,Arrival & Welcome,Arrive at the airport and transfer to hotel,"Airport pickup; Hotel check-in","Dinner","Hotel Name"
+2,City Tour,Morning city tour including main attractions,"Guided tour; Visit attractions","Breakfast; Lunch","Hotel Name"
+3,Cultural Experience,Visit local museums and cultural sites,"Museum visit; Cultural tour","Breakfast; Lunch",""`}
               rows={8}
               className="w-full border border-neutral-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent font-mono text-sm"
             />
             <p className="mt-1 text-xs text-neutral-500">
-              Paste your CSV content here. Include header row: Day Number, Title, Description
+              Paste your CSV content here. Include header row: Day Number, Title, Description, Activities, Meals, Accommodation. Activities and Meals should be semicolon-separated.
             </p>
           </div>
           <div className="flex items-center gap-2">
