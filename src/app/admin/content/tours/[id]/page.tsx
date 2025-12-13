@@ -2210,27 +2210,49 @@ const ItineraryTab = memo(({ days, addDay, updateDay, removeDay, onImportCSV }: 
 
     setImporting(true);
     try {
-      // Parse CSV text using PapaParse
+      // Parse CSV text using PapaParse (same way as file upload)
       const Papa = (await import("papaparse")).default;
-      const parsed = Papa.parse(pastedCSV.trim(), {
-        header: true,
-        skipEmptyLines: true,
-        transformHeader: (header) => header.trim(),
-        transform: (value) => value.trim(),
+      
+      const parsePromise = new Promise<any[]>((resolve, reject) => {
+        Papa.parse(pastedCSV.trim(), {
+          header: true,
+          skipEmptyLines: true,
+          transformHeader: (header) => header.trim(),
+          transform: (value) => {
+            if (typeof value === "string") {
+              return value.trim();
+            }
+            return value;
+          },
+          complete: (results) => {
+            if (results.errors && results.errors.length > 0) {
+              console.warn("CSV parsing warnings:", results.errors);
+            }
+            resolve(results.data || []);
+          },
+          error: (error: Error) => {
+            reject(error);
+          },
+        });
       });
 
-      console.log("Parsed CSV:", parsed);
+      const rows = await parsePromise;
+      console.log("Parsed CSV rows:", rows);
 
-      if (!parsed.data || parsed.data.length === 0) {
-        console.error("CSV parsing resulted in empty data. Errors:", parsed.errors);
-        alert(`Pasted CSV is empty or invalid. Please check the format.\n\nExpected format:\nDay Number,Title,Description,Activities,Meals,Accommodation`);
+      if (!rows || rows.length === 0) {
+        alert(`Pasted CSV is empty or invalid.\n\nExpected format:\nDay Number,Title,Description,Activities,Meals,Accommodation\n\nMake sure you include the header row and at least one data row.`);
         setImporting(false);
         return;
       }
 
       // Filter out completely empty rows
-      const validRows = parsed.data.filter((row: any) => {
-        const hasData = Object.values(row).some((val: any) => val && String(val).trim().length > 0);
+      const validRows = rows.filter((row: any) => {
+        if (!row || typeof row !== "object") return false;
+        const hasData = Object.values(row).some((val: any) => {
+          if (val === null || val === undefined) return false;
+          const strVal = String(val).trim();
+          return strVal.length > 0;
+        });
         return hasData;
       });
 
@@ -2248,7 +2270,6 @@ const ItineraryTab = memo(({ days, addDay, updateDay, removeDay, onImportCSV }: 
     } catch (error: any) {
       console.error("CSV paste import error:", error);
       alert(`Failed to import pasted CSV: ${error.message || "Unknown error"}\n\nPlease check the CSV format and try again.`);
-    } finally {
       setImporting(false);
     }
   };
