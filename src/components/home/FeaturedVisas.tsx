@@ -45,7 +45,22 @@ const formatEntrySummary = (visa: FeaturedVisa) => {
 };
 
 export function FeaturedVisas({ visas }: { visas: FeaturedVisa[] }) {
-  if (visas.length === 0) {
+  if (!visas || visas.length === 0) {
+    return null;
+  }
+
+  // Filter out any invalid visas (ensure all are proper objects with required fields)
+  const validVisas = visas.filter((visa) => {
+    return (
+      visa &&
+      typeof visa === 'object' &&
+      typeof visa.id === 'string' &&
+      typeof visa.name === 'string' &&
+      typeof visa.price === 'number'
+    );
+  });
+
+  if (validVisas.length === 0) {
     return null;
   }
 
@@ -68,7 +83,7 @@ export function FeaturedVisas({ visas }: { visas: FeaturedVisa[] }) {
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {visas.map((visa, index) => (
+          {validVisas.map((visa, index) => (
             <motion.div
               key={visa.id}
               initial={{ opacity: 0, y: 20 }}
@@ -121,7 +136,7 @@ export function FeaturedVisas({ visas }: { visas: FeaturedVisa[] }) {
                     <div className="mt-auto flex items-center justify-between pt-4 border-t border-neutral-200">
                       <div>
                         <div className="text-2xl font-bold text-primary-600">
-                          ₹{visa.price.toLocaleString()}
+                          ₹{typeof visa.price === 'number' ? visa.price.toLocaleString() : '0'}
                         </div>
                         <div className="text-xs text-neutral-500">starting from</div>
                       </div>

@@ -20,7 +20,22 @@ type FeaturedTour = {
 };
 
 export function FeaturedTours({ tours }: { tours: FeaturedTour[] }) {
-  if (tours.length === 0) {
+  if (!tours || tours.length === 0) {
+    return null;
+  }
+
+  // Filter out any invalid tours (ensure all are proper objects with required fields)
+  const validTours = tours.filter((tour) => {
+    return (
+      tour &&
+      typeof tour === 'object' &&
+      typeof tour.id === 'string' &&
+      typeof tour.name === 'string' &&
+      typeof tour.price === 'number'
+    );
+  });
+
+  if (validTours.length === 0) {
     return null;
   }
 
@@ -43,7 +58,7 @@ export function FeaturedTours({ tours }: { tours: FeaturedTour[] }) {
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {tours.map((tour, index) => (
+          {validTours.map((tour, index) => (
             <motion.div
               key={tour.id}
               initial={{ opacity: 0, y: 20 }}
@@ -76,25 +91,25 @@ export function FeaturedTours({ tours }: { tours: FeaturedTour[] }) {
                   </div>
                   <div className="p-6 flex-1 flex flex-col">
                     <h3 className="text-xl font-bold text-neutral-900 mb-2 line-clamp-2">
-                      {tour.name}
+                      {typeof tour.name === 'string' ? tour.name : ''}
                     </h3>
-                    {tour.subtitle && (
+                    {tour.subtitle && typeof tour.subtitle === 'string' && (
                       <p className="text-neutral-600 text-sm mb-2 line-clamp-1">
                         {tour.subtitle}
                       </p>
                     )}
                     <div className="flex items-center text-neutral-600 text-sm mb-3">
                       <MapPin size={16} className="mr-1" />
-                      <span className="line-clamp-1">{tour.destination}</span>
+                      <span className="line-clamp-1">{typeof tour.destination === 'string' ? tour.destination : ''}</span>
                     </div>
                     <div className="flex items-center text-neutral-600 text-sm mb-4">
                       <Calendar size={16} className="mr-1" />
-                      <span>{tour.duration}</span>
+                      <span>{typeof tour.duration === 'string' ? tour.duration : ''}</span>
                     </div>
                     <div className="mt-auto flex items-center justify-between pt-4 border-t border-neutral-200">
                       <div>
                         <div className="text-2xl font-bold text-primary-600">
-                          ₹{tour.price.toLocaleString()}
+                          ₹{typeof tour.price === 'number' ? tour.price.toLocaleString() : '0'}
                         </div>
                         <div className="text-xs text-neutral-500">per person</div>
                       </div>

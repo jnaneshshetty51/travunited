@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 
 interface LogoProps {
   width?: number;
@@ -10,23 +11,23 @@ interface LogoProps {
 }
 
 export function Logo({ width = 140, height = 56, className = "h-14 w-auto", priority = false }: LogoProps) {
-  const [useFallback, setUseFallback] = useState(false);
+  const [imgSrc, setImgSrc] = useState("/logo.svg");
 
-  // Try SVG first, fallback to PNG if SVG fails to load
   return (
-    <img
-      src={useFallback ? "/logo.png" : "/logo.svg"}
+    <Image
+      src={imgSrc}
       alt="Travunited Logo"
       width={width}
       height={height}
       className={className}
+      priority={priority}
+      unoptimized={imgSrc.endsWith('.svg')}
       onError={() => {
-        if (!useFallback) {
-          setUseFallback(true);
+        // Fallback to PNG if SVG fails to load
+        if (imgSrc.endsWith('.svg')) {
+          setImgSrc("/logo.png");
         }
       }}
-      loading={priority ? "eager" : "lazy"}
-      style={{ maxWidth: "100%", height: "auto" }}
     />
   );
 }

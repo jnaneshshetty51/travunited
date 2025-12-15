@@ -101,56 +101,88 @@ export default async function Home() {
   }
 
   // Transform visas data for component
-  const visaCards = featuredVisas.map((visa) => ({
-    id: visa.id,
-    slug: visa.slug,
-    name: visa.name,
-    subtitle: visa.subtitle,
-    country: visa.country.name,
-    countryCode: visa.country.code.toLowerCase(),
-    price: visa.priceInInr,
-    processingTime: visa.processingTime,
-    entryType: visa.entryType,
-    entryTypeLegacy: visa.entryTypeLegacy,
-    stayType: visa.stayType,
-    visaSubTypeLabel: visa.visaSubTypeLabel,
-    // Use hero image for cards; do not fall back to sample to avoid thumbnailing
-    image: getMediaProxyUrl(visa.heroImageUrl),
-  }));
+  const visaCards = featuredVisas.map((visa) => {
+    // Ensure all values are primitives, not objects
+    return {
+      id: String(visa.id || ''),
+      slug: String(visa.slug || ''),
+      name: String(visa.name || ''),
+      subtitle: visa.subtitle ? String(visa.subtitle) : null,
+      country: String(visa.country?.name || ''),
+      countryCode: String(visa.country?.code?.toLowerCase() || ''),
+      price: Number(visa.priceInInr || 0),
+      processingTime: String(visa.processingTime || ''),
+      entryType: visa.entryType ? String(visa.entryType) : null,
+      entryTypeLegacy: visa.entryTypeLegacy ? String(visa.entryTypeLegacy) : null,
+      stayType: visa.stayType ? String(visa.stayType) : null,
+      visaSubTypeLabel: visa.visaSubTypeLabel ? String(visa.visaSubTypeLabel) : null,
+      // Use hero image for cards; do not fall back to sample to avoid thumbnailing
+      image: getMediaProxyUrl(visa.heroImageUrl) || null,
+    };
+  });
 
   // Transform tours data for component
-  const tourCards = featuredTours.map((tour) => ({
-    id: tour.id,
-    slug: tour.slug || tour.id,
-    name: tour.name,
-    subtitle: tour.subtitle,
-    destination: tour.destinationCountry || tour.destination,
-    duration: tour.durationDays
-      ? `${tour.durationDays} ${tour.durationDays === 1 ? "Day" : "Days"}`
-      : tour.duration,
-    durationNights: tour.durationNights,
-    price: tour.price || tour.basePriceInInr || 0,
-    image: getMediaProxyUrl(tour.heroImageUrl || tour.featuredImage || tour.imageUrl),
-  }));
+  const tourCards = featuredTours.map((tour) => {
+    // Ensure all values are primitives, not objects
+    return {
+      id: String(tour.id || ''),
+      slug: String(tour.slug || tour.id || ''),
+      name: String(tour.name || ''),
+      subtitle: tour.subtitle ? String(tour.subtitle) : null,
+      destination: String(tour.destinationCountry || tour.destination || ''),
+      duration: tour.durationDays
+        ? `${tour.durationDays} ${tour.durationDays === 1 ? "Day" : "Days"}`
+        : String(tour.duration || ''),
+      durationNights: tour.durationNights ? Number(tour.durationNights) : null,
+      price: Number(tour.price || tour.basePriceInInr || 0),
+      image: getMediaProxyUrl(tour.heroImageUrl || tour.featuredImage || tour.imageUrl) || null,
+    };
+  });
 
   // Transform blogs data for component
-  const blogCards = featuredBlogs.map((post) => ({
-    id: post.slug,
-    title: post.title,
-    excerpt: post.excerpt,
-    image: getMediaProxyUrl(post.coverImage),
-    date: (post.publishedAt ?? post.createdAt).toISOString(),
-    category: typeof post.category === 'string' ? post.category : String(post.category || ''),
-  }));
+  const blogCards = featuredBlogs.map((post) => {
+    // Safely convert category to string, handling objects and null/undefined
+    let category: string | null = null;
+    if (post.category) {
+      if (typeof post.category === 'string') {
+        category = post.category;
+      } else if (typeof post.category === 'object') {
+        // If category is an object, extract a meaningful string or use null
+        category = null; // Don't render objects
+      } else {
+        category = String(post.category);
+      }
+    }
+    
+    return {
+      id: post.slug,
+      title: post.title,
+      excerpt: post.excerpt,
+      image: getMediaProxyUrl(post.coverImage),
+      date: (post.publishedAt ?? post.createdAt).toISOString(),
+      category,
+    };
+  });
+
+  // Ensure arrays are valid and filter out any invalid entries
+  const safeVisaCards = Array.isArray(visaCards) 
+    ? visaCards.filter((card) => card && typeof card === 'object' && typeof card.id === 'string' && typeof card.name === 'string')
+    : [];
+  const safeTourCards = Array.isArray(tourCards)
+    ? tourCards.filter((card) => card && typeof card === 'object' && typeof card.id === 'string' && typeof card.name === 'string')
+    : [];
+  const safeBlogCards = Array.isArray(blogCards)
+    ? blogCards.filter((card) => card && typeof card === 'object' && typeof card.id === 'string' && typeof card.title === 'string')
+    : [];
 
   return (
     <div className="flex flex-col">
       <Hero />
-      {visaCards.length > 0 && <FeaturedVisas visas={visaCards} />}
-      {tourCards.length > 0 && <FeaturedTours tours={tourCards} />}
+      {safeVisaCards.length > 0 && <FeaturedVisas visas={safeVisaCards} />}
+      {safeTourCards.length > 0 && <FeaturedTours tours={safeTourCards} />}
       <WhyTravunited />
       <Testimonials />
-      {blogCards.length > 0 && <BlogHighlights posts={blogCards} />}
+      {safeBlogCards.length > 0 && <BlogHighlights posts={safeBlogCards} />}
     </div>
   );
 }
