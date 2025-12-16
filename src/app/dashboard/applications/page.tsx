@@ -118,7 +118,7 @@ export default function ApplicationsPage() {
       // Add Invoice button - use the blob API route instead of redirect route
       actions.push({
         label: "Download Invoice",
-        href: `/api/invoices/application/${app.id}`,
+        href: `/api/invoices/download/application/${app.id}`,
         icon: FileText,
         download: true,
       });
@@ -297,11 +297,29 @@ export default function ApplicationsPage() {
                                     key={index}
                                     onClick={async () => {
                                       try {
-                                        const response = await fetch(action.href);
+                                        const response = await fetch(action.href, {
+                                          method: "GET",
+                                          headers: {
+                                            "Accept": "application/pdf",
+                                          },
+                                        });
+                                        
                                         if (!response.ok) {
-                                          throw new Error("Failed to download invoice");
+                                          let errorMessage = "Failed to download invoice";
+                                          try {
+                                            const errorData = await response.json();
+                                            errorMessage = errorData.error || errorData.message || errorMessage;
+                                          } catch {
+                                            errorMessage = `Server error: ${response.status} ${response.statusText}`;
+                                          }
+                                          throw new Error(errorMessage);
                                         }
+                                        
                                         const blob = await response.blob();
+                                        if (!blob || blob.size === 0) {
+                                          throw new Error("Received empty file");
+                                        }
+                                        
                                         const url = window.URL.createObjectURL(blob);
                                         const a = document.createElement("a");
                                         a.href = url;
@@ -312,7 +330,10 @@ export default function ApplicationsPage() {
                                         document.body.removeChild(a);
                                       } catch (error) {
                                         console.error("Error downloading invoice:", error);
-                                        alert("Failed to download invoice. Please try again.");
+                                        const errorMessage = error instanceof Error 
+                                          ? error.message 
+                                          : "Network error. Please check your connection and try again.";
+                                        alert(`Failed to download invoice: ${errorMessage}`);
                                       }
                                     }}
                                     className={`inline-flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${

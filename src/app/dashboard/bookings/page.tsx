@@ -251,12 +251,29 @@ export default function BookingsPage() {
                                           throw new Error("Invalid invoice URL (missing ID)");
                                         }
 
-                                        const response = await fetch(action.href);
+                                        const response = await fetch(action.href, {
+                                          method: "GET",
+                                          headers: {
+                                            "Accept": "application/pdf",
+                                          },
+                                        });
+                                        
                                         if (!response.ok) {
-                                          const errorData = await response.json().catch(() => ({}));
-                                          throw new Error(errorData.error || errorData.message || `Server returned ${response.status}: Failed to download invoice`);
+                                          let errorMessage = "Failed to download invoice";
+                                          try {
+                                            const errorData = await response.json();
+                                            errorMessage = errorData.error || errorData.message || errorMessage;
+                                          } catch {
+                                            errorMessage = `Server error: ${response.status} ${response.statusText}`;
+                                          }
+                                          throw new Error(errorMessage);
                                         }
+                                        
                                         const blob = await response.blob();
+                                        if (!blob || blob.size === 0) {
+                                          throw new Error("Received empty file");
+                                        }
+                                        
                                         const url = window.URL.createObjectURL(blob);
                                         const a = document.createElement("a");
                                         a.href = url;
@@ -267,8 +284,10 @@ export default function BookingsPage() {
                                         document.body.removeChild(a);
                                       } catch (error) {
                                         console.error("Error downloading invoice:", error);
-                                        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-                                        alert(`Failed to download invoice from ${action.href}\nError: ${errorMessage}`);
+                                        const errorMessage = error instanceof Error 
+                                          ? error.message 
+                                          : "Network error. Please check your connection and try again.";
+                                        alert(`Failed to download invoice: ${errorMessage}`);
                                       }
                                     }}
                                     className={`inline-flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${action.variant === "primary"

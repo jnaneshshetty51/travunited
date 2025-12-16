@@ -430,12 +430,29 @@ export default function BookingDetailPage() {
                   <button
                     onClick={async () => {
                       try {
-                        const response = await fetch(`/api/invoices/download/booking/${booking.id}`);
+                        const response = await fetch(`/api/invoices/download/booking/${booking.id}`, {
+                          method: "GET",
+                          headers: {
+                            "Accept": "application/pdf",
+                          },
+                        });
+                        
                         if (!response.ok) {
-                          const errorData = await response.json().catch(() => ({}));
-                          throw new Error(errorData.error || errorData.message || "Failed to download invoice");
+                          let errorMessage = "Failed to download invoice";
+                          try {
+                            const errorData = await response.json();
+                            errorMessage = errorData.error || errorData.message || errorMessage;
+                          } catch {
+                            errorMessage = `Server error: ${response.status} ${response.statusText}`;
+                          }
+                          throw new Error(errorMessage);
                         }
+                        
                         const blob = await response.blob();
+                        if (!blob || blob.size === 0) {
+                          throw new Error("Received empty file");
+                        }
+                        
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement("a");
                         a.href = url;
@@ -446,7 +463,10 @@ export default function BookingDetailPage() {
                         document.body.removeChild(a);
                       } catch (error) {
                         console.error("Error downloading invoice:", error);
-                        alert(`Failed to download invoice: ${error instanceof Error ? error.message : "Please try again."}`);
+                        const errorMessage = error instanceof Error 
+                          ? error.message 
+                          : "Network error. Please check your connection and try again.";
+                        alert(`Failed to download invoice: ${errorMessage}`);
                       }
                     }}
                     className="w-full flex items-center justify-center space-x-2 border border-neutral-300 text-neutral-700 px-4 py-2 rounded-lg hover:bg-neutral-50 transition-colors"
