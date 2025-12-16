@@ -335,12 +335,7 @@ export async function GET(
       // Fallback: Generate invoice on-the-fly if not in storage or storage access fails
       try {
         const completedPayments = booking.payments?.filter(p => p.status === "COMPLETED") || [];
-        if (completedPayments.length === 0) {
-          return NextResponse.json(
-            { error: "No completed payments found for this booking" },
-            { status: 400 }
-          );
-        }
+        // Relaxed check: Allow invoice generation even if no payments are recorded (e.g. for offline payments or admin bookings)
 
         const totalPaid = completedPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
         const latestPayment = completedPayments[0];

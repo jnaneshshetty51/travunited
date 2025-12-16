@@ -6,11 +6,12 @@ import { AdminHeader } from "./AdminHeader";
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <div className="flex min-h-screen bg-neutral-50">
-      <div className="hidden lg:flex w-64 flex-shrink-0">
-        <AdminSidebarStatic />
+      <div className={`hidden lg:flex flex-shrink-0 transition-all duration-300 ${collapsed ? "w-20" : "w-64"}`}>
+        <AdminSidebarStatic collapsed={collapsed} setCollapsed={setCollapsed} />
       </div>
 
       <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />

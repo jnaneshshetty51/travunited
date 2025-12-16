@@ -174,8 +174,8 @@ export default function BookingsPage() {
           <button
             onClick={() => setSelectedStatus(null)}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedStatus === null
-                ? "bg-primary-600 text-white"
-                : "bg-white text-neutral-700 border border-neutral-300 hover:bg-neutral-50"
+              ? "bg-primary-600 text-white"
+              : "bg-white text-neutral-700 border border-neutral-300 hover:bg-neutral-50"
               }`}
           >
             All
@@ -190,8 +190,8 @@ export default function BookingsPage() {
                 key={group}
                 onClick={() => setSelectedStatus(group)}
                 className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedStatus === group
-                    ? "bg-primary-600 text-white"
-                    : "bg-white text-neutral-700 border border-neutral-300 hover:bg-neutral-50"
+                  ? "bg-primary-600 text-white"
+                  : "bg-white text-neutral-700 border border-neutral-300 hover:bg-neutral-50"
                   }`}
               >
                 {group} ({count})
@@ -248,7 +248,8 @@ export default function BookingsPage() {
                                       try {
                                         const response = await fetch(action.href);
                                         if (!response.ok) {
-                                          throw new Error("Failed to download invoice");
+                                          const errorData = await response.json().catch(() => ({}));
+                                          throw new Error(errorData.error || errorData.message || "Failed to download invoice");
                                         }
                                         const blob = await response.blob();
                                         const url = window.URL.createObjectURL(blob);
@@ -261,12 +262,12 @@ export default function BookingsPage() {
                                         document.body.removeChild(a);
                                       } catch (error) {
                                         console.error("Error downloading invoice:", error);
-                                        alert("Failed to download invoice. Please try again.");
+                                        alert(`Failed to download invoice: ${error instanceof Error ? error.message : "Please try again."}`);
                                       }
                                     }}
                                     className={`inline-flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${action.variant === "primary"
-                                        ? "bg-primary-600 text-white hover:bg-primary-700"
-                                        : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                                      ? "bg-primary-600 text-white hover:bg-primary-700"
+                                      : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
                                       }`}
                                   >
                                     <Icon size={16} />
@@ -285,8 +286,8 @@ export default function BookingsPage() {
                                   key={index}
                                   {...props}
                                   className={`inline-flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${action.variant === "primary"
-                                      ? "bg-primary-600 text-white hover:bg-primary-700"
-                                      : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                                    ? "bg-primary-600 text-white hover:bg-primary-700"
+                                    : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
                                     }`}
                                 >
                                   <Icon size={16} />
