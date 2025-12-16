@@ -1,10 +1,9 @@
-"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
   Edit,
@@ -19,9 +18,13 @@ import {
   ChevronDown,
   Upload,
   Download,
+  Loader2,
 } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { ImportModal } from "@/components/admin/ImportModal";
+import { useDebounce } from "@/hooks/useDebounce";
+
+
 
 // Memoized input components to prevent focus loss
 const SearchInput = memo(({ value, onChange, placeholder }: {
@@ -47,9 +50,9 @@ const SearchInput = memo(({ value, onChange, placeholder }: {
   );
 }, (prevProps, nextProps) => {
   // Custom comparison: only re-render if value or onChange reference changes
-  return prevProps.value === nextProps.value && 
-         prevProps.placeholder === nextProps.placeholder &&
-         prevProps.onChange === nextProps.onChange;
+  return prevProps.value === nextProps.value &&
+    prevProps.placeholder === nextProps.placeholder &&
+    prevProps.onChange === nextProps.onChange;
 });
 SearchInput.displayName = "SearchInput";
 
@@ -73,9 +76,9 @@ const SelectInput = memo(({ value, onChange, children, className = "" }: {
     </select>
   );
 }, (prevProps, nextProps) => {
-  return prevProps.value === nextProps.value && 
-         prevProps.onChange === nextProps.onChange &&
-         prevProps.className === nextProps.className;
+  return prevProps.value === nextProps.value &&
+    prevProps.onChange === nextProps.onChange &&
+    prevProps.className === nextProps.className;
 });
 SelectInput.displayName = "SelectInput";
 
@@ -175,45 +178,62 @@ const VISA_FILTER_DEFAULT: VisaFilters = {
   search: "",
 };
 
+
+
 export default function AdminVisasPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // State
   const [visas, setVisas] = useState<VisaRecord[]>([]);
   const [countries, setCountries] = useState<CountryOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<VisaFilters>(VISA_FILTER_DEFAULT);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isFiltering, setIsFiltering] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [showBulkActions, setShowBulkActions] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
-  const bootstrapped = useRef(false);
+
+  // Filters state
+  const [filters, setFilters] = useState<VisaFilters>({
+    countryId: "",
+    category: "",
+    status: "all",
+    search: "",
+  });
+
+  // Debounced search for API calls
+  const debouncedSearch = useDebounce(filters.search, 300);
+
+  // -- Data Fetching --
 
   const fetchCountries = useCallback(async () => {
     try {
       const response = await fetch("/api/admin/content/countries");
       if (response.ok) {
         const data = await response.json();
-        setCountries(
-          data.map((country: any) => ({
-            id: country.id,
-            name: country.name,
-          }))
-        );
+        setCountries(data.map((country: any) => ({
+          id: country.id,
+          name: country.name,
+        })));
       }
     } catch (error) {
       console.error("Error loading countries", error);
     }
   }, []);
 
-  const fetchVisas = useCallback(async (activeFilters: VisaFilters) => {
+  const fetchVisas = useCallback(async (currentFilters: VisaFilters, isRefresh = false) => {
+    if (!isRefresh) setIsFiltering(true);
+
     try {
       const params = new URLSearchParams();
-      if (activeFilters.countryId) params.set("countryId", activeFilters.countryId);
-      if (activeFilters.category) params.set("category", activeFilters.category);
-      if (activeFilters.status && activeFilters.status !== "all")
-        params.set("status", activeFilters.status);
-      if (activeFilters.search) params.set("search", activeFilters.search);
+      if (currentFilters.countryId) params.set("countryId", currentFilters.countryId);
+      if (currentFilters.category) params.set("category", currentFilters.category);
+      if (currentFilters.status && currentFilters.status !== "all")
+        params.set("status", currentFilters.status);
+      if (currentFilters.search) params.set("search", currentFilters.search);
 
       const response = await fetch(
         `/api/admin/content/visas${params.toString() ? `?${params}` : ""}`
@@ -225,87 +245,82 @@ export default function AdminVisasPage() {
     } catch (error) {
       console.error("Error fetching visas:", error);
     } finally {
-      setRefreshing(false);
+      setIsFiltering(false);
+      if (isRefresh) setRefreshing(false);
     }
   }, []);
 
+  // -- Effects --
+
+  // 1. Authentication check
   useEffect(() => {
-    if (status === "loading" || bootstrapped.current) return;
+    if (status === "loading") return;
     if (!session?.user) {
       router.push("/login");
       return;
     }
     if (session.user.role !== "STAFF_ADMIN" && session.user.role !== "SUPER_ADMIN") {
       router.push("/admin");
-      return;
     }
-    bootstrapped.current = true;
-    Promise.all([fetchCountries(), fetchVisas(VISA_FILTER_DEFAULT)]).finally(() =>
-      setLoading(false)
-    );
-  }, [session, status, router, fetchCountries, fetchVisas]);
+  }, [session, status, router]);
 
-  const handleFilterChange = useCallback((field: keyof VisaFilters, value: string) => {
-    setFilters((prev) => {
-      const nextFilters = { ...prev, [field]: value } as VisaFilters;
-      // Don't fetch immediately for search - it's handled by debounced handler
-      // Filter changes don't show loading indicators
-      if (field !== "search") {
-        fetchVisas(nextFilters);
-      }
-      return nextFilters;
-    });
-  }, [fetchVisas]);
-
-  // Debounced search handler
-  const [searchValue, setSearchValue] = useState(filters.search);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
+  // 2. Initial Data Load
   useEffect(() => {
-    // Sync searchValue with filters.search when filters change externally
-    if (filters.search !== searchValue) {
-      setSearchValue(filters.search);
+    if (status === "authenticated") {
+      Promise.all([fetchCountries(), fetchVisas(filters)]).finally(() =>
+        setInitialLoading(false)
+      );
     }
-  }, [filters.search, searchValue]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]); // Only run once on auth confirmation
 
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchValue(value);
-    // Clear existing timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    // Set new timeout for debounced search
-    // Search filter changes don't show loading indicators
-    searchTimeoutRef.current = setTimeout(() => {
-      setFilters((prev) => {
-        const nextFilters = { ...prev, search: value } as VisaFilters;
-        fetchVisas(nextFilters);
-        return nextFilters;
-      });
-    }, 300);
-  }, [fetchVisas]);
-
-  // Cleanup timeout on unmount
+  // 3. Reactive Fetch on Filter Changes
   useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, []);
+    if (!initialLoading) {
+      // Create a filter object with the DEBOUNCED search value
+      const filtersToFetch = {
+        ...filters,
+        search: debouncedSearch
+      };
+
+      // We essentially want to ignore the direct filters.search update and wait for debouncedSearch
+      // But we DO want to fetch immediately on other filter changes.
+      // The dependency array handles this.
+      fetchVisas(filtersToFetch);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.countryId, filters.category, filters.status, debouncedSearch]); // Dependencies explicitly listed
+
+  // -- Handlers --
+
+  const handleFilterChange = (field: keyof VisaFilters, value: string) => {
+    setFilters((prev) => ({ ...prev, [field]: value }));
+    // No manual fetch call needed thanks to useEffect
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchVisas(filters, true);
+  };
 
   const handleToggleStatus = async (visa: VisaRecord) => {
     try {
+      // Optimistic update
+      setVisas(prev => prev.map(v => v.id === visa.id ? { ...v, isActive: !v.isActive } : v));
+
       await fetch(`/api/admin/content/visas/${visa.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !visa.isActive }),
       });
-      fetchVisas(filters);
+      // No refetch needed if optimistic update succeeds
     } catch (error) {
       console.error("Failed to toggle visa status", error);
+      // Revert on failure
+      fetchVisas(filters);
     }
   };
+
 
   const handleToggleFeatured = async (visa: VisaRecord) => {
     try {
@@ -321,10 +336,7 @@ export default function AdminVisasPage() {
     }
   };
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchVisas(filters);
-  };
+
 
   const handleSelectAll = () => {
     if (selectedIds.size === filteredVisas.length) {
@@ -392,7 +404,7 @@ export default function AdminVisasPage() {
 
   const filteredVisas = useMemo(() => visas, [visas]);
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
         <div className="text-center">
@@ -414,16 +426,19 @@ export default function AdminVisasPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleRefresh}
-              className="inline-flex items-center gap-2 border border-neutral-200 px-4 py-2 rounded-lg text-neutral-600 hover:bg-neutral-50"
-            >
-              <RefreshCw
-                size={16}
-                className={refreshing ? "animate-spin" : ""}
-              />
-              Refresh
-            </button>
+            <div className="relative">
+              <button
+                onClick={handleRefresh}
+                className="inline-flex items-center gap-2 border border-neutral-200 px-4 py-2 rounded-lg text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+                disabled={refreshing || isFiltering}
+              >
+                <RefreshCw
+                  size={16}
+                  className={refreshing || isFiltering ? "animate-spin" : ""}
+                />
+                Refresh
+              </button>
+            </div>
             <div className="relative">
               <button
                 onClick={() => setShowImportModal(true)}
@@ -436,7 +451,7 @@ export default function AdminVisasPage() {
                 onClick={() => {
                   window.open("/api/admin/content/visas/export?format=xlsx", "_blank");
                 }}
-                className="inline-flex items-center gap-2 border border-neutral-200 px-4 py-2 rounded-lg text-neutral-700 hover:bg-neutral-50"
+                className="inline-flex items-center gap-2 border border-neutral-200 px-4 py-2 rounded-lg text-neutral-700 hover:bg-neutral-50 ml-2"
               >
                 <Download size={18} />
                 Export
@@ -456,8 +471,8 @@ export default function AdminVisasPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="relative flex-1">
               <SearchInput
-                value={searchValue}
-                onChange={handleSearchChange}
+                value={filters.search}
+                onChange={(value) => handleFilterChange("search", value)}
                 placeholder="Search visas..."
               />
             </div>
@@ -564,8 +579,17 @@ export default function AdminVisasPage() {
           </div>
         )}
 
+        {/* List Content */}
+        {isFiltering && (
+          <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center rounded-2xl pointer-events-none">
+            <div className="bg-white p-2 rounded-full shadow-lg">
+              <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
+            </div>
+          </div>
+        )}
+
         {filteredVisas.length > 0 ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {filteredVisas.map((visa, index) => {
               const visaModeDisplay =
                 formatEnumLabel(visa.visaMode, visaModeLabels) || "Not specified";
@@ -578,129 +602,127 @@ export default function AdminVisasPage() {
               const subtypeDisplay = buildVisaSubtypeLabel(visa);
               return (
                 <motion.div
-                key={visa.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className="bg-white border border-neutral-200 rounded-2xl p-5 space-y-4 hover:shadow-medium transition-shadow relative"
-              >
-                <div className="absolute top-4 left-4">
-                  <button
-                    onClick={() => handleSelectOne(visa.id)}
-                    className="flex items-center"
-                  >
-                    {selectedIds.has(visa.id) ? (
-                      <CheckSquare size={18} className="text-primary-600" />
-                    ) : (
-                      <Square size={18} className="text-neutral-400" />
-                    )}
-                  </button>
-                </div>
-                <div className="flex items-start justify-between gap-3 pl-6">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-lg font-bold text-neutral-900">
-                        {visa.name}
-                      </h2>
-                    </div>
-                    <p className="text-sm text-neutral-500">
-                      {visa.country.name} &middot; {visa.category}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
+                  key={visa.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="bg-white border border-neutral-200 rounded-2xl p-5 space-y-4 hover:shadow-medium transition-shadow relative"
+                >
+                  <div className="absolute top-4 left-4">
                     <button
-                      onClick={() => handleToggleFeatured(visa)}
-                      className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full transition-colors ${
-                        visa.isFeatured
+                      onClick={() => handleSelectOne(visa.id)}
+                      className="flex items-center"
+                    >
+                      {selectedIds.has(visa.id) ? (
+                        <CheckSquare size={18} className="text-primary-600" />
+                      ) : (
+                        <Square size={18} className="text-neutral-400" />
+                      )}
+                    </button>
+                  </div>
+                  <div className="flex items-start justify-between gap-3 pl-6">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-bold text-neutral-900">
+                          {visa.name}
+                        </h2>
+                      </div>
+                      <p className="text-sm text-neutral-500">
+                        {visa.country.name} &middot; {visa.category}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleToggleFeatured(visa)}
+                        className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full transition-colors ${visa.isFeatured
                           ? "text-amber-600 bg-amber-50 hover:bg-amber-100"
                           : "text-neutral-500 bg-neutral-100 hover:bg-neutral-200"
-                      }`}
-                      title={visa.isFeatured ? "Remove from homepage" : "Show on homepage"}
-                    >
-                      <Star size={12} className={visa.isFeatured ? "fill-amber-500 text-amber-500" : ""} />
-                      Featured
-                    </button>
-                    <button
-                      onClick={() => handleToggleStatus(visa)}
-                      className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                        visa.isActive
+                          }`}
+                        title={visa.isFeatured ? "Remove from homepage" : "Show on homepage"}
+                      >
+                        <Star size={12} className={visa.isFeatured ? "fill-amber-500 text-amber-500" : ""} />
+                        Featured
+                      </button>
+                      <button
+                        onClick={() => handleToggleStatus(visa)}
+                        className={`text-xs font-semibold px-2 py-1 rounded-full ${visa.isActive
                           ? "bg-green-50 text-green-700"
                           : "bg-neutral-100 text-neutral-600"
-                      }`}
-                    >
-                      {visa.isActive ? "Active" : "Inactive"}
-                    </button>
+                          }`}
+                      >
+                        {visa.isActive ? "Active" : "Inactive"}
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-neutral-600">
-                  <div>
-                    <div className="text-xs text-neutral-500 uppercase">Processing</div>
-                    <div className="font-medium text-neutral-900">{visa.processingTime}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-neutral-500 uppercase">Stay Duration</div>
-                    <div className="font-medium text-neutral-900">
-                      {visa.stayDurationDays ? `${visa.stayDurationDays} days` : visa.stayDuration}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-neutral-600">
+                    <div>
+                      <div className="text-xs text-neutral-500 uppercase">Processing</div>
+                      <div className="font-medium text-neutral-900">{visa.processingTime}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-neutral-500 uppercase">Stay Duration</div>
+                      <div className="font-medium text-neutral-900">
+                        {visa.stayDurationDays ? `${visa.stayDurationDays} days` : visa.stayDuration}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-neutral-500 uppercase">Validity</div>
+                      <div className="font-medium text-neutral-900">
+                        {visa.validityDays ? `${visa.validityDays} days from issue` : "N/A"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-neutral-500 uppercase">Visa Mode</div>
+                      <div className="font-medium text-neutral-900">{visaModeDisplay}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-neutral-500 uppercase">Entry Type</div>
+                      <div className="font-medium text-neutral-900">{entryDisplay}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-neutral-500 uppercase">Stay Type</div>
+                      <div className="font-medium text-neutral-900">{stayDisplay}</div>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <div className="text-xs text-neutral-500 uppercase">Subtype</div>
+                      <div className="font-medium text-neutral-900">{subtypeDisplay}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-neutral-500 uppercase">Documents</div>
+                      <div className="font-medium text-neutral-900">
+                        {visa._count.requirements} requirements
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-xs text-neutral-500 uppercase">Validity</div>
-                    <div className="font-medium text-neutral-900">
-                      {visa.validityDays ? `${visa.validityDays} days from issue` : "N/A"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-neutral-500 uppercase">Visa Mode</div>
-                    <div className="font-medium text-neutral-900">{visaModeDisplay}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-neutral-500 uppercase">Entry Type</div>
-                    <div className="font-medium text-neutral-900">{entryDisplay}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-neutral-500 uppercase">Stay Type</div>
-                    <div className="font-medium text-neutral-900">{stayDisplay}</div>
-                  </div>
-                  <div className="sm:col-span-2">
-                    <div className="text-xs text-neutral-500 uppercase">Subtype</div>
-                    <div className="font-medium text-neutral-900">{subtypeDisplay}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-neutral-500 uppercase">Documents</div>
-                    <div className="font-medium text-neutral-900">
-                      {visa._count.requirements} requirements
-                    </div>
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-2xl font-bold text-primary-600">
-                      {visa.currency === "INR" ? "₹" : visa.currency === "USD" ? "$" : visa.currency === "EUR" ? "€" : visa.currency === "AED" ? "د.إ" : visa.currency === "GBP" ? "£" : visa.currency || "₹"}
-                      {visa.priceInInr.toLocaleString()}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-2xl font-bold text-primary-600">
+                        {visa.currency === "INR" ? "₹" : visa.currency === "USD" ? "$" : visa.currency === "EUR" ? "€" : visa.currency === "AED" ? "د.إ" : visa.currency === "GBP" ? "£" : visa.currency || "₹"}
+                        {visa.priceInInr.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-neutral-500">Per traveller</div>
                     </div>
-                    <div className="text-xs text-neutral-500">Per traveller</div>
+                    <div className="flex items-center gap-3 text-sm font-medium">
+                      <Link
+                        href={`/admin/content/visas/${visa.id}`}
+                        className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700"
+                      >
+                        <Edit size={16} />
+                        Edit
+                      </Link>
+                      <button
+                        onClick={() =>
+                          router.push(`/admin/content/visas/new?clone=${visa.id}`)
+                        }
+                        className="inline-flex items-center gap-1 text-neutral-500 hover:text-neutral-800"
+                      >
+                        <Copy size={16} />
+                        Duplicate
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 text-sm font-medium">
-                    <Link
-                      href={`/admin/content/visas/${visa.id}`}
-                      className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700"
-                    >
-                      <Edit size={16} />
-                      Edit
-                    </Link>
-                    <button
-                      onClick={() =>
-                        router.push(`/admin/content/visas/new?clone=${visa.id}`)
-                      }
-                      className="inline-flex items-center gap-1 text-neutral-500 hover:text-neutral-800"
-                    >
-                      <Copy size={16} />
-                      Duplicate
-                    </button>
-                  </div>
-                </div>
                 </motion.div>
               );
             })}

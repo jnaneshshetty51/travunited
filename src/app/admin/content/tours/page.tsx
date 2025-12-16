@@ -1,14 +1,14 @@
-"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { Plus, Search, Filter, Star, RefreshCw, Upload, Globe, Tag, Eye, Trash2, Download, ArrowUpDown, X, CheckCircle, AlertCircle, FileText } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus, Search, Filter, Star, RefreshCw, Upload, Globe, Tag, Eye, Trash2, Download, ArrowUpDown, X, CheckCircle, AlertCircle, FileText, Loader2 } from "lucide-react";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import { ImportModal } from "@/components/admin/ImportModal";
 import { formatDate } from "@/lib/dateFormat";
+import { useDebounce } from "@/hooks/useDebounce";
 
 // Memoized input components to prevent focus loss
 const SearchInput = memo(({ value, onChange, placeholder }: {
@@ -35,9 +35,9 @@ const SearchInput = memo(({ value, onChange, placeholder }: {
 }, (prevProps, nextProps) => {
   // Custom comparison: only re-render if value or onChange reference changes
   // This prevents re-renders when parent re-renders due to other state changes
-  return prevProps.value === nextProps.value && 
-         prevProps.placeholder === nextProps.placeholder &&
-         prevProps.onChange === nextProps.onChange;
+  return prevProps.value === nextProps.value &&
+    prevProps.placeholder === nextProps.placeholder &&
+    prevProps.onChange === nextProps.onChange;
 });
 SearchInput.displayName = "SearchInput";
 
@@ -136,13 +136,17 @@ const TOUR_FILTER_DEFAULT: TourFilters = {
   search: "",
 };
 
+
+
 export default function AdminToursPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
+  // State
   const [tours, setTours] = useState<TourRecord[]>([]);
   const [countries, setCountries] = useState<CountryOption[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<TourFilters>(TOUR_FILTER_DEFAULT);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isFiltering, setIsFiltering] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
@@ -151,35 +155,39 @@ export default function AdminToursPage() {
   const [bulkActionMessage, setBulkActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [sortField, setSortField] = useState<"createdAt" | "price" | "name" | "status">("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const bootstrapped = useRef(false);
+
+  // Filters state
+  const [filters, setFilters] = useState<TourFilters>(TOUR_FILTER_DEFAULT);
+
+  // Debounced search for API calls
+  const debouncedSearch = useDebounce(filters.search, 300);
+
+  // -- Data Fetching --
 
   const fetchCountries = useCallback(async () => {
     try {
       const response = await fetch("/api/admin/content/countries");
       if (response.ok) {
         const data = await response.json();
-        setCountries(
-          data.map((country: any) => ({
-            id: country.id,
-            name: country.name,
-          }))
-        );
+        setCountries(data.map((country: any) => ({
+          id: country.id,
+          name: country.name,
+        })));
       }
     } catch (error) {
       console.error("Failed to load countries", error);
     }
   }, []);
 
-  const fetchTours = useCallback(async (activeFilters: TourFilters, showLoading = false) => {
+  const fetchTours = useCallback(async (currentFilters: TourFilters, isRefresh = false) => {
+    if (!isRefresh) setIsFiltering(true);
+
     try {
-      if (showLoading) {
-        setLoading(true);
-      }
       const params = new URLSearchParams();
-      if (activeFilters.countryId) params.set("countryId", activeFilters.countryId);
-      if (activeFilters.status && activeFilters.status !== "all")
-        params.set("status", activeFilters.status);
-      if (activeFilters.search) params.set("search", activeFilters.search);
+      if (currentFilters.countryId) params.set("countryId", currentFilters.countryId);
+      if (currentFilters.status && currentFilters.status !== "all")
+        params.set("status", currentFilters.status);
+      if (currentFilters.search) params.set("search", currentFilters.search);
 
       const response = await fetch(
         `/api/admin/content/tours${params.toString() ? `?${params}` : ""}`
@@ -188,18 +196,18 @@ export default function AdminToursPage() {
         const data = await response.json();
         // Apply client-side filters for tourType, region, packageType, featured
         let filtered = data;
-        if (activeFilters.tourType !== "all") {
-          filtered = filtered.filter((t: TourRecord) => t.tourType === activeFilters.tourType);
+        if (currentFilters.tourType !== "all") {
+          filtered = filtered.filter((t: TourRecord) => t.tourType === currentFilters.tourType);
         }
-        if (activeFilters.region !== "all") {
-          filtered = filtered.filter((t: TourRecord) => t.region === activeFilters.region);
+        if (currentFilters.region !== "all") {
+          filtered = filtered.filter((t: TourRecord) => t.region === currentFilters.region);
         }
-        if (activeFilters.packageType !== "all") {
-          filtered = filtered.filter((t: TourRecord) => t.packageType === activeFilters.packageType);
+        if (currentFilters.packageType !== "all") {
+          filtered = filtered.filter((t: TourRecord) => t.packageType === currentFilters.packageType);
         }
-        if (activeFilters.featured === "yes") {
+        if (currentFilters.featured === "yes") {
           filtered = filtered.filter((t: TourRecord) => t.isFeatured);
-        } else if (activeFilters.featured === "no") {
+        } else if (currentFilters.featured === "no") {
           filtered = filtered.filter((t: TourRecord) => !t.isFeatured);
         }
         setTours(filtered);
@@ -207,81 +215,65 @@ export default function AdminToursPage() {
     } catch (error) {
       console.error("Error fetching tours:", error);
     } finally {
-      if (showLoading) {
-        setLoading(false);
-      }
-      setRefreshing(false);
+      setIsFiltering(false);
+      if (isRefresh) setRefreshing(false);
     }
   }, []);
 
+  // -- Effects --
+
+  // 1. Authentication check
   useEffect(() => {
-    if (status === "loading" || bootstrapped.current) return;
+    if (status === "loading") return;
     if (!session?.user) {
       router.push("/login");
       return;
     }
     if (session.user.role !== "STAFF_ADMIN" && session.user.role !== "SUPER_ADMIN") {
       router.push("/admin");
-      return;
     }
-    bootstrapped.current = true;
-    Promise.all([fetchCountries(), fetchTours(TOUR_FILTER_DEFAULT, true)]).finally(() =>
-      setLoading(false)
-    );
-  }, [session, status, router, fetchCountries, fetchTours]);
+  }, [session, status, router]);
 
-  const handleFilterChange = useCallback((field: keyof TourFilters, value: string) => {
-    setFilters((prev) => {
-      const nextFilters = { ...prev, [field]: value } as TourFilters;
-      // Don't fetch immediately for search - it's handled by debounced handler
-      // Don't show loading indicator for filter changes
-      if (field !== "search") {
-        fetchTours(nextFilters, false);
-      }
-      return nextFilters;
-    });
-  }, [fetchTours]);
-
-  // Debounced search handler
-  const [searchValue, setSearchValue] = useState(filters.search);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
+  // 2. Initial Data Load
   useEffect(() => {
-    // Sync searchValue with filters.search when filters change externally
-    if (filters.search !== searchValue) {
-      setSearchValue(filters.search);
+    if (status === "authenticated") {
+      Promise.all([fetchCountries(), fetchTours(TOUR_FILTER_DEFAULT)]).finally(() =>
+        setInitialLoading(false)
+      );
     }
-  }, [filters.search, searchValue]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchValue(value);
-    // Clear existing timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    // Set new timeout for debounced search
-    // Don't show loading indicator for search filter changes
-    searchTimeoutRef.current = setTimeout(() => {
-      setFilters((prev) => {
-        const nextFilters = { ...prev, search: value } as TourFilters;
-        fetchTours(nextFilters, false);
-        return nextFilters;
-      });
-    }, 300);
-  }, [fetchTours]);
-
-  // Cleanup timeout on unmount
+  // 3. Reactive Fetch on Filter Changes
   useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, []);
+    if (!initialLoading) {
+      const filtersToFetch = {
+        ...filters,
+        search: debouncedSearch
+      };
+
+      fetchTours(filtersToFetch);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    filters.countryId,
+    filters.status,
+    filters.tourType,
+    filters.region,
+    filters.packageType,
+    filters.featured,
+    debouncedSearch
+  ]);
+
+  // -- Handlers --
+
+  const handleFilterChange = (field: keyof TourFilters, value: string) => {
+    setFilters((prev) => ({ ...prev, [field]: value }));
+  };
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchTours(filters, false);
+    fetchTours(filters, true);
   };
 
   const handleSelectAll = (checked: boolean) => {
@@ -322,15 +314,15 @@ export default function AdminToursPage() {
         case "status":
           if (!value) return;
           const statusValue = value === "active" ? "active" : "inactive";
-      const response = await fetch("/api/admin/content/tours/bulk/status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ids: Array.from(selectedIds),
+          const response = await fetch("/api/admin/content/tours/bulk/status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ids: Array.from(selectedIds),
               status: statusValue,
               isActive: statusValue === "active",
-        }),
-      });
+            }),
+          });
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.error || "Failed to update status");
@@ -340,13 +332,13 @@ export default function AdminToursPage() {
         case "featured":
           const featuredValue = value === "true";
           const featuredResponse = await fetch("/api/admin/content/tours/bulk/featured", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ids: Array.from(selectedIds),
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ids: Array.from(selectedIds),
               featured: featuredValue,
-        }),
-      });
+            }),
+          });
           if (!featuredResponse.ok) {
             const errorData = await featuredResponse.json().catch(() => ({}));
             throw new Error(errorData.error || "Failed to update featured status");
@@ -355,14 +347,14 @@ export default function AdminToursPage() {
           break;
         case "delete":
           if (!confirm("Are you absolutely sure? This action cannot be undone.")) {
-      setBulkActionLoading(false);
-      return;
-    }
+            setBulkActionLoading(false);
+            return;
+          }
           const deleteResponse = await fetch("/api/admin/content/tours/bulk/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: Array.from(selectedIds) }),
-      });
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ids: Array.from(selectedIds) }),
+          });
           if (!deleteResponse.ok) {
             const errorData = await deleteResponse.json().catch(() => ({}));
             throw new Error(errorData.error || "Failed to delete tours");
@@ -463,11 +455,11 @@ export default function AdminToursPage() {
   const uniqueRegions = Array.from(new Set(tours.map(t => t.region).filter((r): r is string => Boolean(r))));
   const uniqueTourTypes = Array.from(new Set(tours.map(t => t.tourType).filter((t): t is string => Boolean(t))));
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <AdminLayout>
-      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
-        <div className="text-center">
+        <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+          <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
             <p className="mt-4 text-neutral-600">Loading...</p>
           </div>
@@ -529,7 +521,6 @@ export default function AdminToursPage() {
                 label: "All",
                 action: () => {
                   setFilters(TOUR_FILTER_DEFAULT);
-                  fetchTours(TOUR_FILTER_DEFAULT, false);
                 },
                 active: filters.status === "all" && filters.featured === "all" && filters.tourType === "all" && filters.region === "all",
               },
@@ -537,7 +528,6 @@ export default function AdminToursPage() {
                 label: "Active",
                 action: () => {
                   setFilters({ ...filters, status: "active" });
-                  fetchTours({ ...filters, status: "active" }, false);
                 },
                 active: filters.status === "active",
               },
@@ -545,7 +535,6 @@ export default function AdminToursPage() {
                 label: "Inactive",
                 action: () => {
                   setFilters({ ...filters, status: "inactive" });
-                  fetchTours({ ...filters, status: "inactive" }, false);
                 },
                 active: filters.status === "inactive",
               },
@@ -553,7 +542,6 @@ export default function AdminToursPage() {
                 label: "Featured",
                 action: () => {
                   setFilters({ ...filters, featured: "yes" });
-                  fetchTours({ ...filters, featured: "yes" }, false);
                 },
                 active: filters.featured === "yes",
               },
@@ -561,7 +549,6 @@ export default function AdminToursPage() {
                 label: "Draft",
                 action: () => {
                   setFilters({ ...filters, status: "draft" });
-                  fetchTours({ ...filters, status: "draft" }, false);
                 },
                 active: filters.status === "draft",
               },
@@ -569,9 +556,8 @@ export default function AdminToursPage() {
               <button
                 key={chip.label}
                 onClick={chip.action}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  chip.active ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                }`}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${chip.active ? "bg-neutral-900 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                  }`}
               >
                 {chip.label}
               </button>
@@ -585,7 +571,6 @@ export default function AdminToursPage() {
                   key={region}
                   onClick={() => {
                     setFilters({ ...filters, region });
-                    fetchTours({ ...filters, region }, false);
                   }}
                   className="rounded-full border border-neutral-200 px-3 py-1 text-neutral-600 hover:border-neutral-400"
                 >
@@ -597,51 +582,62 @@ export default function AdminToursPage() {
         </div>
 
         {/* Filters */}
+        {/* List Content */}
+        {isFiltering && (
+          <div className="fixed bottom-4 right-4 bg-white p-3 rounded-full shadow-lg z-50 flex items-center gap-2 border border-neutral-200">
+            <Loader2 className="w-5 h-5 animate-spin text-primary-600" />
+            <span className="text-sm font-medium text-neutral-700">Updating...</span>
+          </div>
+        )}
+
         <div className="bg-white rounded-lg shadow-medium p-6 border border-neutral-200 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
               <Filter size={20} className="text-neutral-400" />
               <h2 className="text-lg font-semibold text-neutral-900">Filters</h2>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleRefresh}
-                className="inline-flex items-center gap-2 border border-neutral-200 px-3 py-1.5 rounded-lg text-sm text-neutral-600 hover:bg-neutral-50"
-            >
-              <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
-              Refresh
-            </button>
-            <button
-              onClick={() => setShowImportModal(true)}
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <button
+                  onClick={handleRefresh}
+                  className="inline-flex items-center gap-2 border border-neutral-200 px-3 py-1.5 rounded-lg text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+                  disabled={refreshing || isFiltering}
+                >
+                  <RefreshCw size={16} className={refreshing || isFiltering ? "animate-spin" : ""} />
+                  Refresh
+                </button>
+              </div>
+              <button
+                onClick={() => setShowImportModal(true)}
                 className="inline-flex items-center gap-2 border border-neutral-200 px-3 py-1.5 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50"
-            >
+              >
                 <Upload size={16} />
-              Import
-            </button>
-            <button
-              onClick={() => {
-                window.open("/api/admin/content/tours/export?format=xlsx", "_blank");
-              }}
-              className="inline-flex items-center gap-2 border border-neutral-200 px-3 py-1.5 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50"
-            >
-              <Download size={16} />
-              Export
-            </button>
-            <Link
-              href="/admin/content/tours/new"
+                Import
+              </button>
+              <button
+                onClick={() => {
+                  window.open("/api/admin/content/tours/export?format=xlsx", "_blank");
+                }}
+                className="inline-flex items-center gap-2 border border-neutral-200 px-3 py-1.5 rounded-lg text-sm text-neutral-700 hover:bg-neutral-50"
+              >
+                <Download size={16} />
+                Export
+              </button>
+              <Link
+                href="/admin/content/tours/new"
                 className="inline-flex items-center space-x-2 bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors text-sm"
-            >
+              >
                 <Plus size={18} />
-              <span>Add Tour</span>
-            </Link>
+                <span>Add Tour</span>
+              </Link>
+            </div>
           </div>
-        </div>
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">Search</label>
               <SearchInput
-                value={searchValue}
-                onChange={handleSearchChange}
+                value={filters.search}
+                onChange={(value) => handleFilterChange("search", value)}
                 placeholder="Search tours..."
               />
             </div>
@@ -716,11 +712,10 @@ export default function AdminToursPage() {
         {/* Bulk Action Messages */}
         {bulkActionMessage && (
           <div
-            className={`mb-6 rounded-lg p-4 flex items-center space-x-2 ${
-              bulkActionMessage.type === "success"
-                ? "bg-green-50 border border-green-200 text-green-700"
-                : "bg-red-50 border border-red-200 text-red-700"
-            }`}
+            className={`mb-6 rounded-lg p-4 flex items-center space-x-2 ${bulkActionMessage.type === "success"
+              ? "bg-green-50 border border-green-200 text-green-700"
+              : "bg-red-50 border border-red-200 text-red-700"
+              }`}
           >
             {bulkActionMessage.type === "success" ? (
               <CheckCircle size={20} className="flex-shrink-0" />
@@ -781,14 +776,14 @@ export default function AdminToursPage() {
                   <Download size={14} />
                   <span>Export CSV</span>
                 </button>
-                    <button
+                <button
                   onClick={() => handleBulkAction("delete")}
-                      disabled={bulkActionLoading}
+                  disabled={bulkActionLoading}
                   className="px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200 disabled:opacity-50 flex items-center space-x-1"
                 >
                   <Trash2 size={14} />
                   <span>Delete</span>
-                    </button>
+                </button>
               </div>
             </div>
             <button
@@ -819,21 +814,20 @@ export default function AdminToursPage() {
                     { label: "Name", field: "name" as const },
                     { label: "Status", field: "status" as const },
                   ].map((option) => (
-                  <button
+                    <button
                       key={option.field}
                       onClick={() => handleSortChange(option.field)}
-                      className={`inline-flex items-center gap-1 rounded-full border px-4 py-1.5 text-sm transition-colors ${
-                        sortField === option.field
-                          ? "border-neutral-900 bg-neutral-900 text-white"
-                          : "border-neutral-200 text-neutral-600 hover:border-neutral-400"
-                      }`}
+                      className={`inline-flex items-center gap-1 rounded-full border px-4 py-1.5 text-sm transition-colors ${sortField === option.field
+                        ? "border-neutral-900 bg-neutral-900 text-white"
+                        : "border-neutral-200 text-neutral-600 hover:border-neutral-400"
+                        }`}
                     >
                       <ArrowUpDown size={14} />
                       {option.label}
                       {sortField === option.field && (
                         <span className="text-xs">{sortDirection === "asc" ? "↑" : "↓"}</span>
-                    )}
-                  </button>
+                      )}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -877,8 +871,8 @@ export default function AdminToursPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-neutral-200">
                   {sortedTours.map((tour) => (
-                    <tr 
-                      key={tour.id} 
+                    <tr
+                      key={tour.id}
                       className="hover:bg-neutral-50 cursor-pointer"
                       onClick={(e) => {
                         const target = e.target as HTMLElement;
@@ -915,33 +909,33 @@ export default function AdminToursPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-wrap gap-1">
-                        {tour.tourType && (
-                          <span className="inline-flex items-center gap-1 text-xs bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded">
-                            <Tag size={10} />
-                            {tour.tourType}
-                          </span>
-                        )}
-                        {tour.region && (
-                          <span className="inline-flex items-center gap-1 text-xs bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded">
-                            <Globe size={10} />
-                            {tour.region}
-                          </span>
-                        )}
-                      </div>
+                          {tour.tourType && (
+                            <span className="inline-flex items-center gap-1 text-xs bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded">
+                              <Tag size={10} />
+                              {tour.tourType}
+                            </span>
+                          )}
+                          {tour.region && (
+                            <span className="inline-flex items-center gap-1 text-xs bg-neutral-100 text-neutral-700 px-2 py-0.5 rounded">
+                              <Globe size={10} />
+                              {tour.region}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">
-                      {tour.durationDays && tour.durationNights
-                        ? `${tour.durationDays}D/${tour.durationNights}N`
-                        : tour.duration}
+                        {tour.durationDays && tour.durationNights
+                          ? `${tour.durationDays}D/${tour.durationNights}N`
+                          : tour.duration}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-neutral-900">
                         <div className="font-medium">
                           {formatCurrency(tour.basePriceInInr || tour.price || 0)}
-                    </div>
+                        </div>
                         {tour.originalPrice && tour.originalPrice > (tour.basePriceInInr || tour.price || 0) && (
                           <div className="text-xs text-neutral-500 line-through">
                             {formatCurrency(tour.originalPrice)}
-                  </div>
+                          </div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -953,19 +947,19 @@ export default function AdminToursPage() {
                         {formatDate(tour.updatedAt)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={(e) => e.stopPropagation()}>
-                  <Link
-                    href={`/admin/content/tours/${tour.id}`}
+                        <Link
+                          href={`/admin/content/tours/${tour.id}`}
                           className="text-primary-600 hover:text-primary-900 inline-flex items-center space-x-1"
-                  >
+                        >
                           <Eye size={16} />
                           <span>View</span>
-                  </Link>
+                        </Link>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-                </div>
+            </div>
           </div>
         ) : (
           <div className="bg-white rounded-lg border border-neutral-200 p-12 text-center space-y-4">
