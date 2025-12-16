@@ -91,19 +91,8 @@ export async function GET(
             // Try to get the document object first to verify it exists
             const documentObject = await getDocumentObject(invoiceKey);
             if (documentObject) {
-              // Try to get signed URL first (preferred method)
-              try {
-                const signedUrl = await getSignedDocumentUrl(invoiceKey, 300); // 5 minutes expiry
-
-                if (signedUrl) {
-                  // Redirect to signed URL
-                  return NextResponse.redirect(signedUrl);
-                }
-              } catch (signedUrlError) {
-                console.warn("Failed to generate signed URL, falling back to direct stream:", signedUrlError);
-              }
-
-              // Fallback: Stream the file directly
+              // Always stream the file directly instead of redirecting
+              // This ensures fetch() works correctly for blob downloads
               const stream = documentObject.stream;
               const headers = new Headers();
               headers.set("Content-Type", documentObject.contentType || "application/pdf");
@@ -283,19 +272,8 @@ export async function GET(
             // Try to get the document object first to verify it exists
             const documentObject = await getDocumentObject(invoiceKey);
             if (documentObject) {
-              // Try to get signed URL first (preferred method)
-              try {
-                const signedUrl = await getSignedDocumentUrl(invoiceKey, 300); // 5 minutes expiry
-
-                if (signedUrl) {
-                  // Redirect to signed URL
-                  return NextResponse.redirect(signedUrl);
-                }
-              } catch (signedUrlError) {
-                console.warn("Failed to generate signed URL, falling back to direct stream:", signedUrlError);
-              }
-
-              // Fallback: Stream the file directly
+              // Always stream the file directly instead of redirecting
+              // This ensures fetch() works correctly for blob downloads
               const stream = documentObject.stream;
               const headers = new Headers();
               headers.set("Content-Type", documentObject.contentType || "application/pdf");
