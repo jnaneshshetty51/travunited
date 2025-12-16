@@ -81,6 +81,7 @@ export async function GET(req: Request) {
       emailVisaDocumentRejected: (emailSnippets.emailVisaDocumentRejected as string) || "",
       emailVisaApproved: (emailSnippets.emailVisaApproved as string) || "",
       emailVisaRejected: (emailSnippets.emailVisaRejected as string) || "",
+      emailVisaFeedback: (emailSnippets.emailVisaFeedback as string) || "",
       // Tour emails
       emailTourPaymentSuccess: (emailSnippets.emailTourPaymentSuccess as string) || "",
       emailTourPaymentFailed: (emailSnippets.emailTourPaymentFailed as string) || "",
@@ -161,6 +162,7 @@ export async function PUT(req: Request) {
       emailVisaDocumentRejected = "",
       emailVisaApproved = "",
       emailVisaRejected = "",
+      emailVisaFeedback = "",
       // Tour emails
       emailTourPaymentSuccess = "",
       emailTourPaymentFailed = "",
@@ -234,6 +236,7 @@ export async function PUT(req: Request) {
             emailVisaDocumentRejected,
             emailVisaApproved,
             emailVisaRejected,
+            emailVisaFeedback,
             // Tour emails
             emailTourPaymentSuccess,
             emailTourPaymentFailed,
@@ -263,6 +266,7 @@ export async function PUT(req: Request) {
             emailVisaDocumentRejected,
             emailVisaApproved,
             emailVisaRejected,
+            emailVisaFeedback,
             // Tour emails
             emailTourPaymentSuccess,
             emailTourPaymentFailed,

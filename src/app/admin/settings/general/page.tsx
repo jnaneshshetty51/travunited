@@ -31,6 +31,7 @@ interface Settings {
   emailVisaDocumentRejected: string;
   emailVisaApproved: string;
   emailVisaRejected: string;
+  emailVisaFeedback: string;
   
   // Email Basics - Tours
   emailTourPaymentSuccess: string;
@@ -102,6 +103,7 @@ export default function AdminGeneralSettingsPage() {
     emailVisaDocumentRejected: "",
     emailVisaApproved: "",
     emailVisaRejected: "",
+    emailVisaFeedback: "",
     // Tour emails
     emailTourPaymentSuccess: "",
     emailTourPaymentFailed: "",
@@ -822,6 +824,20 @@ export default function AdminGeneralSettingsPage() {
                   <TextareaInput
                     value={settings.emailVisaRejected}
                     onChange={(value) => updateSetting("emailVisaRejected", value)}
+                    disabled={isReadOnly}
+                    rows={8}
+                    placeholder="Leave empty to use default template..."
+                    className="w-full px-4 py-2 font-mono text-sm disabled:bg-neutral-50 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Visa Feedback Email
+                    <span className="text-xs text-neutral-500 ml-2">Variables: {"{"}country{"}"}, {"{"}visaType{"}"}, {"{"}googleReviewUrl{"}"}, {"{"}companyName{"}"}, {"{"}applicationUrl{"}"}</span>
+                  </label>
+                  <TextareaInput
+                    value={settings.emailVisaFeedback}
+                    onChange={(value) => updateSetting("emailVisaFeedback", value)}
                     disabled={isReadOnly}
                     rows={8}
                     placeholder="Leave empty to use default template..."

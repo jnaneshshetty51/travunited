@@ -85,6 +85,13 @@ const EMAIL_TEMPLATES: EmailTemplate[] = [
     category: "visa",
     requiresParams: ["country", "visaType", "reason"],
   },
+  {
+    id: "visaFeedback",
+    name: "Visa Feedback",
+    description: "Sent to users after visa approval (24+ hours) requesting feedback",
+    category: "visa",
+    requiresParams: ["country", "visaType", "googleReviewUrl"],
+  },
   // Tours
   {
     id: "tourPaymentSuccess",
@@ -279,6 +286,7 @@ export default function AdminEmailTestPage() {
       isAdvance: "false",
       pendingBalance: "0",
       loginUrl: typeof window !== "undefined" ? `${window.location.origin}/login` : "https://travunited.in/login",
+      googleReviewUrl: "https://g.page/r/YOUR_GOOGLE_BUSINESS_REVIEW_LINK",
     };
     return defaults[paramName] || "";
   };

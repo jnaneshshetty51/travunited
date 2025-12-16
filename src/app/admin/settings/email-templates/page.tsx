@@ -25,6 +25,7 @@ interface EmailTemplates {
   emailVisaDocumentRejected: string;
   emailVisaApproved: string;
   emailVisaRejected: string;
+  emailVisaFeedback: string;
   
   // Tour emails
   emailTourPaymentSuccess: string;
@@ -100,6 +101,12 @@ const TEMPLATE_METADATA: Record<keyof EmailTemplates, { label: string; descripti
     label: "Visa Rejected",
     description: "Sent when visa is rejected",
     variables: ["country", "visaType", "reason", "applicationUrl"],
+    category: "visa",
+  },
+  emailVisaFeedback: {
+    label: "Visa Feedback Email",
+    description: "Sent to users after visa approval (24+ hours) requesting feedback and Google review",
+    variables: ["country", "visaType", "googleReviewUrl", "companyName", "applicationUrl"],
     category: "visa",
   },
   emailTourPaymentSuccess: {
@@ -185,6 +192,7 @@ export default function EmailTemplatesPage() {
     emailVisaDocumentRejected: "",
     emailVisaApproved: "",
     emailVisaRejected: "",
+    emailVisaFeedback: "",
     emailTourPaymentSuccess: "",
     emailTourPaymentFailed: "",
     emailTourConfirmed: "",
@@ -210,6 +218,7 @@ export default function EmailTemplatesPage() {
       emailVisaDocumentRejected: "visaDocumentRejectedEmail",
       emailVisaApproved: "visaApprovedEmail",
       emailVisaRejected: "visaRejectedEmail",
+      emailVisaFeedback: "visaFeedbackEmail",
       emailTourPaymentSuccess: "tourPaymentSuccessEmail",
       emailTourPaymentFailed: "tourPaymentFailedEmail",
       emailTourConfirmed: "tourConfirmedEmail",
@@ -251,6 +260,7 @@ export default function EmailTemplatesPage() {
         emailVisaDocumentRejected: getTemplateValue("emailVisaDocumentRejected", data.emailVisaDocumentRejected || ""),
         emailVisaApproved: getTemplateValue("emailVisaApproved", data.emailVisaApproved || ""),
         emailVisaRejected: getTemplateValue("emailVisaRejected", data.emailVisaRejected || ""),
+        emailVisaFeedback: getTemplateValue("emailVisaFeedback", data.emailVisaFeedback || ""),
         emailTourPaymentSuccess: getTemplateValue("emailTourPaymentSuccess", data.emailTourPaymentSuccess || ""),
         emailTourPaymentFailed: getTemplateValue("emailTourPaymentFailed", data.emailTourPaymentFailed || ""),
         emailTourConfirmed: getTemplateValue("emailTourConfirmed", data.emailTourConfirmed || ""),
