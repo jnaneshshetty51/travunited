@@ -103,6 +103,19 @@ export default async function Home() {
   // Transform visas data for component
   const visaCards = featuredVisas.map((visa) => {
     // Ensure all values are primitives, not objects
+    // Safely handle category - ensure it's always a string or null
+    let category: string | null = null;
+    if (visa.category) {
+      if (typeof visa.category === 'string') {
+        category = visa.category;
+      } else if (typeof visa.category === 'object') {
+        // If category is an object, don't include it (set to null)
+        category = null;
+      } else {
+        category = String(visa.category);
+      }
+    }
+    
     return {
       id: String(visa.id || ''),
       slug: String(visa.slug || ''),
@@ -116,6 +129,7 @@ export default async function Home() {
       entryTypeLegacy: visa.entryTypeLegacy ? String(visa.entryTypeLegacy) : null,
       stayType: visa.stayType ? String(visa.stayType) : null,
       visaSubTypeLabel: visa.visaSubTypeLabel ? String(visa.visaSubTypeLabel) : null,
+      category, // Include category as string or null
       // Use hero image for cards; do not fall back to sample to avoid thumbnailing
       image: getMediaProxyUrl(visa.heroImageUrl) || null,
     };
