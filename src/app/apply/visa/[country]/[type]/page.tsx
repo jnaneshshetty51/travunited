@@ -1273,8 +1273,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                     }
                   }}
                   className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 ${phoneErrors.primaryContact
-                      ? "border-red-500 focus:border-red-500"
-                      : "border-neutral-300"
+                    ? "border-red-500 focus:border-red-500"
+                    : "border-neutral-300"
                     }`}
                   placeholder="10 digits (e.g., 9876543210) or +91 9876543210"
                 />
@@ -1531,8 +1531,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                                 </label>
                                 <span
                                   className={`text-xs px-2 py-1 rounded-full ${requirement.isRequired
-                                      ? "bg-red-100 text-red-700"
-                                      : "bg-neutral-100 text-neutral-600"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-neutral-100 text-neutral-600"
                                     }`}
                                 >
                                   {requirement.isRequired ? "Required" : "Optional"}
@@ -1620,8 +1620,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                           </label>
                           <span
                             className={`text-xs px-2 py-1 rounded-full ${requirement.isRequired
-                                ? "bg-red-100 text-red-700"
-                                : "bg-neutral-100 text-neutral-600"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-neutral-100 text-neutral-600"
                               }`}
                           >
                             {requirement.isRequired ? "Required" : "Optional"}
@@ -1995,10 +1995,10 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                   <div className="flex flex-col items-center flex-1">
                     <div
                       className={`w-10 h-10 rounded-full flex items-center justify-center ${isCompleted
-                          ? "bg-green-500 text-white"
-                          : isActive
-                            ? "bg-primary-600 text-white"
-                            : "bg-neutral-200 text-neutral-600"
+                        ? "bg-green-500 text-white"
+                        : isActive
+                          ? "bg-primary-600 text-white"
+                          : "bg-neutral-200 text-neutral-600"
                         }`}
                     >
                       {isCompleted ? <CheckCircle size={20} /> : <Icon size={20} />}
@@ -2128,6 +2128,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
               {/* Modal Content */}
               <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-neutral-50">
                 {previewModal.url.startsWith("data:image") ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={previewModal.url}
                     alt="Document preview"

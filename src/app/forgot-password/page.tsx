@@ -36,20 +36,20 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setError("");
     setSuccess("");
-    
+
     // Validate email format
     if (!email.trim()) {
       setError("Please enter your email address");
       setEmailValid(false);
       return;
     }
-    
+
     if (!validateEmail(email)) {
       setError("Please enter a valid email address");
       setEmailValid(false);
       return;
     }
-    
+
     setEmailValid(true);
     setLoading(true);
 
@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
       });
 
       const data = await response.json();
-      
+
       // Debug: Log the exact response from API with full details
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log("[Forgot Password] 📨 API Response Received:");
@@ -89,12 +89,12 @@ export default function ForgotPasswordPage() {
         }
         setStep("sent");
         setResendCooldown(60);
-        
+
         // Clear any existing timer
         if (timerRef.current) {
           clearInterval(timerRef.current);
         }
-        
+
         // Start new timer
         timerRef.current = setInterval(() => {
           setResendCooldown((prev) => {
@@ -121,14 +121,14 @@ export default function ForgotPasswordPage() {
 
   const handleResendLink = async () => {
     if (resendCooldown > 0) return;
-    
+
     setError("");
     setLoading(true);
 
     try {
       // Normalize email same as handleSendLink
       const normalizedEmail = email.trim().toLowerCase();
-      
+
       const response = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -147,12 +147,12 @@ export default function ForgotPasswordPage() {
           setError("");
         }
         setResendCooldown(60);
-        
+
         // Clear any existing timer
         if (timerRef.current) {
           clearInterval(timerRef.current);
         }
-        
+
         // Start new timer
         timerRef.current = setInterval(() => {
           setResendCooldown((prev) => {
@@ -239,9 +239,8 @@ export default function ForgotPasswordPage() {
                       }}
                       required
                       disabled={loading}
-                      className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 transition-colors ${
-                        !emailValid ? 'border-red-300 focus:ring-red-500' : 'border-neutral-300'
-                      }`}
+                      className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:opacity-50 transition-colors ${!emailValid ? 'border-red-300 focus:ring-red-500' : 'border-neutral-300'
+                        }`}
                       placeholder="your.email@example.com"
                     />
                   </div>
@@ -293,7 +292,7 @@ export default function ForgotPasswordPage() {
                 Click the link in your email to reset your password. The link will expire in 1 hour.
               </p>
               <p className="text-sm text-neutral-500 mt-3">
-                Didn't receive it? Check your spam folder or resend below.
+                Didn&apos;t receive it? Check your spam folder or resend below.
               </p>
 
               {error && (
