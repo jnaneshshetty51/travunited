@@ -37,13 +37,35 @@ export async function GET(req: NextRequest) {
 
     if (dateFrom || dateTo) {
       where.createdAt = {};
-      if (dateFrom) {
-        where.createdAt.gte = new Date(dateFrom);
+      if (dateFrom && dateFrom.trim() !== "") {
+        try {
+          where.createdAt.gte = new Date(dateFrom);
+          if (isNaN(where.createdAt.gte.getTime())) {
+            throw new Error(`Invalid dateFrom: ${dateFrom}`);
+          }
+        } catch (dateError) {
+          console.error("Invalid dateFrom:", dateFrom, dateError);
+          return NextResponse.json(
+            { error: `Invalid dateFrom parameter: ${dateFrom}` },
+            { status: 400 }
+          );
+        }
       }
-      if (dateTo) {
-        const toDate = new Date(dateTo);
-        toDate.setHours(23, 59, 59, 999);
-        where.createdAt.lte = toDate;
+      if (dateTo && dateTo.trim() !== "") {
+        try {
+          const toDate = new Date(dateTo);
+          if (isNaN(toDate.getTime())) {
+            throw new Error(`Invalid dateTo: ${dateTo}`);
+          }
+          toDate.setHours(23, 59, 59, 999);
+          where.createdAt.lte = toDate;
+        } catch (dateError) {
+          console.error("Invalid dateTo:", dateTo, dateError);
+          return NextResponse.json(
+            { error: `Invalid dateTo parameter: ${dateTo}` },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -110,14 +132,14 @@ export async function GET(req: NextRequest) {
       }
 
       tourMap[key].totalBookings++;
-      tourMap[key].totalTravellers += booking.travellers.length;
+      tourMap[key].totalTravellers += (Array.isArray(booking.travellers) ? booking.travellers.length : 0);
 
-      if (booking.payments.length > 0) {
+      if (booking.payments && Array.isArray(booking.payments) && booking.payments.length > 0) {
         tourMap[key].paidBookings++;
-        tourMap[key].totalRevenue += booking.payments.reduce((sum, p) => sum + p.amount, 0);
+        tourMap[key].totalRevenue += booking.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
       }
 
-      if (booking.status === "CANCELLED" || booking.status === "CANCELLED") {
+      if (booking.status === "CANCELLED") {
         tourMap[key].cancelledCount++;
       }
     });
@@ -227,8 +249,22 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching tour performance report:", error);
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    // Log full error details for debugging
+    console.error("Full error details:", {
+      message: errorMessage,
+      stack: errorStack,
+      error: error,
+    });
+    
     return NextResponse.json(
-      { error: "Internal server error" },
+      { 
+        error: errorMessage,
+        // Only include stack in development
+        ...(process.env.NODE_ENV === "development" && errorStack ? { details: errorStack } : {})
+      },
       { status: 500 }
     );
   }

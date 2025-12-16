@@ -10,7 +10,7 @@ interface LogoProps {
   priority?: boolean;
 }
 
-export function Logo({ width = 120, height = 48, className = "h-12 w-auto", priority = false }: LogoProps) {
+export function Logo({ width = 80, height = 32, className = "h-8 w-auto", priority = false }: LogoProps) {
   const [imgSrc, setImgSrc] = useState("/logo.svg");
 
   return (
