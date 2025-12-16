@@ -221,11 +221,16 @@ export default function ContactPage() {
                   });
 
                   const result = await response.json().catch(() => ({}));
-                  if (!response.ok || result?.success === false) {
+                  
+                  if (!response.ok) {
+                    throw new Error(result?.error || `Server error: ${response.status} ${response.statusText}`);
+                  }
+                  
+                  if (result?.success === false) {
                     throw new Error(result?.error || "Failed to send message. Please try again.");
                   }
 
-                  setSuccessMessage("Thank you! We've received your message.");
+                  setSuccessMessage("Thank you! We've received your message and will get back to you soon.");
                   e.currentTarget.reset();
                 } catch (error: any) {
                   console.error("Error submitting contact form:", error);

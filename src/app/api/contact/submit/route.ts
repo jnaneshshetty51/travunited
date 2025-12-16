@@ -87,15 +87,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      const errorMessages = error.errors.map((e) => e.message).join(", ");
       return NextResponse.json(
-        { success: false, error: "Invalid input. Please check all required fields." },
+        { success: false, error: `Invalid input: ${errorMessages}` },
         { status: 400 }
       );
     }
 
     console.error("Error submitting contact form:", error);
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
-        { success: false, error: "Internal server error" },
+        { success: false, error: errorMessage },
         { status: 500 }
       );
   }
