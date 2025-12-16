@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, ArrowLeft, CheckCircle, User, FileText, CreditCard, Calendar, Upload, X, Eye } from "lucide-react";
+import { ArrowRight, ArrowLeft, CheckCircle, User, FileText, CreditCard, Calendar, Upload, X, Eye, FileCheck } from "lucide-react";
 import Link from "next/link";
 import { saveDraftToLocalStorage, getDraftFromLocalStorage, clearDraftFromLocalStorage, VisaDraft } from "@/lib/localStorage";
 import { loadRazorpayScript } from "@/lib/razorpay-client";
@@ -52,7 +52,8 @@ const steps = [
   { id: 3, name: "Travellers", icon: User },
   { id: 4, name: "Documents", icon: FileText },
   { id: 5, name: "Review", icon: CheckCircle },
-  { id: 6, name: "Payment", icon: CreditCard },
+  { id: 6, name: "Terms & Conditions", icon: FileCheck },
+  { id: 7, name: "Payment", icon: CreditCard },
 ];
 
 export default function VisaApplicationPage({ params }: { params: { country: string; type: string } }) {
@@ -67,6 +68,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
   const [createdTravellerIds, setCreatedTravellerIds] = useState<string[]>([]);
   const [dateErrors, setDateErrors] = useState<Record<string, string>>({});
   const [phoneErrors, setPhoneErrors] = useState<Record<string, string>>({});
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   type FormDataTraveller = {
     id: string;
@@ -1780,6 +1782,115 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         );
 
       case 6:
+        return (
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-neutral-900 mb-4">
+              Terms & Conditions
+            </h2>
+            
+            <div className="bg-neutral-50 rounded-lg p-6 max-h-96 overflow-y-auto border border-neutral-200">
+              <div className="prose prose-sm max-w-none">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-neutral-900">Application Terms & Conditions</h3>
+                  <Link
+                    href="/terms"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-primary-600 hover:text-primary-700 underline"
+                  >
+                    View Full Terms
+                  </Link>
+                </div>
+                
+                <div className="space-y-4 text-neutral-700">
+                  <div>
+                    <h4 className="font-semibold mb-2">1. Application Process</h4>
+                    <p className="text-sm">
+                      By submitting this visa application, you acknowledge that all information provided is accurate and complete. 
+                      Any false or misleading information may result in visa rejection or legal consequences.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold mb-2">2. Document Requirements</h4>
+                    <p className="text-sm">
+                      You are responsible for providing all required documents as per the visa requirements. 
+                      Incomplete or incorrect documents may delay processing or result in application rejection.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold mb-2">3. Processing Time</h4>
+                    <p className="text-sm">
+                      Processing times are estimates and may vary based on embassy/consulate workload, 
+                      completeness of documents, and other factors beyond our control.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold mb-2">4. Fees & Refunds</h4>
+                    <p className="text-sm">
+                      Application fees are non-refundable once the application is submitted to the embassy/consulate. 
+                      Service fees may be refundable in certain circumstances as per our refund policy.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold mb-2">5. Visa Decision</h4>
+                    <p className="text-sm">
+                      The final visa decision rests solely with the embassy/consulate. We cannot guarantee visa approval 
+                      and are not responsible for visa rejections.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold mb-2">6. Data Privacy</h4>
+                    <p className="text-sm">
+                      Your personal information will be used solely for visa processing purposes and shared with 
+                      relevant authorities as required. We maintain strict data protection measures.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold mb-2">7. Travel Responsibility</h4>
+                    <p className="text-sm">
+                      You are responsible for ensuring your passport is valid, meeting entry requirements, 
+                      and complying with all immigration laws of the destination country.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <label className="flex items-start space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="mt-1 h-5 w-5 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-neutral-900">
+                    I have read and agree to the Terms & Conditions
+                  </span>
+                  <p className="text-xs text-neutral-600 mt-1">
+                    You must accept the terms and conditions to proceed with your visa application.
+                  </p>
+                </div>
+              </label>
+            </div>
+            
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p className="text-sm text-yellow-800">
+                <strong>Important:</strong> Please read all terms carefully. By proceeding, you acknowledge that you understand 
+                and agree to be bound by these terms and conditions.
+              </p>
+            </div>
+          </div>
+        );
+
+      case 7:
         const visaTotalAmount = visaPrice * Math.max(formData.travellers?.length ?? 1, 1);
         const isFreeVisa = visaTotalAmount <= 0;
         
@@ -1954,13 +2065,38 @@ export default function VisaApplicationPage({ params }: { params: { country: str
               <ArrowRight size={20} />
             </button>
           )}
+          {currentStep === 6 && (
+            <button
+              onClick={prevStep}
+              className="px-6 py-3 border border-neutral-300 rounded-lg font-medium hover:bg-neutral-50 flex items-center space-x-2"
+            >
+              <ArrowLeft size={20} />
+              <span>Previous</span>
+            </button>
+          )}
           {currentStep === 5 && (
             <button
               onClick={handleConfirmAndPay}
               disabled={loading}
               className="px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
             >
-              <span>{loading ? "Saving..." : "Confirm & Continue to Payment"}</span>
+              <span>{loading ? "Saving..." : "Confirm & Continue"}</span>
+              <ArrowRight size={20} />
+            </button>
+          )}
+          {currentStep === 6 && (
+            <button
+              onClick={() => {
+                if (!termsAccepted) {
+                  alert("Please accept the Terms & Conditions to proceed");
+                  return;
+                }
+                setCurrentStep(7);
+              }}
+              disabled={!termsAccepted}
+              className="px-6 py-3 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            >
+              <span>Continue to Payment</span>
               <ArrowRight size={20} />
             </button>
           )}
