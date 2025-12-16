@@ -25,6 +25,7 @@ export default function CustomerReportPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary] = useState<any>(null);
   const [customers, setCustomers] = useState<CustomerRow[]>([]);
@@ -65,6 +66,7 @@ export default function CustomerReportPage() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setInitialLoad(false);
     }
   }, [dateFrom, dateTo, page]);
 
@@ -94,7 +96,7 @@ export default function CustomerReportPage() {
     }
   };
 
-  if (loading) {
+  if (initialLoad) {
     return (
       <AdminLayout>
         <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
@@ -149,7 +151,7 @@ export default function CustomerReportPage() {
           </button>
         </div>
 
-        <div className={loading && summary ? "opacity-50 pointer-events-none transition-opacity" : ""}>
+        <div className={loading && !refreshing ? "opacity-50 pointer-events-none transition-opacity" : ""}>
           {summary && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
               <div className="bg-white rounded-2xl shadow-medium p-6 border border-neutral-200">
