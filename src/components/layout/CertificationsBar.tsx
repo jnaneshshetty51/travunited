@@ -16,18 +16,21 @@ export function CertificationsBar() {
           Certified &amp; Trusted By
         </p>
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 items-center justify-items-center">
-          {certifications.map((cert) => (
-            <div key={cert.name} className="flex items-center justify-center">
-              <Image
-                src={cert.src}
-                alt={cert.name}
-                width={200}
-                height={80}
-                className="h-8 w-auto object-contain grayscale hover:grayscale-0 transition"
-                priority={false}
-              />
-            </div>
-          ))}
+          {certifications.map((cert) => {
+            const isTAAIOrISO = cert.name === "TAAI" || cert.name === "ISO 9001:2015";
+            return (
+              <div key={cert.name} className="flex items-center justify-center">
+                <Image
+                  src={cert.src}
+                  alt={cert.name}
+                  width={200}
+                  height={80}
+                  className={`w-auto object-contain grayscale hover:grayscale-0 transition ${isTAAIOrISO ? "h-10" : "h-8"}`}
+                  priority={false}
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
