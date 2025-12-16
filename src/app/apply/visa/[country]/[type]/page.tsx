@@ -171,8 +171,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
           travellerLabel: travellerData
             ? `${travellerData.firstName} ${travellerData.lastName}`.trim()
             : travellerIndex >= 0
-            ? `Traveller ${travellerIndex + 1}`
-            : null,
+              ? `Traveller ${travellerIndex + 1}`
+              : null,
           category:
             requirement?.category ||
             (requirement
@@ -188,12 +188,12 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         };
       })
       .filter(Boolean) as Array<{
-      key: string;
-      requirement?: VisaRequirement;
-      travellerLabel: string | null;
-      category?: string;
-      fileName: string;
-    }>;
+        key: string;
+        requirement?: VisaRequirement;
+        travellerLabel: string | null;
+        category?: string;
+        fileName: string;
+      }>;
   }, [formData.documents, formData.travellers, requirementMap]);
 
   useEffect(() => {
@@ -238,7 +238,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
   useEffect(() => {
     const editId = searchParams.get("edit");
     const applicationId = searchParams.get("applicationId");
-    
+
     if (editId || applicationId) {
       const appId = editId || applicationId;
       fetch(`/api/applications/${appId}`)
@@ -260,9 +260,9 @@ export default function VisaApplicationPage({ params }: { params: { country: str
               },
               applicationId: data.id,
             }));
-            
+
             setDraftId(data.id);
-            
+
             // Load travellers if available
             if (data.travellers && data.travellers.length > 0) {
               const travellersWithIds: FormDataTraveller[] = data.travellers.map((t: any, idx: number) => ({
@@ -277,12 +277,12 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                 nationality: t.traveller?.nationality || "Indian",
                 currentCity: t.traveller?.currentCity || "",
               }));
-              
+
               setFormData(prev => ({
                 ...prev,
                 travellers: travellersWithIds,
               }));
-              
+
               setCreatedTravellerIds(travellersWithIds.map(t => t.id));
             }
           }
@@ -297,7 +297,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
   useEffect(() => {
     const editId = searchParams.get("edit");
     const applicationId = searchParams.get("applicationId");
-    
+
     // Skip localStorage if editing existing application
     if (editId || applicationId) {
       // Continue to auto-fill for logged-in users even when editing
@@ -362,7 +362,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         };
       });
     }
-    
+
     // Auto-fill for logged-in users
     if (session?.user) {
       setFormData((prev) => ({
@@ -498,7 +498,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
       const travellers = (prev.travellers || []).map((t) =>
         t.id === travellerId ? { ...t, [field]: value } : t
       );
-      
+
       // Clear error for this field when user updates it
       const travellerIndex = travellers.findIndex(t => t.id === travellerId);
       if (travellerIndex >= 0) {
@@ -510,7 +510,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
           return newErrors;
         });
       }
-      
+
       return {
         ...prev,
         travellers,
@@ -609,10 +609,10 @@ export default function VisaApplicationPage({ params }: { params: { country: str
     if (!phone || phone.trim() === "") {
       return null; // Phone is optional, so empty is valid
     }
-    
+
     // Remove all non-digit characters for validation
     const digitsOnly = phone.replace(/\D/g, "");
-    
+
     // Check if it's a valid Indian mobile number (10 digits)
     if (digitsOnly.length === 10) {
       // Check if it starts with 6-9 (valid Indian mobile prefixes)
@@ -621,7 +621,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
       }
       return "Phone number must start with 6, 7, 8, or 9";
     }
-    
+
     // Check if it's E.164 format (international)
     if (phone.startsWith("+")) {
       const e164Pattern = /^\+[1-9]\d{1,14}$/;
@@ -630,16 +630,16 @@ export default function VisaApplicationPage({ params }: { params: { country: str
       }
       return "Invalid international phone format. Use E.164 format (e.g., +911234567890)";
     }
-    
+
     // If it has digits but wrong length
     if (digitsOnly.length > 0 && digitsOnly.length < 10) {
       return "Phone number must be 10 digits";
     }
-    
+
     if (digitsOnly.length > 10 && !phone.startsWith("+")) {
       return "Phone number must be 10 digits or use international format (+country code)";
     }
-    
+
     return "Invalid phone number format";
   };
 
@@ -658,13 +658,13 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         return;
       }
     }
-    
+
     if (currentStep === 2) {
       if (!formData.primaryContact?.name || !formData.primaryContact?.email) {
         alert("Please fill in all required contact information");
         return;
       }
-      
+
       // Validate phone number if provided
       if (formData.primaryContact?.phone) {
         const phoneError = validatePhoneNumber(formData.primaryContact.phone);
@@ -680,7 +680,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         });
       }
     }
-    
+
     if (currentStep === 3) {
       if (!formData.travellers || formData.travellers.length === 0) {
         alert("Please add at least one traveller");
@@ -688,21 +688,21 @@ export default function VisaApplicationPage({ params }: { params: { country: str
       }
       // Validate all travellers have required fields
       for (const traveller of formData.travellers) {
-        if (!traveller.firstName || !traveller.lastName || !traveller.dateOfBirth || 
-            !traveller.gender || !traveller.passportNumber || !traveller.passportIssueDate || 
-            !traveller.passportExpiryDate || !traveller.nationality) {
+        if (!traveller.firstName || !traveller.lastName || !traveller.dateOfBirth ||
+          !traveller.gender || !traveller.passportNumber || !traveller.passportIssueDate ||
+          !traveller.passportExpiryDate || !traveller.nationality) {
           alert("Please fill in all required fields for all travellers");
           return;
         }
-      
-      // Validate all dates before proceeding
-      if (!validateDates()) {
-        alert("Please fix the date errors before proceeding");
-        return;
-      }
+
+        // Validate all dates before proceeding
+        if (!validateDates()) {
+          alert("Please fix the date errors before proceeding");
+          return;
+        }
       }
     }
-    
+
     if (currentStep === 4 && visaInfo) {
       const missingDocs: string[] = [];
 
@@ -731,7 +731,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         return;
       }
     }
-    
+
     if (currentStep < steps.length) {
       setCurrentStep(currentStep + 1);
       // Auto-save disabled - drafts should not be saved automatically
@@ -799,7 +799,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
       alert("Please add at least one traveller");
       return;
     }
-    
+
     // Validate all dates before proceeding
     if (!validateDates()) {
       alert("Please fix the date errors before proceeding to payment");
@@ -841,8 +841,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         body: JSON.stringify({
           country: formData.country,
           visaType: formData.visaType,
-           visaId: visaInfo?.id,
-           totalAmount,
+          visaId: visaInfo?.id,
+          totalAmount,
           travelDate: formData.travelDate,
           tripType: formData.tripType,
           selectedSubTypeId: formData.selectedSubTypeId,
@@ -867,12 +867,12 @@ export default function VisaApplicationPage({ params }: { params: { country: str
           applicationId: data.applicationId,
           travellerIds: travellerMap,
         }));
-        
+
         // Upload documents
         if (formData.documents) {
           await uploadDocuments(data.applicationId, travellerMap);
         }
-        
+
         // Clear draft - auto-draft saving is disabled
         clearDraftFromLocalStorage();
         // Auto-draft saving disabled - drafts should not be saved automatically
@@ -884,12 +884,12 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         //   travellerIds: travellerMap,
         //   documents: {},
         // });
-        
+
         setCurrentStep(6);
       } else {
         const errorData = await response.json();
         let errorMessage = errorData.error || "Failed to save application. Please try again.";
-        
+
         // Handle validation errors with field-specific messages
         if (errorData.details && Array.isArray(errorData.details)) {
           const phoneError = errorData.details.find((d: any) => d.field === "primaryContact.phone");
@@ -903,7 +903,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
             errorMessage = detailMessages || errorMessage;
           }
         }
-        
+
         alert(errorMessage);
       }
     } catch (error) {
@@ -923,8 +923,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
       travellerIdMap && travellerIdMap.length
         ? travellerIdMap
         : createdTravellerIds.length
-        ? createdTravellerIds
-        : formData.travellerIds || [];
+          ? createdTravellerIds
+          : formData.travellerIds || [];
 
     for (const doc of Object.values(formData.documents)) {
       if (!doc?.file || !doc.requirementId) continue;
@@ -1049,7 +1049,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
         handler: async (response: any) => {
           try {
             console.log("Payment response:", response);
-            
+
             // Verify payment on server
             const verifyResponse = await fetch("/api/payments/verify", {
               method: "POST",
@@ -1083,7 +1083,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
       };
 
       const razorpay = new window.Razorpay(options);
-      
+
       razorpay.on("payment.failed", (response: any) => {
         console.error("Payment failed:", response);
         setLoading(false);
@@ -1158,9 +1158,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                     });
                   }}
                   min={new Date().toISOString().split("T")[0]}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 ${
-                    dateErrors.travelDate ? "border-red-500" : "border-neutral-300"
-                  }`}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 ${dateErrors.travelDate ? "border-red-500" : "border-neutral-300"
+                    }`}
                 />
                 {dateErrors.travelDate && (
                   <p className="text-sm text-red-600 mt-1">{dateErrors.travelDate}</p>
@@ -1273,11 +1272,10 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                       }
                     }
                   }}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 ${
-                    phoneErrors.primaryContact
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-primary-500 ${phoneErrors.primaryContact
                       ? "border-red-500 focus:border-red-500"
                       : "border-neutral-300"
-                  }`}
+                    }`}
                   placeholder="10 digits (e.g., 9876543210) or +91 9876543210"
                 />
                 {phoneErrors.primaryContact && (
@@ -1369,9 +1367,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         value={traveller.dateOfBirth}
                         onChange={(e) => updateTravellerField(traveller.id, "dateOfBirth", e.target.value)}
                         max={new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]} // At least 1 year ago
-                        className={`w-full px-4 py-2 border rounded-lg ${
-                          dateErrors[`traveller-${index}-dateOfBirth`] ? "border-red-500" : "border-neutral-300"
-                        }`}
+                        className={`w-full px-4 py-2 border rounded-lg ${dateErrors[`traveller-${index}-dateOfBirth`] ? "border-red-500" : "border-neutral-300"
+                          }`}
                       />
                       {dateErrors[`traveller-${index}-dateOfBirth`] && (
                         <p className="text-sm text-red-600 mt-1">{dateErrors[`traveller-${index}-dateOfBirth`]}</p>
@@ -1430,9 +1427,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         value={traveller.passportIssueDate}
                         onChange={(e) => updateTravellerField(traveller.id, "passportIssueDate", e.target.value)}
                         max={new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split("T")[0]} // Yesterday (must be in past)
-                        className={`w-full px-4 py-2 border rounded-lg ${
-                          dateErrors[`traveller-${index}-passportIssueDate`] ? "border-red-500" : "border-neutral-300"
-                        }`}
+                        className={`w-full px-4 py-2 border rounded-lg ${dateErrors[`traveller-${index}-passportIssueDate`] ? "border-red-500" : "border-neutral-300"
+                          }`}
                       />
                       {dateErrors[`traveller-${index}-passportIssueDate`] && (
                         <p className="text-sm text-red-600 mt-1">{dateErrors[`traveller-${index}-passportIssueDate`]}</p>
@@ -1448,9 +1444,8 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                         value={traveller.passportExpiryDate}
                         onChange={(e) => updateTravellerField(traveller.id, "passportExpiryDate", e.target.value)}
                         min={traveller.passportIssueDate ? new Date(new Date(traveller.passportIssueDate).getTime() + 24 * 60 * 60 * 1000).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]} // Must be after issue date, or today if no issue date
-                        className={`w-full px-4 py-2 border rounded-lg ${
-                          dateErrors[`traveller-${index}-passportExpiryDate`] ? "border-red-500" : "border-neutral-300"
-                        }`}
+                        className={`w-full px-4 py-2 border rounded-lg ${dateErrors[`traveller-${index}-passportExpiryDate`] ? "border-red-500" : "border-neutral-300"
+                          }`}
                       />
                       {dateErrors[`traveller-${index}-passportExpiryDate`] && (
                         <p className="text-sm text-red-600 mt-1">{dateErrors[`traveller-${index}-passportExpiryDate`]}</p>
@@ -1535,11 +1530,10 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                                   {requirement.name}
                                 </label>
                                 <span
-                                  className={`text-xs px-2 py-1 rounded-full ${
-                                    requirement.isRequired
+                                  className={`text-xs px-2 py-1 rounded-full ${requirement.isRequired
                                       ? "bg-red-100 text-red-700"
                                       : "bg-neutral-100 text-neutral-600"
-                                  }`}
+                                    }`}
                                 >
                                   {requirement.isRequired ? "Required" : "Optional"}
                                 </span>
@@ -1561,7 +1555,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                                     {doc.preview && (
                                       <button
                                         type="button"
-                                        onClick={() => setPreviewModal({ url: doc.preview!, fileName: doc.file.name })}
+                                        onClick={() => setPreviewModal({ url: doc.preview!, fileName: doc.file!.name })}
                                         className="p-1 text-primary-600 hover:text-primary-700"
                                       >
                                         <Eye size={16} />
@@ -1625,11 +1619,10 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                             {requirement.name}
                           </label>
                           <span
-                            className={`text-xs px-2 py-1 rounded-full ${
-                              requirement.isRequired
+                            className={`text-xs px-2 py-1 rounded-full ${requirement.isRequired
                                 ? "bg-red-100 text-red-700"
                                 : "bg-neutral-100 text-neutral-600"
-                            }`}
+                              }`}
                           >
                             {requirement.isRequired ? "Required" : "Optional"}
                           </span>
@@ -1651,7 +1644,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                               {doc.preview && (
                                 <button
                                   type="button"
-                                  onClick={() => setPreviewModal({ url: doc.preview!, fileName: doc.file.name })}
+                                  onClick={() => setPreviewModal({ url: doc.preview!, fileName: doc.file!.name })}
                                   className="p-1 text-primary-600 hover:text-primary-700"
                                 >
                                   <Eye size={16} />
@@ -1788,7 +1781,7 @@ export default function VisaApplicationPage({ params }: { params: { country: str
             <h2 className="text-2xl font-bold text-neutral-900 mb-4">
               Terms & Conditions
             </h2>
-            
+
             <div className="bg-neutral-50 rounded-lg p-6 max-h-96 overflow-y-auto border border-neutral-200">
               <div className="prose prose-sm max-w-none">
                 <div className="flex items-center justify-between mb-4">
@@ -1802,67 +1795,67 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                     View Full Terms
                   </Link>
                 </div>
-                
+
                 <div className="space-y-4 text-neutral-700">
                   <div>
                     <h4 className="font-semibold mb-2">1. Application Process</h4>
                     <p className="text-sm">
-                      By submitting this visa application, you acknowledge that all information provided is accurate and complete. 
+                      By submitting this visa application, you acknowledge that all information provided is accurate and complete.
                       Any false or misleading information may result in visa rejection or legal consequences.
                     </p>
                   </div>
-                  
+
                   <div>
                     <h4 className="font-semibold mb-2">2. Document Requirements</h4>
                     <p className="text-sm">
-                      You are responsible for providing all required documents as per the visa requirements. 
+                      You are responsible for providing all required documents as per the visa requirements.
                       Incomplete or incorrect documents may delay processing or result in application rejection.
                     </p>
                   </div>
-                  
+
                   <div>
                     <h4 className="font-semibold mb-2">3. Processing Time</h4>
                     <p className="text-sm">
-                      Processing times are estimates and may vary based on embassy/consulate workload, 
+                      Processing times are estimates and may vary based on embassy/consulate workload,
                       completeness of documents, and other factors beyond our control.
                     </p>
                   </div>
-                  
+
                   <div>
                     <h4 className="font-semibold mb-2">4. Fees & Refunds</h4>
                     <p className="text-sm">
-                      Application fees are non-refundable once the application is submitted to the embassy/consulate. 
+                      Application fees are non-refundable once the application is submitted to the embassy/consulate.
                       Service fees may be refundable in certain circumstances as per our refund policy.
                     </p>
                   </div>
-                  
+
                   <div>
                     <h4 className="font-semibold mb-2">5. Visa Decision</h4>
                     <p className="text-sm">
-                      The final visa decision rests solely with the embassy/consulate. We cannot guarantee visa approval 
+                      The final visa decision rests solely with the embassy/consulate. We cannot guarantee visa approval
                       and are not responsible for visa rejections.
                     </p>
                   </div>
-                  
+
                   <div>
                     <h4 className="font-semibold mb-2">6. Data Privacy</h4>
                     <p className="text-sm">
-                      Your personal information will be used solely for visa processing purposes and shared with 
+                      Your personal information will be used solely for visa processing purposes and shared with
                       relevant authorities as required. We maintain strict data protection measures.
                     </p>
                   </div>
-                  
+
                   <div>
                     <h4 className="font-semibold mb-2">7. Travel Responsibility</h4>
                     <p className="text-sm">
-                      You are responsible for ensuring your passport is valid, meeting entry requirements, 
+                      You are responsible for ensuring your passport is valid, meeting entry requirements,
                       and complying with all immigration laws of the destination country.
                     </p>
                   </div>
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <label className="flex items-start space-x-3 cursor-pointer">
                 <input
@@ -1881,10 +1874,10 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                 </div>
               </label>
             </div>
-            
+
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <p className="text-sm text-yellow-800">
-                <strong>Important:</strong> Please read all terms carefully. By proceeding, you acknowledge that you understand 
+                <strong>Important:</strong> Please read all terms carefully. By proceeding, you acknowledge that you understand
                 and agree to be bound by these terms and conditions.
               </p>
             </div>
@@ -1894,13 +1887,13 @@ export default function VisaApplicationPage({ params }: { params: { country: str
       case 7:
         const visaTotalAmount = visaPrice * Math.max(formData.travellers?.length ?? 1, 1);
         const isFreeVisa = visaTotalAmount <= 0;
-        
+
         return (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-neutral-900 mb-4">
               {isFreeVisa ? "Signup/Login & Submit Application" : "Signup/Login & Payment"}
             </h2>
-            
+
             {!session ? (
               <div className="bg-neutral-50 rounded-lg p-6 space-y-4">
                 <p className="text-neutral-700">
@@ -1951,10 +1944,10 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                     disabled={loading}
                     className="w-full bg-primary-600 text-white px-6 py-4 rounded-lg font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {loading 
-                      ? "Processing..." 
-                      : isFreeVisa 
-                        ? "Submit Application" 
+                    {loading
+                      ? "Processing..."
+                      : isFreeVisa
+                        ? "Submit Application"
                         : "Proceed to Payment"}
                   </button>
                 </div>
@@ -2001,29 +1994,26 @@ export default function VisaApplicationPage({ params }: { params: { country: str
                 <div key={step.id} className="flex items-center flex-1 min-w-[160px]">
                   <div className="flex flex-col items-center flex-1">
                     <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        isCompleted
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${isCompleted
                           ? "bg-green-500 text-white"
                           : isActive
-                          ? "bg-primary-600 text-white"
-                          : "bg-neutral-200 text-neutral-600"
-                      }`}
+                            ? "bg-primary-600 text-white"
+                            : "bg-neutral-200 text-neutral-600"
+                        }`}
                     >
                       {isCompleted ? <CheckCircle size={20} /> : <Icon size={20} />}
                     </div>
                     <span
-                      className={`mt-2 text-xs font-medium text-center ${
-                        isActive ? "text-primary-600" : "text-neutral-600"
-                      }`}
+                      className={`mt-2 text-xs font-medium text-center ${isActive ? "text-primary-600" : "text-neutral-600"
+                        }`}
                     >
                       {step.name}
                     </span>
                   </div>
                   {index < steps.length - 1 && (
                     <div
-                      className={`h-1 flex-1 mx-2 ${
-                        isCompleted ? "bg-green-500" : "bg-neutral-200"
-                    } hidden sm:block`}
+                      className={`h-1 flex-1 mx-2 ${isCompleted ? "bg-green-500" : "bg-neutral-200"
+                        } hidden sm:block`}
                     />
                   )}
                 </div>
