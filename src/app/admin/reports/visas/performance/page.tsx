@@ -63,9 +63,13 @@ export default function VisaTypePerformancePage() {
 
       const response = await fetch(`/api/admin/reports/visas/performance?${params.toString()}`);
       if (!response.ok) {
-        throw new Error(`Failed to load report: ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to load report: ${response.statusText}`);
       }
       const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
       setVisaTypes(data.rows || []);
     } catch (error: any) {
       console.error("Error fetching report:", error);

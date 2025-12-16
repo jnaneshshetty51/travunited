@@ -37,13 +37,35 @@ export async function GET(req: NextRequest) {
 
     if (dateFrom || dateTo) {
       where.createdAt = {};
-      if (dateFrom) {
-        where.createdAt.gte = new Date(dateFrom);
+      if (dateFrom && dateFrom.trim() !== "") {
+        try {
+          where.createdAt.gte = new Date(dateFrom);
+          if (isNaN(where.createdAt.gte.getTime())) {
+            throw new Error(`Invalid dateFrom: ${dateFrom}`);
+          }
+        } catch (dateError) {
+          console.error("Invalid dateFrom:", dateFrom, dateError);
+          return NextResponse.json(
+            { error: `Invalid dateFrom parameter: ${dateFrom}` },
+            { status: 400 }
+          );
+        }
       }
-      if (dateTo) {
-        const toDate = new Date(dateTo);
-        toDate.setHours(23, 59, 59, 999);
-        where.createdAt.lte = toDate;
+      if (dateTo && dateTo.trim() !== "") {
+        try {
+          const toDate = new Date(dateTo);
+          if (isNaN(toDate.getTime())) {
+            throw new Error(`Invalid dateTo: ${dateTo}`);
+          }
+          toDate.setHours(23, 59, 59, 999);
+          where.createdAt.lte = toDate;
+        } catch (dateError) {
+          console.error("Invalid dateTo:", dateTo, dateError);
+          return NextResponse.json(
+            { error: `Invalid dateTo parameter: ${dateTo}` },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -52,22 +74,28 @@ export async function GET(req: NextRequest) {
     }
 
     // Get applications with visa details
-    const applications = await prisma.application.findMany({
-      where,
-      include: {
-        visa: {
-          include: {
-            country: true,
+    let applications;
+    try {
+      applications = await prisma.application.findMany({
+        where,
+        include: {
+          visa: {
+            include: {
+              country: true,
+            },
+          },
+          travellers: true,
+          payments: {
+            where: {
+              status: "COMPLETED",
+            },
           },
         },
-        travellers: true,
-        payments: {
-          where: {
-            status: "COMPLETED",
-          },
-        },
-      },
-    });
+      });
+    } catch (dbError) {
+      console.error("Database query error:", dbError);
+      throw new Error(`Database query failed: ${dbError instanceof Error ? dbError.message : "Unknown error"}`);
+    }
 
     // Filter by country if specified
     let filteredApplications = applications;
@@ -93,50 +121,57 @@ export async function GET(req: NextRequest) {
       refundedCount: number;
     }> = {};
 
-    filteredApplications.forEach((app) => {
-      const visaId = app.visaId || "unknown";
-      const visaName = app.visaType || app.visa?.name || "Unknown";
-      const countryName = app.visa?.country?.name || app.country || "Unknown";
-      const key = `${visaId}-${visaName}`;
+    try {
+      filteredApplications.forEach((app) => {
+        const visaId = app.visaId || "unknown";
+        const visaName = app.visaType || app.visa?.name || "Unknown";
+        const countryName = app.visa?.country?.name || app.country || "Unknown";
+        const key = `${visaId}-${visaName}`;
 
-      if (!visaTypeMap[key]) {
-        visaTypeMap[key] = {
-          visaId,
-          visaName,
-          countryName,
-          totalApplications: 0,
-          paidApplications: 0,
-          totalRevenue: 0,
-          totalTravellers: 0,
-          approvedCount: 0,
-          rejectedCount: 0,
-          decidedCount: 0,
-          refundedCount: 0,
-        };
-      }
+        if (!visaTypeMap[key]) {
+          visaTypeMap[key] = {
+            visaId,
+            visaName,
+            countryName,
+            totalApplications: 0,
+            paidApplications: 0,
+            totalRevenue: 0,
+            totalTravellers: 0,
+            approvedCount: 0,
+            rejectedCount: 0,
+            decidedCount: 0,
+            refundedCount: 0,
+          };
+        }
 
-      visaTypeMap[key].totalApplications++;
-      visaTypeMap[key].totalTravellers += app.travellers.length;
+        visaTypeMap[key].totalApplications++;
+        visaTypeMap[key].totalTravellers += (Array.isArray(app.travellers) ? app.travellers.length : 0);
 
-      if (app.payments.length > 0) {
-        visaTypeMap[key].paidApplications++;
-        visaTypeMap[key].totalRevenue += app.payments.reduce((sum, p) => sum + p.amount, 0);
-      }
+        if (app.payments && Array.isArray(app.payments) && app.payments.length > 0) {
+          visaTypeMap[key].paidApplications++;
+          visaTypeMap[key].totalRevenue += app.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        }
 
-      if (app.status === "APPROVED") {
-        visaTypeMap[key].approvedCount++;
-        visaTypeMap[key].decidedCount++;
-      } else if (app.status === "REJECTED") {
-        visaTypeMap[key].rejectedCount++;
-        visaTypeMap[key].decidedCount++;
-      }
+        if (app.status === "APPROVED") {
+          visaTypeMap[key].approvedCount++;
+          visaTypeMap[key].decidedCount++;
+        } else if (app.status === "REJECTED") {
+          visaTypeMap[key].rejectedCount++;
+          visaTypeMap[key].decidedCount++;
+        }
 
-      // Check for refunds
-      const refundedPayments = app.payments.filter((p) => p.status === "REFUNDED");
-      if (refundedPayments.length > 0) {
-        visaTypeMap[key].refundedCount++;
-      }
-    });
+        // Check for refunds
+        if (app.payments && Array.isArray(app.payments)) {
+          const refundedPayments = app.payments.filter((p) => p.status === "REFUNDED");
+          if (refundedPayments.length > 0) {
+            visaTypeMap[key].refundedCount++;
+          }
+        }
+      });
+    } catch (processingError) {
+      console.error("Error processing applications:", processingError);
+      throw new Error(`Failed to process applications: ${processingError instanceof Error ? processingError.message : "Unknown error"}`);
+    }
 
     // Calculate metrics
     const visaTypeData = Object.values(visaTypeMap).map((visa) => {
@@ -157,6 +192,19 @@ export async function GET(req: NextRequest) {
         refundRate,
       };
     }).sort((a, b) => b.totalApplications - a.totalApplications);
+
+    // Ensure we always return a valid response even if there's no data
+    if (visaTypeData.length === 0 && filteredApplications.length === 0) {
+      // No applications found, return empty result
+      return NextResponse.json({
+        summary: {
+          totalVisaTypes: 0,
+          totalApplications: 0,
+          totalRevenue: 0,
+        },
+        rows: [],
+      });
+    }
 
     // Export handling
     if (format === "pdf") {
@@ -211,6 +259,20 @@ export async function GET(req: NextRequest) {
       }));
 
       if (format === "xlsx") {
+        if (exportData.length === 0) {
+          // Return empty Excel file with headers
+          const headers = ["Visa Type", "Country", "Total Applications", "Paid Applications", "Total Revenue (INR)", "Average Travellers per Application", "Approved", "Rejected", "Approval Rate (%)", "Refund Rate (%)"];
+          const ws = XLSX.utils.aoa_to_sheet([headers]);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, "Visa Type Performance");
+          const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+          return new NextResponse(buffer, {
+            headers: {
+              "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              "Content-Disposition": `attachment; filename=visa-type-performance-${new Date().toISOString().split("T")[0]}.xlsx`,
+            },
+          });
+        }
         const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Visa Type Performance");
@@ -222,6 +284,17 @@ export async function GET(req: NextRequest) {
           },
         });
       } else {
+        if (exportData.length === 0) {
+          // Return empty CSV with headers
+          const headers = ["Visa Type", "Country", "Total Applications", "Paid Applications", "Total Revenue (INR)", "Average Travellers per Application", "Approved", "Rejected", "Approval Rate (%)", "Refund Rate (%)"];
+          const csv = headers.join(",") + "\n";
+          return new NextResponse(csv, {
+            headers: {
+              "Content-Type": "text/csv",
+              "Content-Disposition": `attachment; filename=visa-type-performance-${new Date().toISOString().split("T")[0]}.csv`,
+            },
+          });
+        }
         const csv = [
           Object.keys(exportData[0] || {}).join(","),
           ...exportData.map((row) =>
@@ -250,8 +323,22 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error fetching visa type performance report:", error);
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    // Log full error details for debugging
+    console.error("Full error details:", {
+      message: errorMessage,
+      stack: errorStack,
+      error: error,
+    });
+    
     return NextResponse.json(
-      { error: "Internal server error" },
+      { 
+        error: errorMessage,
+        // Only include stack in development
+        ...(process.env.NODE_ENV === "development" && errorStack ? { details: errorStack } : {})
+      },
       { status: 500 }
     );
   }
