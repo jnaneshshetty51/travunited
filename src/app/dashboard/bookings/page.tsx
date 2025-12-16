@@ -246,10 +246,15 @@ export default function BookingsPage() {
                                     key={index}
                                     onClick={async () => {
                                       try {
+                                        console.log("Attempting to download invoice from:", action.href);
+                                        if (action.href.includes("undefined")) {
+                                          throw new Error("Invalid invoice URL (missing ID)");
+                                        }
+
                                         const response = await fetch(action.href);
                                         if (!response.ok) {
                                           const errorData = await response.json().catch(() => ({}));
-                                          throw new Error(errorData.error || errorData.message || "Failed to download invoice");
+                                          throw new Error(errorData.error || errorData.message || `Server returned ${response.status}: Failed to download invoice`);
                                         }
                                         const blob = await response.blob();
                                         const url = window.URL.createObjectURL(blob);
@@ -262,7 +267,8 @@ export default function BookingsPage() {
                                         document.body.removeChild(a);
                                       } catch (error) {
                                         console.error("Error downloading invoice:", error);
-                                        alert(`Failed to download invoice: ${error instanceof Error ? error.message : "Please try again."}`);
+                                        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+                                        alert(`Failed to download invoice from ${action.href}\nError: ${errorMessage}`);
                                       }
                                     }}
                                     className={`inline-flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${action.variant === "primary"
