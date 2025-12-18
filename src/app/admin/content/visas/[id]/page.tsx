@@ -286,36 +286,35 @@ export default function AdminVisaEditorPage() {
       backendSync: false, // Can enable later for cross-device sync
       backendEndpoint: `/api/admin/content/visas/${params.id}/draft`,
       onRestore: (restoredState: any) => {
-        // For new forms, always restore if draft exists
-        // For existing forms, restore only if we haven't loaded from server yet
-        // (to avoid overwriting server data with stale drafts)
-        if (isNew || !hasLoadedFromServer) {
-          if (Object.keys(restoredState).length > 0) {
-            if (restoredState.formData) {
-              setFormData(restoredState.formData);
-            }
-            if (restoredState.requirements) {
-              setRequirements(restoredState.requirements);
-            }
-            if (restoredState.faqs) {
-              setFaqs(restoredState.faqs);
-            }
-            if (restoredState.subTypes) {
-              setSubTypes(restoredState.subTypes);
-            }
-            if (restoredState.activeTab) {
-              setActiveTab(restoredState.activeTab);
-            }
-            if (restoredState.heroImageMode) {
-              setHeroImageMode(restoredState.heroImageMode);
-            }
-            if (restoredState.sampleVisaImageMode) {
-              setSampleVisaImageMode(restoredState.sampleVisaImageMode);
-            }
-            // Show notification that draft was restored
-            setShowDraftSaved(true);
-            setTimeout(() => setShowDraftSaved(false), 3000);
+        // Always restore if draft exists and we haven't loaded from server yet
+        // For new forms, this allows restoring drafts
+        // For existing forms, this prevents overwriting server data
+        if (!hasLoadedFromServer && Object.keys(restoredState).length > 0) {
+          console.log("Restoring draft:", restoredState);
+          if (restoredState.formData) {
+            setFormData(restoredState.formData);
           }
+          if (restoredState.requirements) {
+            setRequirements(restoredState.requirements);
+          }
+          if (restoredState.faqs) {
+            setFaqs(restoredState.faqs);
+          }
+          if (restoredState.subTypes) {
+            setSubTypes(restoredState.subTypes);
+          }
+          if (restoredState.activeTab) {
+            setActiveTab(restoredState.activeTab);
+          }
+          if (restoredState.heroImageMode) {
+            setHeroImageMode(restoredState.heroImageMode);
+          }
+          if (restoredState.sampleVisaImageMode) {
+            setSampleVisaImageMode(restoredState.sampleVisaImageMode);
+          }
+          // Show notification that draft was restored
+          setShowDraftSaved(true);
+          setTimeout(() => setShowDraftSaved(false), 3000);
         }
       },
       excludeKeys: ['_savedAt'],
@@ -468,8 +467,12 @@ export default function AdminVisaEditorPage() {
     } else if (cloneSourceId) {
       fetchVisa(cloneSourceId, true);
     } else {
+      // For new forms, delay marking as loaded to allow draft restoration
       setLoading(false);
-      setHasLoadedFromServer(true); // Mark as loaded for new forms
+      // Set a small delay to allow draft restoration to happen first
+      setTimeout(() => {
+        setHasLoadedFromServer(true);
+      }, 100);
     }
   }, [session, status, router, isNew, params.id, cloneSourceId, fetchVisa, fetchCountries]);
 
@@ -794,14 +797,48 @@ export default function AdminVisaEditorPage() {
               Configure everything travellers will see plus what powers the visa flow.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={autoGenerateSlug}
-            className="inline-flex items-center gap-2 px-4 py-2 border border-neutral-200 rounded-lg text-sm font-medium text-neutral-600 hover:bg-neutral-50"
-          >
-            <RefreshCw size={16} />
-            Auto slug
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                // Explicitly save draft
+                try {
+                  const draftData = {
+                    formData,
+                    requirements,
+                    faqs,
+                    subTypes,
+                    activeTab,
+                    heroImageMode,
+                    sampleVisaImageMode,
+                  };
+                  const storageKey = `admin-form-${formPersistenceKey}`;
+                  localStorage.setItem(
+                    storageKey,
+                    JSON.stringify({ ...draftData, _savedAt: Date.now() })
+                  );
+                  console.log("Draft manually saved:", storageKey);
+                  setShowDraftSaved(true);
+                  setTimeout(() => setShowDraftSaved(false), 2000);
+                } catch (error) {
+                  console.error("Error saving draft:", error);
+                  alert("Failed to save draft. Please check console for details.");
+                }
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-primary-200 bg-primary-50 text-primary-700 rounded-lg text-sm font-medium hover:bg-primary-100"
+            >
+              <Save size={16} />
+              Save Draft
+            </button>
+            <button
+              type="button"
+              onClick={autoGenerateSlug}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-neutral-200 rounded-lg text-sm font-medium text-neutral-600 hover:bg-neutral-50"
+            >
+              <RefreshCw size={16} />
+              Auto slug
+            </button>
+          </div>
         </div>
 
         <div className="bg-white border border-neutral-200 rounded-2xl">

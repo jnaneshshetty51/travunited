@@ -57,13 +57,18 @@ export function useFormPersistence<T extends Record<string, any>>(
           // Remove internal metadata
           const { _savedAt, ...cleanState } = restoredState;
           
+          console.log(`Draft found for ${formKey}, restoring...`, cleanState);
+          
           if (onRestore) {
             onRestore(cleanState);
           }
         } else {
           // Clear expired state
+          console.log(`Draft expired for ${formKey}, clearing...`);
           localStorage.removeItem(storageKey);
         }
+      } else {
+        console.log(`No draft found for ${formKey}`);
       }
     } catch (error) {
       console.error(`Error restoring form state for ${formKey}:`, error);
@@ -90,6 +95,7 @@ export function useFormPersistence<T extends Record<string, any>>(
 
       // Save to localStorage (always)
       localStorage.setItem(storageKey, JSON.stringify(stateToSave));
+      console.log(`Draft saved for ${formKey}`, { timestamp: new Date().toISOString() });
 
       // Optionally sync to backend
       if (backendSync && backendEndpoint) {
@@ -160,13 +166,23 @@ export function useFormPersistence<T extends Record<string, any>>(
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      // Save immediately
-      saveFormState();
+      // Save immediately (fire and forget)
+      saveFormState().catch(err => console.error("Error saving on blur:", err));
     };
 
     const handleBeforeUnload = () => {
-      // Save immediately before page unload
-      saveFormState();
+      // Save immediately before page unload (synchronous localStorage only)
+      // Note: async operations may not complete before page unloads
+      try {
+        const stateToSave: any = { ...formStateRef.current };
+        excludeKeys.forEach((key) => {
+          delete stateToSave[key];
+        });
+        stateToSave._savedAt = Date.now();
+        localStorage.setItem(storageKey, JSON.stringify(stateToSave));
+      } catch (error) {
+        console.error("Error saving on beforeunload:", error);
+      }
     };
 
     window.addEventListener("blur", handleBlur);
