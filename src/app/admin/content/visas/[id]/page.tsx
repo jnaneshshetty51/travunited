@@ -224,12 +224,11 @@ export default function AdminVisaEditorPage() {
       enabled: true,
       debounceMs: 1000, // 1 second debounce for auto-save
       onRestore: (restoredState: any) => {
-        // Restore draft if we haven't loaded from server yet
-        // This works for both new forms and when editing (before server data loads)
-        if (!hasLoadedFromServer) {
-          // For new forms, restore everything
-          // For existing forms, only restore if user made changes before server data loaded
-          if (isNew || Object.keys(restoredState).length > 0) {
+        // For new forms, always restore if draft exists
+        // For existing forms, restore only if we haven't loaded from server yet
+        // (to avoid overwriting server data with stale drafts)
+        if (isNew || !hasLoadedFromServer) {
+          if (Object.keys(restoredState).length > 0) {
             if (restoredState.formData) {
               setFormData(restoredState.formData);
             }
@@ -252,10 +251,8 @@ export default function AdminVisaEditorPage() {
               setSampleVisaImageMode(restoredState.sampleVisaImageMode);
             }
             // Show notification that draft was restored
-            if (Object.keys(restoredState).length > 0) {
-              setShowDraftSaved(true);
-              setTimeout(() => setShowDraftSaved(false), 3000);
-            }
+            setShowDraftSaved(true);
+            setTimeout(() => setShowDraftSaved(false), 3000);
           }
         }
       },
