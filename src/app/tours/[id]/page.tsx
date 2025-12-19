@@ -22,7 +22,6 @@ import { prisma } from "@/lib/prisma";
 import { getMediaProxyUrl } from "@/lib/media";
 import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
 import { PhotoGallery } from "@/components/tours/PhotoGallery";
-import { TourDetailClient } from "./TourDetailClient";
 import { BackToToursButton } from "./BackToToursButton";
 
 export async function generateMetadata({
