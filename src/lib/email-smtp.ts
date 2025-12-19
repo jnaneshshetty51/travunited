@@ -58,7 +58,7 @@ function getTransporter(): Transporter {
 export async function sendMailSMTP(options: SMTPEmailOptions): Promise<{ messageId: string }> {
   const transport = getTransporter();
 
-  const from = options.from || process.env.EMAIL_FROM || process.env.EMAIL_FROM_GENERAL || "no-reply@travunited.com";
+  const from = options.from || process.env.EMAIL_FROM || process.env.EMAIL_FROM_GENERAL || "no-reply@travunited.in";
 
   const info = await transport.sendMail({
     from,
