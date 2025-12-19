@@ -285,7 +285,7 @@ export default function AdminEmailTestPage() {
       password: "TempPassword123!",
       isAdvance: "false",
       pendingBalance: "0",
-      loginUrl: typeof window !== "undefined" ? `${window.location.origin}/login` : "https://travunited.in/login",
+      loginUrl: typeof window !== "undefined" ? `${window.location.origin}/login` : "https://travunited.com/login",
       googleReviewUrl: "https://g.page/r/YOUR_GOOGLE_BUSINESS_REVIEW_LINK",
     };
     return defaults[paramName] || "";

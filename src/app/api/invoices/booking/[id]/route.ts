@@ -93,7 +93,7 @@ export async function GET(
     const companyName = process.env.COMPANY_NAME || "Travunited";
     const companyAddress = process.env.COMPANY_ADDRESS || "Your Company Address";
     const companyPhone = process.env.COMPANY_PHONE;
-    const companyEmail = process.env.COMPANY_EMAIL || "support@travunited.in";
+    const companyEmail = process.env.COMPANY_EMAIL || "support@travunited.com";
     const companyGSTIN = process.env.COMPANY_GSTIN;
 
     // Safely get traveller count

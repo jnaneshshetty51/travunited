@@ -8,7 +8,7 @@ import { sendEmail } from "@/lib/email";
 import { getAdminUserIds, getVisaAdminEmail } from "@/lib/admin-contacts";
 export const dynamic = "force-dynamic";
 
-const APP_BASE_URL = process.env.NEXTAUTH_URL || "https://travunited.in";
+const APP_BASE_URL = process.env.NEXTAUTH_URL || "https://travunited.com";
 
 export async function POST(
   req: Request,

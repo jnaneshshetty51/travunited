@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
                 <strong>Configuration Details:</strong>
                 <ul>
                   <li>Provider: <strong>AWS SDK</strong></li>
-                  <li>From: <strong>${process.env.EMAIL_FROM || "no-reply@travunited.in"}</strong></li>
+                  <li>From: <strong>${process.env.EMAIL_FROM || "no-reply@travunited.com"}</strong></li>
                   <li>Sent: <strong>${new Date().toLocaleString()}</strong></li>
                 </ul>
               </div>

@@ -86,7 +86,7 @@ export async function GET(req: Request) {
         : {
             id: null,
             name: "System",
-            email: "system@travunited.in",
+            email: "system@travunited.com",
           },
       entityType: log.entityType,
       entityId: log.entityId,

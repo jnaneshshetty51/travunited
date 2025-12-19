@@ -112,7 +112,7 @@ export async function POST(req: Request) {
     const baseUrl =
       process.env.NEXTAUTH_URL ||
       process.env.NEXT_PUBLIC_APP_URL ||
-      "https://travunited.in";
+      "https://travunited.com";
     const magicLink = `${baseUrl}/reset-password?id=${reset.id}&token=${encodeURIComponent(rawToken)}`;
 
     // Log the full magic link for debugging (safe to log as it's a one-time use token)

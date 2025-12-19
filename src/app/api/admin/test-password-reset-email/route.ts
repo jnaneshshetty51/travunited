@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     const { email, resetLink } = testEmailSchema.parse(body);
 
     // Use provided link or create a test link
-    const testLink = resetLink || `https://travunited.in/reset-password?id=test&token=test-token-12345`;
+    const testLink = resetLink || `https://travunited.com/reset-password?id=test&token=test-token-12345`;
 
     console.log("[Test Password Reset Email] Sending test email", {
       email,

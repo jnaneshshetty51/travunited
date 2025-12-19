@@ -72,7 +72,7 @@ export function replaceTemplateVariables(
   if (!template) return template;
   
   let result = template;
-  const baseUrl = process.env.NEXTAUTH_URL || "https://travunited.in";
+  const baseUrl = process.env.NEXTAUTH_URL || "https://travunited.com";
   
   // Replace common variables
   const replacements: Record<string, string> = {
@@ -97,7 +97,7 @@ export function replaceTemplateVariables(
     "{bookingUrl}": variables.bookingUrl || (variables.bookingId ? `${baseUrl}/dashboard/bookings/${variables.bookingId}` : ""),
     "{googleReviewUrl}": variables.googleReviewUrl || "",
     "{companyName}": variables.companyName || "Travunited",
-    "{supportEmail}": variables.supportEmail || "support@travunited.in",
+    "{supportEmail}": variables.supportEmail || "support@travunited.com",
     "{supportPhone}": variables.supportPhone || "",
     "{contactName}": variables.contactName || "",
     "{companyNameLead}": variables.companyNameLead || "",
@@ -494,7 +494,7 @@ export function getDefaultEmailTemplate(templateKey: string): string {
 
     {nextStepsSection}
 
-    <p>If you have any questions, please feel free to reach out to us at <a href="mailto:careers@travunited.in">careers@travunited.in</a>.</p>
+    <p>If you have any questions, please feel free to reach out to us at <a href="mailto:careers@travunited.com">careers@travunited.com</a>.</p>
 
     <p>Thank you for your interest in joining {companyName}!</p>
 

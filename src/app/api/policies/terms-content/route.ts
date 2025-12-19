@@ -104,8 +104,8 @@ export async function GET() {
         <h2 class="text-xl font-semibold text-neutral-900 mb-3">10. Contact Us</h2>
         <p class="text-neutral-700 leading-relaxed">
           If you have any questions about these Terms & Conditions, please contact us at{" "}
-          <a href="mailto:info@travunited.in" class="text-primary-600 hover:text-primary-700 underline">
-            info@travunited.in
+          <a href="mailto:info@travunited.com" class="text-primary-600 hover:text-primary-700 underline">
+            info@travunited.com
           </a>
         </p>
       </section>

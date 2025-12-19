@@ -155,11 +155,11 @@ export function Footer() {
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-6 text-sm">
               <a
-                href="mailto:info@travunited.in"
+                href="mailto:info@travunited.com"
                 className="flex items-center space-x-2 hover:text-white transition-colors"
               >
                 <Mail size={16} />
-                <span>info@travunited.in</span>
+                <span>info@travunited.com</span>
               </a>
               <a
                 href="tel:+916360392398"

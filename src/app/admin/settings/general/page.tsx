@@ -507,7 +507,7 @@ export default function AdminGeneralSettingsPage() {
                     value={settings.emailFromGeneral}
                     onChange={(value) => updateSetting("emailFromGeneral", value)}
                     disabled={isReadOnly}
-                    placeholder="Travunited <no-reply@travunited.in>"
+                    placeholder="Travunited <no-reply@travunited.com>"
                     className="w-full px-4 py-2 disabled:bg-neutral-50 disabled:cursor-not-allowed"
                   />
                   <p className="text-xs text-neutral-500 mt-1">
@@ -523,7 +523,7 @@ export default function AdminGeneralSettingsPage() {
                     value={settings.emailFromVisa}
                     onChange={(value) => updateSetting("emailFromVisa", value)}
                     disabled={isReadOnly}
-                    placeholder="Visa Desk <visa@travunited.in>"
+                    placeholder="Visa Desk <visa@travunited.com>"
                     className="w-full px-4 py-2 disabled:bg-neutral-50 disabled:cursor-not-allowed"
                   />
                   <p className="text-xs text-neutral-500 mt-1">
@@ -539,7 +539,7 @@ export default function AdminGeneralSettingsPage() {
                     value={settings.emailFromTours}
                     onChange={(value) => updateSetting("emailFromTours", value)}
                     disabled={isReadOnly}
-                    placeholder="Tours Desk <tours@travunited.in>"
+                    placeholder="Tours Desk <tours@travunited.com>"
                     className="w-full px-4 py-2 disabled:bg-neutral-50 disabled:cursor-not-allowed"
                   />
                   <p className="text-xs text-neutral-500 mt-1">

@@ -55,7 +55,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const baseUrl = process.env.NEXTAUTH_URL || "https://travunited.in";
+    const baseUrl = process.env.NEXTAUTH_URL || "https://travunited.com";
     let success = false;
     let error: string | null = null;
 
