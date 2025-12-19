@@ -9,9 +9,12 @@ export async function GET(
   { params }: { params: { slug: string } }
 ) {
   try {
+    // Decode the slug to handle URL-encoded characters and forward slashes
+    const decodedSlug = decodeURIComponent(params.slug);
+    
     const tour = await prisma.tour.findFirst({
       where: {
-        slug: params.slug,
+        slug: decodedSlug,
         OR: [
           { isActive: true },
           { status: "active" },

@@ -27,10 +27,14 @@ import { BackToHolidaysButton } from "./BackToHolidaysButton";
 export async function generateMetadata({
   params,
 }: {
-  params: { id: string };
+  params: { id: string[] };
 }): Promise<Metadata> {
+  // Join the path segments and decode URL encoding
+  const slug = Array.isArray(params.id) ? params.id.join('/') : params.id;
+  const decodedSlug = decodeURIComponent(slug);
+  
   const tour = await prisma.tour.findFirst({
-    where: { slug: params.id },
+    where: { slug: decodedSlug },
   });
 
   if (!tour) {
@@ -73,12 +77,16 @@ export default async function TourDetailPage({
   params,
   searchParams,
 }: {
-  params: { id: string };
+  params: { id: string[] };
   searchParams: { [key: string]: string | string[] | undefined };
 }) {
+  // Join the path segments and decode URL encoding
+  const slug = Array.isArray(params.id) ? params.id.join('/') : params.id;
+  const decodedSlug = decodeURIComponent(slug);
+  
   const tour = await prisma.tour.findFirst({
     where: { 
-      slug: params.id,
+      slug: decodedSlug,
       OR: [
         { isActive: true },
         { status: "active" },

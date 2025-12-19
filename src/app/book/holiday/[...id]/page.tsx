@@ -101,7 +101,7 @@ interface Tour {
   childAgeLimit?: number | null;
 }
 
-export default function TourBookingPage({ params }: { params: { id: string } }) {
+export default function TourBookingPage({ params }: { params: { id: string[] } }) {
   const { data: session } = useSession();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
@@ -253,7 +253,11 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
   useEffect(() => {
     const fetchTour = async () => {
       try {
-        const response = await fetch(`/api/tours/${params.id}`);
+        // Join the path segments and encode for URL
+        const slug = Array.isArray(params.id) ? params.id.join('/') : params.id;
+        const encodedSlug = encodeURIComponent(slug);
+        
+        const response = await fetch(`/api/tours/${encodedSlug}`);
         if (response.ok) {
           const data = await response.json();
           setTour(data);
@@ -767,8 +771,10 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
     }
 
     if (!session) {
+      const slug = Array.isArray(params.id) ? params.id.join('/') : params.id;
+      const encodedSlug = encodeURIComponent(slug);
       router.push(
-        `/signup?email=${encodeURIComponent(formData.primaryContact.email || "")}&redirect=/book/holiday/${params.id}`
+        `/signup?email=${encodeURIComponent(formData.primaryContact.email || "")}&redirect=/book/holiday/${encodedSlug}`
       );
       return null;
     }
@@ -880,7 +886,9 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
 
     if (!session) {
       alert("Please login to proceed with payment");
-      router.push(`/login?redirect=/book/holiday/${params.id}`);
+      const slug = Array.isArray(params.id) ? params.id.join('/') : params.id;
+      const encodedSlug = encodeURIComponent(slug);
+      router.push(`/login?redirect=/book/holiday/${encodedSlug}`);
       return;
     }
 
@@ -2053,7 +2061,7 @@ export default function TourBookingPage({ params }: { params: { id: string } }) 
       <div className="bg-white border-b border-neutral-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <Link
-            href={`/holidays/${params.id}`}
+            href={`/holidays/${Array.isArray(params.id) ? params.id.join('/') : params.id}`}
             className="text-primary-600 hover:text-primary-700 text-sm"
           >
             ← Back to Holiday Details

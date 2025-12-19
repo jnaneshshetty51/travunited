@@ -608,7 +608,7 @@ export default function HolidaysGridClient({ tours, countries, regions, tourType
               whileHover={{ y: -4 }}
               className="group"
             >
-              <Link href={buildToursUrl(tour.id)}>
+              <Link href={buildToursUrl(tour.slug || tour.id)}>
                 <div className="bg-white rounded-2xl shadow-medium hover:shadow-large transition-shadow duration-300 overflow-hidden h-full flex flex-col">
                   {/* Image */}
                   <div className="aspect-[4/3] relative bg-neutral-100">
