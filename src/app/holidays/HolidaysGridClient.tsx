@@ -705,7 +705,7 @@ export default function HolidaysGridClient({ tours, countries, regions, tourType
                           {tour.price.toLocaleString()}
                         </div>
                         <div className="text-xs text-neutral-500">
-                          {tour.allowAdvance ? "Advance available" : "Full payment"}
+                          {tour.allowAdvance ? "Advance available" : "Starting from"}
                         </div>
                       </div>
                       <div className="flex items-center text-primary-600 font-medium group-hover:translate-x-1 transition-transform">
