@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useMemo, useState, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
@@ -64,30 +64,11 @@ interface Props {
 
 export default function ToursGridClient({ tours, countries, regions, tourTypes, themes }: Props) {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const destinationParam = searchParams?.get("destination") || "";
   
-  const [searchQuery, setSearchQuery] = useState(destinationParam);
-  const [selectedCountry, setSelectedCountry] = useState<string>("all");
-  
-  // Initialize search query from URL params
-  useEffect(() => {
-    if (destinationParam) {
-      setSearchQuery(destinationParam);
-    }
-  }, [destinationParam]);
-  const [selectedRegion, setSelectedRegion] = useState<string>("all");
-  const [selectedTourType, setSelectedTourType] = useState<string>("all");
-  const [selectedThemes, setSelectedThemes] = useState<string[]>([]);
-  const [durationRange, setDurationRange] = useState<[number, number]>([0, 30]);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 500000]);
-  const [onlyFeatured, setOnlyFeatured] = useState(false);
-  const [onlyAdvance, setOnlyAdvance] = useState(false);
-  const [sortOption, setSortOption] = useState<
-    "recommended" | "price-asc" | "price-desc" | "duration-asc" | "duration-desc" | "newest"
-  >("recommended");
-  const [showFilters, setShowFilters] = useState(false);
-
-  // Calculate min/max for ranges
+  // Calculate min/max for ranges (needed for initial state)
   const maxDuration = useMemo(() => {
     return Math.max(...tours.map((t) => t.durationDays || 0), 30);
   }, [tours]);
@@ -95,6 +76,112 @@ export default function ToursGridClient({ tours, countries, regions, tourTypes, 
   const maxPrice = useMemo(() => {
     return Math.max(...tours.map((t) => t.price), 500000);
   }, [tours]);
+
+  // Initialize state from URL params or sessionStorage
+  const getInitialState = useCallback(() => {
+    // Try to restore from sessionStorage first (for back navigation)
+    if (typeof window !== "undefined") {
+      const stored = sessionStorage.getItem("tours-filter-state");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          // Only use stored state if we're coming from a detail page (no URL params except destination)
+          const hasOtherParams = Array.from(searchParams?.keys() || []).some(
+            (key) => key !== "destination"
+          );
+          if (!hasOtherParams && Object.keys(parsed).length > 0) {
+            // Ensure ranges are valid
+            return {
+              ...parsed,
+              durationRange: parsed.durationRange || [0, maxDuration],
+              priceRange: parsed.priceRange || [0, maxPrice],
+            };
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+    }
+    
+    // Otherwise, use URL params
+    return {
+      searchQuery: destinationParam,
+      selectedCountry: searchParams?.get("country") || "all",
+      selectedRegion: searchParams?.get("region") || "all",
+      selectedTourType: searchParams?.get("tourType") || "all",
+      selectedThemes: searchParams?.get("themes")?.split(",").filter(Boolean) || [],
+      durationRange: [
+        parseInt(searchParams?.get("durationMin") || "0"),
+        parseInt(searchParams?.get("durationMax") || maxDuration.toString()),
+      ] as [number, number],
+      priceRange: [
+        parseInt(searchParams?.get("priceMin") || "0"),
+        parseInt(searchParams?.get("priceMax") || maxPrice.toString()),
+      ] as [number, number],
+      onlyFeatured: searchParams?.get("featured") === "true",
+      onlyAdvance: searchParams?.get("advance") === "true",
+      sortOption: (searchParams?.get("sort") || "recommended") as
+        | "recommended"
+        | "price-asc"
+        | "price-desc"
+        | "duration-asc"
+        | "duration-desc"
+        | "newest",
+    };
+  }, [searchParams, destinationParam, maxDuration, maxPrice]);
+
+  const initialState = getInitialState();
+  
+  const [searchQuery, setSearchQuery] = useState(initialState.searchQuery);
+  const [selectedCountry, setSelectedCountry] = useState<string>(initialState.selectedCountry);
+  const [selectedRegion, setSelectedRegion] = useState<string>(initialState.selectedRegion);
+  const [selectedTourType, setSelectedTourType] = useState<string>(initialState.selectedTourType);
+  const [selectedThemes, setSelectedThemes] = useState<string[]>(initialState.selectedThemes);
+  const [durationRange, setDurationRange] = useState<[number, number]>(initialState.durationRange);
+  const [priceRange, setPriceRange] = useState<[number, number]>(initialState.priceRange);
+  const [onlyFeatured, setOnlyFeatured] = useState(initialState.onlyFeatured);
+  const [onlyAdvance, setOnlyAdvance] = useState(initialState.onlyAdvance);
+  const [sortOption, setSortOption] = useState<
+    "recommended" | "price-asc" | "price-desc" | "duration-asc" | "duration-desc" | "newest"
+  >(initialState.sortOption);
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Initialize search query from URL params
+  useEffect(() => {
+    if (destinationParam) {
+      setSearchQuery(destinationParam);
+    }
+  }, [destinationParam]);
+  
+  // Save filter state to sessionStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const filterState = {
+        searchQuery,
+        selectedCountry,
+        selectedRegion,
+        selectedTourType,
+        selectedThemes,
+        durationRange,
+        priceRange,
+        onlyFeatured,
+        onlyAdvance,
+        sortOption,
+      };
+      sessionStorage.setItem("tours-filter-state", JSON.stringify(filterState));
+    }
+  }, [
+    searchQuery,
+    selectedCountry,
+    selectedRegion,
+    selectedTourType,
+    selectedThemes,
+    durationRange,
+    priceRange,
+    onlyFeatured,
+    onlyAdvance,
+    sortOption,
+  ]);
 
   const filteredTours = useMemo(() => {
     const lower = searchQuery.toLowerCase();
@@ -188,6 +275,42 @@ export default function ToursGridClient({ tours, countries, regions, tourTypes, 
     );
   };
 
+  // Function to build URL with current filter state
+  const buildToursUrl = useCallback((tourId?: string) => {
+    const params = new URLSearchParams();
+    
+    if (searchQuery) params.set("destination", searchQuery);
+    if (selectedCountry !== "all") params.set("country", selectedCountry);
+    if (selectedRegion !== "all") params.set("region", selectedRegion);
+    if (selectedTourType !== "all") params.set("tourType", selectedTourType);
+    if (selectedThemes.length > 0) params.set("themes", selectedThemes.join(","));
+    if (durationRange[0] > 0) params.set("durationMin", durationRange[0].toString());
+    if (durationRange[1] < maxDuration) params.set("durationMax", durationRange[1].toString());
+    if (priceRange[0] > 0) params.set("priceMin", priceRange[0].toString());
+    if (priceRange[1] < maxPrice) params.set("priceMax", priceRange[1].toString());
+    if (onlyFeatured) params.set("featured", "true");
+    if (onlyAdvance) params.set("advance", "true");
+    if (sortOption !== "recommended") params.set("sort", sortOption);
+    
+    const queryString = params.toString();
+    return tourId 
+      ? `/tours/${tourId}${queryString ? `?${queryString}` : ""}`
+      : `/tours${queryString ? `?${queryString}` : ""}`;
+  }, [
+    searchQuery,
+    selectedCountry,
+    selectedRegion,
+    selectedTourType,
+    selectedThemes,
+    durationRange,
+    priceRange,
+    onlyFeatured,
+    onlyAdvance,
+    sortOption,
+    maxDuration,
+    maxPrice,
+  ]);
+
   const clearFilters = () => {
     setSelectedCountry("all");
     setSelectedRegion("all");
@@ -198,6 +321,12 @@ export default function ToursGridClient({ tours, countries, regions, tourTypes, 
     setOnlyFeatured(false);
     setOnlyAdvance(false);
     setSearchQuery("");
+    // Clear sessionStorage
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("tours-filter-state");
+    }
+    // Navigate to clean URL
+    router.push("/tours");
   };
 
   const hasActiveFilters =
@@ -479,7 +608,7 @@ export default function ToursGridClient({ tours, countries, regions, tourTypes, 
               whileHover={{ y: -4 }}
               className="group"
             >
-              <Link href={`/tours/${tour.id}`}>
+              <Link href={buildToursUrl(tour.id)}>
                 <div className="bg-white rounded-2xl shadow-medium hover:shadow-large transition-shadow duration-300 overflow-hidden h-full flex flex-col">
                   {/* Image */}
                   <div className="aspect-[4/3] relative bg-neutral-100">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
+import { TourDetailClient } from "./TourDetailClient";
 import {
   Calendar,
   MapPin,
@@ -21,6 +22,8 @@ import { prisma } from "@/lib/prisma";
 import { getMediaProxyUrl } from "@/lib/media";
 import { ImageWithFallback } from "@/components/ui/ImageWithFallback";
 import { PhotoGallery } from "@/components/tours/PhotoGallery";
+import { TourDetailClient } from "./TourDetailClient";
+import { BackToToursButton } from "./BackToToursButton";
 
 export async function generateMetadata({
   params,
@@ -69,8 +72,10 @@ export async function generateMetadata({
 
 export default async function TourDetailPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams: { [key: string]: string | string[] | undefined };
 }) {
   const tour = await prisma.tour.findFirst({
     where: { 
@@ -147,8 +152,9 @@ export default async function TourDetailPage({
   const originalPrice = tour.originalPrice;
 
   return (
-    <div className="min-h-screen bg-white">
-      <Hero 
+    <TourDetailClient searchParams={searchParams}>
+      <div className="min-h-screen bg-white">
+        <Hero 
         tour={tour} 
         gallery={gallery}
         destinationDisplay={destinationDisplay}
@@ -498,6 +504,7 @@ export default async function TourDetailPage({
         </div>
       </div>
     </div>
+    </TourDetailClient>
   );
 }
 
@@ -557,12 +564,7 @@ function Hero({
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
       <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
         <div className="max-w-7xl mx-auto">
-          <Link
-            href="/tours"
-            className="inline-flex items-center text-white/80 hover:text-white mb-4 text-sm"
-          >
-            ← Back to Tours
-          </Link>
+          <BackToToursButton />
           
           {/* Title & Location */}
           <h1 className="text-3xl md:text-5xl font-bold mb-3">{tour.name}</h1>
