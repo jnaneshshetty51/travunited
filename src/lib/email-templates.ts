@@ -31,6 +31,7 @@ export interface EmailTemplateVariables {
   verificationLink?: string;
   dashboardUrl?: string;
   applicationUrl?: string;
+  documentsUrl?: string;
   bookingUrl?: string;
   googleReviewUrl?: string;
   
