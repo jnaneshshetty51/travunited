@@ -1,18 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Mail, Lock, ArrowRight, AlertCircle } from "lucide-react";
+import { Mail, Lock, ArrowRight, AlertCircle, CheckCircle } from "lucide-react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const searchParams = useSearchParams();
+  const [email, setEmail] = useState(searchParams.get("email") || "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  // Show success message if email was just verified
+  useEffect(() => {
+    if (searchParams.get("verified") === "true") {
+      setSuccess("Email verified successfully! Please login with your password.");
+      // Clear the verified param from URL
+      router.replace("/login", { scroll: false });
+    }
+  }, [searchParams, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,12 +102,37 @@ export default function LoginPage() {
                 <div className="flex-1">
                   <span className="text-sm block">{error}</span>
                   {error.includes("verify your email") && (
-                    <Link 
-                      href={`/signup?email=${encodeURIComponent(email)}`}
-                      className="text-sm text-primary-600 hover:text-primary-700 underline mt-1 inline-block"
-                    >
-                      Go to verification page
-                    </Link>
+                    <div className="mt-2 space-y-2">
+                      <Link 
+                        href={`/verify-email?email=${encodeURIComponent(email)}&redirect=/dashboard`}
+                        className="text-sm text-primary-600 hover:text-primary-700 underline block"
+                      >
+                        Verify Email Now
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const res = await fetch("/api/auth/resend-otp", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ email }),
+                            });
+                            if (res.ok) {
+                              setError("Verification code resent! Please check your email.");
+                            } else {
+                              const data = await res.json();
+                              setError(data.error || "Failed to resend code. Please try verifying your email.");
+                            }
+                          } catch (err) {
+                            setError("Failed to resend code. Please try verifying your email.");
+                          }
+                        }}
+                        className="text-sm text-primary-600 hover:text-primary-700 underline block"
+                      >
+                        Resend Verification Code
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

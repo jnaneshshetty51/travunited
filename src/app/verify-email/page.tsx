@@ -70,6 +70,7 @@ function VerifyEmailContent() {
         setOtpError(data.error || "OTP verification failed");
       } else {
         setEmailVerified(true);
+        
         // Merge guest application if exists
         try {
           const mergeResponse = await fetch("/api/guest-applications/merge", {
@@ -84,10 +85,21 @@ function VerifyEmailContent() {
         } catch (error) {
           console.error("Error merging guest application:", error);
         }
-        // Redirect to the redirect URL or dashboard
-        setTimeout(() => {
-          router.push(redirectUrl);
-        }, 1500);
+        
+        // Try to auto-login if user is not already logged in and we have email
+        // Note: We need password to login, so we'll redirect to login page if not authenticated
+        if (sessionStatus !== "authenticated" && email) {
+          // Redirect to login page with a success message
+          setTimeout(() => {
+            router.push(`/login?email=${encodeURIComponent(email)}&verified=true`);
+          }, 1500);
+        } else {
+          // User is already logged in or will be redirected
+          router.refresh();
+          setTimeout(() => {
+            router.push(redirectUrl);
+          }, 1500);
+        }
       }
     } catch (err) {
       setOtpError("An error occurred. Please try again.");
