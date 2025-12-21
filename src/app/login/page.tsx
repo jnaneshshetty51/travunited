@@ -96,30 +96,38 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {success && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start space-x-2 text-green-700">
+                <CheckCircle size={20} className="mt-0.5 flex-shrink-0" />
+                <p className="text-sm">{success}</p>
+              </div>
+            )}
+            
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-2 text-red-700">
                 <AlertCircle size={20} className="mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
                   <span className="text-sm block">{error}</span>
-                  {error.includes("verify your email") && (
+                  {error.includes("verify your email") && email && (
                     <div className="mt-2 space-y-2">
                       <Link 
                         href={`/verify-email?email=${encodeURIComponent(email)}&redirect=/dashboard`}
                         className="text-sm text-primary-600 hover:text-primary-700 underline block"
                       >
-                        Verify Email Now
+                        Verify Email Now →
                       </Link>
                       <button
                         type="button"
                         onClick={async () => {
                           try {
+                            setError("");
                             const res = await fetch("/api/auth/resend-otp", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({ email }),
                             });
                             if (res.ok) {
-                              setError("Verification code resent! Please check your email.");
+                              setSuccess("Verification code resent! Please check your email.");
                             } else {
                               const data = await res.json();
                               setError(data.error || "Failed to resend code. Please try verifying your email.");
