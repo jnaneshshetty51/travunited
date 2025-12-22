@@ -1,453 +1,144 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-generator client {
-  provider = "prisma-client-js"
-}
-
-enum UserRole {
-  CUSTOMER
-  STAFF_ADMIN
-  SUPER_ADMIN
-}
-
-enum DocScope {
-  PER_TRAVELLER
-  PER_APPLICATION
-}
-
-enum VisaMode {
-  EVISA
-  STICKER
-  VOA
-  VFS
-  ETA
-  PRE_ENROLLMENT
-  ARRIVAL_CARD
-  VISA_FREE_ENTRY
-  SCHENGEN_VISA
-  APPOINTMENTS
-  OTHER
-}
-
-enum EntryType {
-  SINGLE
-  DOUBLE
-  MULTIPLE
-}
-
-enum StayType {
-  SHORT_STAY
-  LONG_STAY
-}
-
-model User {
-  id                     String          @id @default(cuid())
-  name                   String?
-  email                  String          @unique
-  phone                  String?
-  passwordHash           String
-  role                   UserRole        @default(CUSTOMER)
-  isActive               Boolean         @default(true)
-  emailVerified          Boolean         @default(false)
-  emailVerifiedAt        DateTime?
-  passwordResetToken     String?         @unique
-  passwordResetExpires   DateTime?
-  registrationOtp        String? // 6-digit OTP for email verification during registration
-  registrationOtpExpires DateTime? // OTP expiration time (usually 10 minutes)
-  createdAt              DateTime        @default(now())
-  updatedAt              DateTime        @updatedAt
-  applications           Application[]
-  bookings               Booking[]
-  travellers             Traveller[]
-  processedApplications  Application[]   @relation("ProcessedBy")
-  processedBookings      Booking[]       @relation("ProcessedBy")
-  reviews                Review[]
-  auditLogs              AuditLog[]
-  payments               Payment[]
-  passwordResets         PasswordReset[]
-  promoCodeUsages        PromoCodeUsage[]
-  // Relations to Notification models intentionally removed for now - will be re-added when User model is finalized
-  // notifications Notification[]
-  // notificationSettings UserNotificationSettings?
-}
-
 model Application {
-  id                       String                 @id @default(cuid())
-  user                     User                   @relation(fields: [userId], references: [id])
-  userId                   String
-  visaTypeId               String
-  country                  String?
-  visaType                 String?
-  visa                     Visa?                  @relation(fields: [visaId], references: [id])
-  visaId                   String?
-  visaSubType              VisaSubType?           @relation(fields: [visaSubTypeId], references: [id])
-  visaSubTypeId            String? // Selected visa subtype ID
-  status                   String                 @default("DRAFT") // DRAFT, PAYMENT_PENDING, SUBMITTED, IN_PROCESS, APPROVED, REJECTED
-  totalAmount              Int                    @default(0)
-  currency                 String                 @default("INR")
-  processedBy              User?                  @relation("ProcessedBy", fields: [processedById], references: [id])
-  processedById            String?
-  visaDocumentUrl          String? // URL to approved visa document
-  invoiceUrl               String? // URL to uploaded invoice PDF
-  invoiceUploadedAt        DateTime? // When invoice was uploaded
-  invoiceUploadedByAdminId String? // Admin who uploaded the invoice
-  notes                    String? // Admin notes
-  feedbackEmailSentAt      DateTime? // When feedback email was sent (for approved visas)
-  createdAt                DateTime               @default(now())
-  updatedAt                DateTime               @updatedAt
-  documents                ApplicationDocument[]
-  travellers               ApplicationTraveller[]
-  reviews                  Review[]
-  payments                 Payment[]
-  promoCode                PromoCode?     @relation(fields: [promoCodeId], references: [id])
-  promoCodeId              String?
-  discountAmount           Int?           @default(0) // Discount amount in paise
-  promoCodeUsages          PromoCodeUsage[]
-}
-
-model ApplicationTraveller {
-  id            String      @id @default(cuid())
-  application   Application @relation(fields: [applicationId], references: [id])
-  applicationId String
-  traveller     Traveller   @relation(fields: [travellerId], references: [id])
-  travellerId   String
-  createdAt     DateTime    @default(now())
+  id                                   String                 @id
+  userId                               String
+  visaTypeId                           String
+  country                              String?
+  visaType                             String?
+  status                               String                 @default("DRAFT")
+  totalAmount                          Int                    @default(0)
+  currency                             String                 @default("INR")
+  processedById                        String?
+  visaDocumentUrl                      String?
+  notes                                String?
+  createdAt                            DateTime               @default(now())
+  updatedAt                            DateTime
+  visaId                               String?
+  feedbackEmailSentAt                  DateTime?
+  visaSubTypeId                        String?
+  invoiceUrl                           String?
+  invoiceUploadedAt                    DateTime?
+  invoiceUploadedByAdminId             String?
+  User_Application_processedByIdToUser User?                  @relation("Application_processedByIdToUser", fields: [processedById], references: [id])
+  User_Application_userIdToUser        User                   @relation("Application_userIdToUser", fields: [userId], references: [id])
+  Visa                                 Visa?                  @relation(fields: [visaId], references: [id])
+  VisaSubType                          VisaSubType?           @relation(fields: [visaSubTypeId], references: [id])
+  ApplicationDocument                  ApplicationDocument[]
+  ApplicationTraveller                 ApplicationTraveller[]
+  Payment                              Payment[]
+  Review                               Review[]
 }
 
 model ApplicationDocument {
-  id              String                   @id @default(cuid())
-  application     Application              @relation(fields: [applicationId], references: [id])
-  applicationId   String
-  traveller       Traveller?               @relation(fields: [travellerId], references: [id])
-  travellerId     String?
-  requirement     VisaDocumentRequirement? @relation(fields: [requirementId], references: [id])
-  requirementId   String?
-  filePath        String
-  documentType    String?
-  status          String                   @default("PENDING") // PENDING, APPROVED, REJECTED
-  rejectionReason String? // Reason if rejected
-  fileSize        Int? // size in bytes
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
+  id                      String                   @id
+  applicationId           String
+  travellerId             String?
+  filePath                String
+  documentType            String?
+  status                  String                   @default("PENDING")
+  rejectionReason         String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime
+  requirementId           String?
+  fileSize                Int?
+  Application             Application              @relation(fields: [applicationId], references: [id])
+  VisaDocumentRequirement VisaDocumentRequirement? @relation(fields: [requirementId], references: [id])
+  Traveller               Traveller?               @relation(fields: [travellerId], references: [id])
 }
 
-model Traveller {
-  id             String                 @id @default(cuid())
-  user           User                   @relation(fields: [userId], references: [id])
-  userId         String
-  firstName      String
-  lastName       String
-  email          String?
-  phone          String?
-  dateOfBirth    DateTime?
-  passportNumber String?
-  passportExpiry DateTime?
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
-  applications   ApplicationTraveller[]
-  bookings       BookingTraveller[]
-  documents      ApplicationDocument[]
+model ApplicationTraveller {
+  id            String      @id
+  applicationId String
+  travellerId   String
+  createdAt     DateTime    @default(now())
+  Application   Application @relation(fields: [applicationId], references: [id])
+  Traveller     Traveller   @relation(fields: [travellerId], references: [id])
+}
+
+model AuditLog {
+  id          String          @id
+  timestamp   DateTime        @default(now())
+  adminId     String?
+  entityType  AuditEntityType
+  entityId    String?
+  action      AuditAction
+  description String
+  metadata    Json?
+  User        User?           @relation(fields: [adminId], references: [id])
+}
+
+model BlogPost {
+  id              String    @id
+  title           String
+  slug            String    @unique
+  excerpt         String?
+  coverImage      String?
+  content         String
+  category        String?
+  readTime        String?
+  isPublished     Boolean   @default(false)
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime
+  metaTitle       String?
+  metaDescription String?
+  focusKeyword    String?
+  author          String?
+  isFeatured      Boolean   @default(false)
 }
 
 model Booking {
-  id                       String             @id @default(cuid())
-  user                     User               @relation(fields: [userId], references: [id])
-  userId                   String
-  tour                     Tour?              @relation(fields: [tourId], references: [id])
-  tourId                   String?
-  tourName                 String?
-  status                   String             @default("DRAFT") // DRAFT, PAYMENT_PENDING, BOOKED, CONFIRMED, COMPLETED
-  totalAmount              Int
-  currency                 String             @default("INR")
-  travelDate               DateTime?
-  foodPreference           String?
-  foodPreferenceNotes      String?
-  languagePreference       String?
-  languagePreferenceOther  String?
-  driverPreference         String?
-  specialRequests          String?
-  policyAccepted           Boolean            @default(false)
-  policyAcceptedAt         DateTime?
-  policyAcceptedByUserId   String?
-  policyVersion            String?
-  policyAcceptedIp         String?
-  policyAcceptedUserAgent  String?
-  documents                Json? // Booking-level documents: { travellerId: [{ type, key, status, rejectionReason }], booking: [...] }
-  processedBy              User?              @relation("ProcessedBy", fields: [processedById], references: [id])
-  processedById            String?
-  voucherUrl               String? // URL to tour voucher
-  invoiceUrl               String? // URL to uploaded invoice PDF
-  invoiceUploadedAt        DateTime? // When invoice was uploaded
-  invoiceUploadedByAdminId String? // Admin who uploaded the invoice
-  notes                    String? // Admin notes
-  source                   String?            @default("WEBSITE") // Source of booking: WEBSITE, ADMIN, API, etc.
-  createdAt                DateTime           @default(now())
-  updatedAt                DateTime           @updatedAt
-  travellers               BookingTraveller[]
-  addOns                   BookingAddOn[]
-  reviews                  Review[]
-  payments                 Payment[]
-  bookingDocuments         BookingDocument[]
-  promoCode                PromoCode?     @relation(fields: [promoCodeId], references: [id])
-  promoCodeId              String?
-  discountAmount           Int?           @default(0) // Discount amount in paise
-  promoCodeUsages          PromoCodeUsage[]
-}
-
-model BookingTraveller {
-  id                     String            @id @default(cuid())
-  booking                Booking           @relation(fields: [bookingId], references: [id])
-  bookingId              String
-  traveller              Traveller?        @relation(fields: [travellerId], references: [id])
-  travellerId            String?
-  firstName              String
-  lastName               String
-  dateOfBirth            DateTime?
-  age                    Int?
-  travellerType          String? // "adult" | "child" | "infant"
-  gender                 String?
-  nationality            String?
-  passportNumber         String?
-  passportExpiry         DateTime?
-  passportIssuingCountry String?
-  passportFileKey        String?
-  panNumber              String? // PAN number for Indian travellers
-  aadharFileKey          String? // Aadhaar file upload key for Indian travellers
-  isPassportRequired     Boolean           @default(false)
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
-  documents              BookingDocument[]
-}
-
-model Country {
-  id        String   @id @default(cuid())
-  name      String
-  code      String   @unique
-  region    String?
-  flagUrl   String?
-  isActive  Boolean  @default(true)
-  visas     Visa[]
-  tours     Tour[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Visa {
-  id                 String                    @id @default(cuid())
-  country            Country                   @relation(fields: [countryId], references: [id])
-  countryId          String
-  name               String
-  slug               String                    @unique
-  subtitle           String?
-  category           String
-  isActive           Boolean                   @default(true)
-  isFeatured         Boolean                   @default(false)
-  priceInInr         Int // Legacy field - total price (govtFee + serviceFee)
-  processingTime     String
-  stayDuration       String // Legacy field - text format
-  validity           String // Legacy field - text format
-  entryTypeLegacy    String?
-  visaMode           VisaMode?
-  entryType          EntryType?
-  stayType           StayType?
-  visaSubTypeLabel   String?
-  overview           String
-  eligibility        String
-  importantNotes     String?
-  rejectionReasons   String?
-  whyTravunited      String?
-  statistics         String?
-  heroImageUrl       String?
-  sampleVisaImageUrl String?
-  metaTitle          String?
-  metaDescription    String?
-  // New fields matching CSV template
-  stayDurationDays   Int? // Integer days from stay_duration_days
-  validityDays       Int? // Integer days from validity_days
-  govtFee            Int? // Government fee from govt_fee
-  serviceFee         Int? // Service fee from service_fee
-  currency           String?                   @default("INR") // Currency from currency column
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
-  faqs               VisaFaq[]
-  requirements       VisaDocumentRequirement[]
-  applications       Application[]
-  subTypes           VisaSubType[]
-}
-
-model VisaDocumentRequirement {
-  id          String                @id @default(cuid())
-  visa        Visa                  @relation(fields: [visaId], references: [id])
-  visaId      String
-  name        String
-  description String?
-  scope       DocScope
-  isRequired  Boolean               @default(true)
-  category    String?
-  sortOrder   Int                   @default(0)
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
-  documents   ApplicationDocument[]
-}
-
-model VisaFaq {
-  id        String   @id @default(cuid())
-  visa      Visa     @relation(fields: [visaId], references: [id])
-  visaId    String
-  category  String?
-  question  String
-  answer    String
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model VisaSubType {
-  id           String        @id @default(cuid())
-  visa         Visa          @relation(fields: [visaId], references: [id], onDelete: Cascade)
-  visaId       String
-  label        String
-  code         String? // Optional internal code
-  sortOrder    Int           @default(0)
-  applications Application[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-
-  @@index([visaId])
-}
-
-model TourDay {
-  id        String   @id @default(cuid())
-  tour      Tour     @relation(fields: [tourId], references: [id])
-  tourId    String
-  dayIndex  Int
-  title     String
-  content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// Content management models
-model VisaType {
-  id             String   @id @default(cuid())
-  country        String
-  name           String
-  description    String?
-  price          Int
-  processingTime String?
-  stayDuration   String?
-  entryType      String?
-  requirements   String? // JSON string
-  documents      String? // JSON string
-  eligibility    String? // JSON string
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-}
-
-model Tour {
-  id                   String      @id @default(cuid())
-  country              Country?    @relation(fields: [countryId], references: [id])
-  countryId            String?
-  name                 String
-  slug                 String?     @unique
-  subtitle             String?
-  destination          String
-  duration             String
-  overview             String?
-  price                Int
-  basePriceInInr       Int?
-  description          String?
-  shortDescription     String?
-  originalPrice        Int?
-  currency             String?     @default("INR")
-  durationDays         Int?
-  durationNights       Int?
-  destinationCountry   String?
-  citiesCovered        String? // JSON string array
-  images               String? // JSON string array
-  featuredImage        String?
-  itinerary            String? // JSON string
-  inclusions           String? // JSON string
-  exclusions           String? // JSON string
-  importantNotes       String?
-  difficultyLevel      String?
-  groupSizeMin         Int?
-  groupSizeMax         Int?
-  availableDates       String? // JSON string array
-  bookingDeadline      DateTime?
-  status               String?     @default("active") // active, inactive, draft
-  isActive             Boolean     @default(true)
-  isFeatured           Boolean     @default(false)
-  categoryId           String?
-  imageUrl             String?
-  heroImageUrl         String?
-  galleryImageUrls     String?
-  allowAdvance         Boolean     @default(false)
-  advancePercentage    Int?
-  requiresPassport     Boolean     @default(false)
-  requiredDocuments    Json? // Tour-level override: ["passport","insurance"] or ["adhar","pan"]
-  childPricingType     String? // "percent" | "fixed" | "none"
-  childPricingValue    Int? // percent or fixed amount (in cents/paise)
-  childAgeLimit        Int?        @default(12)
-  metaTitle            String?
-  metaDescription      String?
-  metaKeywords         String?
-  canonicalUrl         String?
-  ogTitle              String?
-  ogDescription        String?
-  ogImage              String?
-  twitterTitle         String?
-  twitterDescription   String?
-  twitterImage         String?
-  packageType          String?
-  minimumTravelers     Int?
-  maximumTravelers     Int?
-  hotelCategories      String? // JSON string array
-  customizationOptions String? // JSON string
-  seasonalPricing      String? // JSON string
-  bookingPolicies      String?
-  cancellationTerms    String?
-  highlights           String? // JSON string array
-  bestFor              String? // JSON string array
-  destinationState     String?
-  tourType             String?
-  tourSubType          String?
-  region               String?
-  primaryDestination   String?
-  regionTags           String? // JSON string array
-  themes               String? // JSON string array
-  createdAt            DateTime    @default(now())
-  updatedAt            DateTime    @updatedAt
-  days                 TourDay[]
-  bookings             Booking[]
-  addOns               TourAddOn[]
-}
-
-model TourAddOn {
-  id            String         @id @default(cuid())
-  tour          Tour           @relation(fields: [tourId], references: [id])
-  tourId        String
-  name          String
-  description   String?
-  price         Int            @default(0)
-  pricingType   String         @default("PER_BOOKING") // PER_PERSON or PER_BOOKING
-  isRequired    Boolean        @default(false)
-  isActive      Boolean        @default(true)
-  sortOrder     Int            @default(0)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  bookingAddOns BookingAddOn[]
+  id                               String             @id
+  userId                           String
+  tourId                           String?
+  tourName                         String?
+  status                           String             @default("DRAFT")
+  totalAmount                      Int
+  currency                         String             @default("INR")
+  travelDate                       DateTime?
+  processedById                    String?
+  voucherUrl                       String?
+  notes                            String?
+  createdAt                        DateTime           @default(now())
+  updatedAt                        DateTime
+  foodPreference                   String?
+  foodPreferenceNotes              String?
+  languagePreference               String?
+  languagePreferenceOther          String?
+  driverPreference                 String?
+  specialRequests                  String?
+  policyAccepted                   Boolean            @default(false)
+  policyAcceptedAt                 DateTime?
+  policyAcceptedByUserId           String?
+  policyVersion                    String?
+  policyAcceptedIp                 String?
+  policyAcceptedUserAgent          String?
+  documents                        Json?
+  source                           String?            @default("WEBSITE")
+  invoiceUrl                       String?
+  invoiceUploadedAt                DateTime?
+  invoiceUploadedByAdminId         String?
+  User_Booking_processedByIdToUser User?              @relation("Booking_processedByIdToUser", fields: [processedById], references: [id])
+  Tour                             Tour?              @relation(fields: [tourId], references: [id])
+  User_Booking_userIdToUser        User               @relation("Booking_userIdToUser", fields: [userId], references: [id])
+  BookingAddOn                     BookingAddOn[]
+  BookingDocument                  BookingDocument[]
+  BookingTraveller                 BookingTraveller[]
+  Payment                          Payment[]
+  Review                           Review[]
 }
 
 model BookingAddOn {
-  id          String     @id @default(cuid())
-  booking     Booking    @relation(fields: [bookingId], references: [id])
+  id          String     @id
   bookingId   String
-  addOn       TourAddOn? @relation(fields: [addOnId], references: [id])
   addOnId     String?
   name        String
   pricingType String
@@ -456,73 +147,545 @@ model BookingAddOn {
   totalPrice  Int        @default(0)
   metadata    Json?
   createdAt   DateTime   @default(now())
+  TourAddOn   TourAddOn? @relation(fields: [addOnId], references: [id])
+  Booking     Booking    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([addOnId])
+  @@index([bookingId])
 }
 
+model BookingDocument {
+  id               String            @id
+  bookingId        String
+  travellerId      String?
+  type             String
+  key              String
+  fileName         String?
+  status           String            @default("PENDING")
+  rejectionReason  String?
+  uploadedAt       DateTime          @default(now())
+  updatedAt        DateTime
+  fileSize         Int?
+  Booking          Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  BookingTraveller BookingTraveller? @relation(fields: [travellerId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([status])
+  @@index([travellerId])
+}
+
+model BookingTraveller {
+  id                     String            @id
+  bookingId              String
+  travellerId            String?
+  createdAt              DateTime          @default(now())
+  firstName              String            @default("")
+  lastName               String            @default("")
+  dateOfBirth            DateTime?
+  age                    Int?
+  gender                 String?
+  nationality            String?
+  passportNumber         String?
+  passportExpiry         DateTime?
+  passportIssuingCountry String?
+  passportFileKey        String?
+  isPassportRequired     Boolean           @default(false)
+  updatedAt              DateTime          @default(now())
+  fullName               String?
+  travellerType          String?
+  panNumber              String?
+  aadharFileKey          String?
+  BookingDocument        BookingDocument[]
+  Booking                Booking           @relation(fields: [bookingId], references: [id])
+  Traveller              Traveller?        @relation(fields: [travellerId], references: [id], onDelete: Restrict)
+}
+
+model CareerApplication {
+  id             String                  @id
+  name           String
+  email          String
+  phone          String
+  location       String?
+  positionTitle  String
+  experience     Int?
+  currentCompany String?
+  expectedCtc    String?
+  coverNote      String?
+  resumeUrl      String
+  status         CareerApplicationStatus @default(NEW)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime
+  internalNotes  String?
+
+  @@index([createdAt])
+  @@index([email])
+  @@index([positionTitle])
+  @@index([status])
+}
+
+model ContactMessage {
+  id        String   @id
+  email     String
+  subject   String
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([email])
+}
+
+model CorporateLead {
+  id            String              @id
+  companyName   String
+  contactName   String
+  email         String
+  phone         String?
+  message       String?
+  status        CorporateLeadStatus @default(NEW)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime
+  internalNotes String?
+}
+
+model Country {
+  id        String   @id
+  name      String
+  code      String   @unique
+  region    String?
+  flagUrl   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Tour      Tour[]
+  Visa      Visa[]
+}
+
+model CustomTourRequest {
+  id             String                  @id
+  name           String
+  email          String
+  phone          String
+  preferredDates String?
+  pax            Int?
+  budget         Int?
+  message        String?
+  attachments    Json?
+  status         CustomTourRequestStatus @default(NEW)
+  internalNotes  String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime
+
+  @@index([createdAt])
+  @@index([email])
+  @@index([status])
+}
+
+model Notification {
+  id           String    @id
+  userId       String
+  roleScope    String?
+  type         String
+  title        String
+  message      String
+  data         Json?
+  link         String?
+  channelEmail Boolean   @default(false)
+  channelInApp Boolean   @default(true)
+  channelPush  Boolean   @default(false)
+  readAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId])
+  @@index([userId, readAt])
+}
+
+model PasswordReset {
+  id           String    @id
+  userId       String
+  tokenHash    String
+  expiresAt    DateTime
+  used         Boolean   @default(false)
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime  @default(now())
+  otp          String?
+  otpExpiresAt DateTime?
+  User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([otpExpiresAt])
+  @@index([otp])
+  @@index([used])
+  @@index([userId])
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model Payment {
-  id                String   @id @default(cuid())
+  id                String       @id
   userId            String
   applicationId     String?
   bookingId         String?
   amount            Int
-  currency          String   @default("INR")
-  status            String // PENDING, COMPLETED, FAILED, REFUNDED
-  provider          String? // RAZORPAY, PAYPAL, STRIPE, NONE
-  method            String? // CARD, UPI, WALLET, NETBANKING, FREE
+  currency          String       @default("INR")
+  status            String
   razorpayOrderId   String?
   razorpayPaymentId String?
-  metadata          Json? // Additional payment metadata
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  user        User         @relation(fields: [userId], references: [id])
-  application Application? @relation(fields: [applicationId], references: [id])
-  booking     Booking?     @relation(fields: [bookingId], references: [id])
-  promoCode   PromoCode?   @relation(fields: [promoCodeId], references: [id])
-  promoCodeId String?
-  discountAmount Int?      @default(0) // Discount amount in paise
-  promoCodeUsage PromoCodeUsage?
-}
-
-enum ReviewType {
-  VISA
-  TOUR
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime
+  provider          String?
+  method            String?
+  metadata          Json?
+  Application       Application? @relation(fields: [applicationId], references: [id])
+  Booking           Booking?     @relation(fields: [bookingId], references: [id])
+  User              User         @relation(fields: [userId], references: [id])
 }
 
 model Review {
-  id            String     @id @default(cuid())
+  id            String       @id
   type          ReviewType
   rating        Int
   title         String?
   comment       String
-  isVisible     Boolean    @default(true)
+  isVisible     Boolean      @default(true)
   notes         String?
-  userId        String? // Made optional for homepage reviews created by admins
+  userId        String?
   applicationId String?
   bookingId     String?
-  // Homepage review fields
-  reviewerName  String? // Name shown on homepage (for admin-created reviews)
-  imageKey      String? // S3/MinIO key for reviewer image
-  imageUrl      String? // Direct URL for reviewer image
-  isFeatured    Boolean    @default(false) // Featured reviews shown on homepage
-  link          String? // Optional URL to redirect when clicking review card
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime
+  reviewerName  String?
+  imageKey      String?
+  imageUrl      String?
+  isFeatured    Boolean      @default(false)
+  link          String?
+  Application   Application? @relation(fields: [applicationId], references: [id])
+  Booking       Booking?     @relation(fields: [bookingId], references: [id])
+  User          User?        @relation(fields: [userId], references: [id], onDelete: Restrict)
 
-  user        User?        @relation(fields: [userId], references: [id])
-  application Application? @relation(fields: [applicationId], references: [id])
-  booking     Booking?     @relation(fields: [bookingId], references: [id])
+  @@index([isFeatured])
+  @@index([isFeatured, isVisible])
 }
 
-enum AuditEntityType {
-  APPLICATION
-  BOOKING
-  USER
-  ADMIN
-  SETTINGS
-  REVIEW
-  PAYMENT
-  TEAM
-  OTHER
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime
+}
+
+model SitePolicy {
+  id        String   @id
+  key       String   @unique
+  title     String
+  content   String
+  version   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+
+  @@index([key])
+}
+
+model TeamMember {
+  id          String   @id
+  name        String
+  title       String?
+  slug        String?  @unique
+  bio         String?
+  email       String?  @unique
+  phone       String?
+  photoKey    String?
+  photoUrl    String?
+  resumeKey   String?
+  resumeUrl   String?
+  socialLinks Json?
+  isActive    Boolean  @default(true)
+  isFeatured  Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdBy   String?
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+
+  @@index([isActive, isFeatured])
+  @@index([sortOrder])
+}
+
+model Tour {
+  id                   String      @id
+  name                 String
+  destination          String
+  duration             String
+  price                Int
+  description          String?
+  itinerary            String?
+  inclusions           String?
+  exclusions           String?
+  imageUrl             String?
+  isActive             Boolean     @default(true)
+  advancePercentage    Int?
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime
+  allowAdvance         Boolean     @default(false)
+  basePriceInInr       Int?
+  countryId            String?
+  galleryImageUrls     String?
+  heroImageUrl         String?
+  importantNotes       String?
+  isFeatured           Boolean     @default(false)
+  metaDescription      String?
+  metaTitle            String?
+  overview             String?
+  slug                 String?     @unique
+  subtitle             String?
+  availableDates       String?
+  bestFor              String?
+  bookingDeadline      DateTime?
+  bookingPolicies      String?
+  cancellationTerms    String?
+  canonicalUrl         String?
+  categoryId           String?
+  citiesCovered        String?
+  currency             String?     @default("INR")
+  customizationOptions String?
+  destinationCountry   String?
+  destinationState     String?
+  difficultyLevel      String?
+  durationDays         Int?
+  durationNights       Int?
+  featuredImage        String?
+  groupSizeMax         Int?
+  groupSizeMin         Int?
+  highlights           String?
+  hotelCategories      String?
+  images               String?
+  maximumTravelers     Int?
+  metaKeywords         String?
+  minimumTravelers     Int?
+  ogDescription        String?
+  ogImage              String?
+  ogTitle              String?
+  originalPrice        Int?
+  packageType          String?
+  primaryDestination   String?
+  region               String?
+  regionTags           String?
+  seasonalPricing      String?
+  shortDescription     String?
+  status               String?     @default("active")
+  themes               String?
+  tourSubType          String?
+  tourType             String?
+  twitterDescription   String?
+  twitterImage         String?
+  twitterTitle         String?
+  requiresPassport     Boolean     @default(false)
+  childPricingType     String?
+  childPricingValue    Int?
+  childAgeLimit        Int?        @default(12)
+  requiredDocuments    Json?
+  Booking              Booking[]
+  Country              Country?    @relation(fields: [countryId], references: [id])
+  TourAddOn            TourAddOn[]
+  TourDay              TourDay[]
+}
+
+model TourAddOn {
+  id           String         @id
+  tourId       String
+  name         String
+  description  String?
+  price        Int            @default(0)
+  pricingType  String         @default("PER_BOOKING")
+  isRequired   Boolean        @default(false)
+  isActive     Boolean        @default(true)
+  sortOrder    Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  BookingAddOn BookingAddOn[]
+  Tour         Tour           @relation(fields: [tourId], references: [id], onDelete: Cascade)
+
+  @@index([tourId])
+}
+
+model TourDay {
+  id        String   @id
+  tourId    String
+  dayIndex  Int
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Tour      Tour     @relation(fields: [tourId], references: [id])
+}
+
+model Traveller {
+  id                   String                 @id
+  userId               String
+  firstName            String
+  lastName             String
+  email                String?
+  phone                String?
+  dateOfBirth          DateTime?
+  passportNumber       String?
+  passportExpiry       DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime
+  ApplicationDocument  ApplicationDocument[]
+  ApplicationTraveller ApplicationTraveller[]
+  BookingTraveller     BookingTraveller[]
+  User                 User                   @relation(fields: [userId], references: [id])
+}
+
+model User {
+  id                                          String          @id @default(cuid())
+  name                                        String?
+  email                                       String          @unique
+  phone                                       String?
+  passwordHash                                String
+  role                                        UserRole        @default(CUSTOMER)
+  isActive                                    Boolean         @default(true)
+  emailVerified                               Boolean         @default(false)
+  emailVerifiedAt                             DateTime?
+  passwordResetToken                          String?         @unique
+  passwordResetExpires                        DateTime?
+  registrationOtp                             String?
+  registrationOtpExpires                      DateTime?
+  createdAt                                   DateTime        @default(now())
+  updatedAt                                   DateTime        @updatedAt
+  Application_Application_processedByIdToUser Application[]   @relation("Application_processedByIdToUser")
+  Application_Application_userIdToUser        Application[]   @relation("Application_userIdToUser")
+  AuditLog                                    AuditLog[]
+  Booking_Booking_processedByIdToUser         Booking[]       @relation("Booking_processedByIdToUser")
+  Booking_Booking_userIdToUser                Booking[]       @relation("Booking_userIdToUser")
+  PasswordReset                               PasswordReset[]
+  Payment                                     Payment[]
+  Review                                      Review[]
+  Traveller                                   Traveller[]
+}
+
+model UserNotificationSettings {
+  id           String   @id
+  userId       String   @unique
+  emailEnabled Json     @default("{}")
+  inAppEnabled Json     @default("{}")
+  pushEnabled  Json     @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+}
+
+model Visa {
+  id                      String                    @id
+  countryId               String
+  name                    String
+  slug                    String                    @unique
+  subtitle                String?
+  category                String
+  isActive                Boolean                   @default(true)
+  isFeatured              Boolean                   @default(false)
+  priceInInr              Int
+  processingTime          String
+  stayDuration            String
+  validity                String
+  entryTypeLegacy         String
+  overview                String
+  eligibility             String
+  importantNotes          String?
+  rejectionReasons        String?
+  whyTravunited           String?
+  statistics              String?
+  heroImageUrl            String?
+  metaTitle               String?
+  metaDescription         String?
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime
+  stayDurationDays        Int?
+  validityDays            Int?
+  govtFee                 Int?
+  serviceFee              Int?
+  currency                String?                   @default("INR")
+  sampleVisaImageUrl      String?
+  visaMode                VisaMode?
+  entryType               EntryType?
+  stayType                StayType?
+  visaSubTypeLabel        String?
+  Application             Application[]
+  Country                 Country                   @relation(fields: [countryId], references: [id])
+  VisaDocumentRequirement VisaDocumentRequirement[]
+  VisaFaq                 VisaFaq[]
+  VisaSubType             VisaSubType[]
+}
+
+model VisaDocumentRequirement {
+  id                  String                @id
+  visaId              String
+  name                String
+  description         String?
+  scope               DocScope
+  isRequired          Boolean               @default(true)
+  category            String?
+  sortOrder           Int                   @default(0)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  ApplicationDocument ApplicationDocument[]
+  Visa                Visa                  @relation(fields: [visaId], references: [id])
+}
+
+model VisaFaq {
+  id        String   @id
+  visaId    String
+  category  String?
+  question  String
+  answer    String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Visa      Visa     @relation(fields: [visaId], references: [id])
+}
+
+model VisaSubType {
+  id          String        @id
+  visaId      String
+  label       String
+  code        String?
+  sortOrder   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now())
+  Application Application[]
+  Visa        Visa          @relation(fields: [visaId], references: [id], onDelete: Cascade)
+
+  @@index([visaId])
+}
+
+model VisaType {
+  id             String   @id
+  country        String
+  name           String
+  description    String?
+  price          Int
+  processingTime String?
+  stayDuration   String?
+  entryType      String?
+  requirements   String?
+  documents      String?
+  eligibility    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime
+}
+
+model email_events {
+  id            String   @id
+  type          String
+  email         String
+  details       Json     @default("{}")
+  count         Int      @default(1)
+  last_occurred DateTime @default(now())
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  @@unique([email, type])
+  @@index([email])
+  @@index([type])
 }
 
 enum AuditAction {
@@ -543,106 +706,15 @@ enum AuditAction {
   EXPORT
 }
 
-model AuditLog {
-  id          String          @id @default(cuid())
-  timestamp   DateTime        @default(now())
-  adminId     String?
-  entityType  AuditEntityType
-  entityId    String?
-  action      AuditAction
-  description String
-  metadata    Json?
-
-  admin User? @relation(fields: [adminId], references: [id])
-}
-
-model CorporateLead {
-  id            String              @id @default(cuid())
-  companyName   String
-  contactName   String
-  email         String
-  phone         String?
-  message       String?
-  status        CorporateLeadStatus @default(NEW)
-  internalNotes String? // Internal admin notes
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-
-  @@index([status])
-  @@index([email])
-  @@index([createdAt])
-}
-
-enum CorporateLeadStatus {
-  NEW
-  CONTACTED
-  PROPOSAL_SENT
-  WON
-  LOST
-}
-
-model Setting {
-  key       String   @id
-  value     Json
-  updatedAt DateTime @updatedAt
-}
-
-model BlogPost {
-  id              String    @id @default(cuid())
-  title           String
-  slug            String    @unique
-  excerpt         String?
-  coverImage      String?
-  content         String
-  category        String?
-  readTime        String?
-  isPublished     Boolean   @default(false)
-  isFeatured      Boolean   @default(false)
-  publishedAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  // SEO & Metadata
-  metaTitle       String?
-  metaDescription String?
-  focusKeyword    String?
-  author          String?
-  // Note: status is derived from isPublished and publishedAt, not stored directly
-}
-
-model Notification {
-  id           String    @id @default(cuid())
-  userId       String // Store user ID as string, no FK for now
-  roleScope    String? // "CUSTOMER", "STAFF_ADMIN", "SUPER_ADMIN"
-  type         String // e.g. VISA_STATUS_CHANGED, TOUR_BOOKING_CREATED
-  title        String
-  message      String
-  data         Json? // extra data: { applicationId, bookingId, route, ... }
-  link         String? // URL to open when clicked
-  channelEmail Boolean   @default(false) // whether email was sent
-  channelInApp Boolean   @default(true) // in-app enabled
-  channelPush  Boolean   @default(false) // for future browser push
-  readAt       DateTime?
-  createdAt    DateTime  @default(now())
-
-  // FK to User intentionally removed for now - will be re-added when User model is finalized
-  // user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([userId, readAt])
-  @@index([userId, createdAt])
-}
-
-model UserNotificationSettings {
-  id           String   @id @default(cuid())
-  userId       String   @unique // Store user ID as string, no FK for now
-  emailEnabled Json     @default("{}") // per notification type preferences
-  inAppEnabled Json     @default("{}")
-  pushEnabled  Json     @default("{}")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  // FK to User intentionally removed for now - will be re-added when User model is finalized
-  // user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+enum AuditEntityType {
+  APPLICATION
+  BOOKING
+  USER
+  ADMIN
+  SETTINGS
+  REVIEW
+  PAYMENT
+  OTHER
 }
 
 enum CareerApplicationStatus {
@@ -653,40 +725,12 @@ enum CareerApplicationStatus {
   ON_HOLD
 }
 
-model CareerApplication {
-  id             String                  @id @default(cuid())
-  name           String
-  email          String
-  phone          String
-  location       String?
-  positionTitle  String // Position they're applying for
-  experience     Int? // Years of experience
-  currentCompany String?
-  expectedCtc    String? // Expected CTC
-  coverNote      String? // Cover letter/notes
-  resumeUrl      String // MinIO/S3 URL to resume file
-  status         CareerApplicationStatus @default(NEW)
-  internalNotes  String? // Internal admin notes
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-
-  @@index([status])
-  @@index([positionTitle])
-  @@index([email])
-  @@index([createdAt])
-}
-
-model ContactMessage {
-  id        String   @id @default(cuid())
-  name      String
-  email     String
-  phone     String?
-  subject   String
-  message   String
-  createdAt DateTime @default(now())
-
-  @@index([email])
-  @@index([createdAt])
+enum CorporateLeadStatus {
+  NEW
+  CONTACTED
+  PROPOSAL_SENT
+  WON
+  LOST
 }
 
 enum CustomTourRequestStatus {
@@ -696,213 +740,38 @@ enum CustomTourRequestStatus {
   CLOSED
 }
 
-model CustomTourRequest {
-  id             String                  @id @default(cuid())
-  name           String
-  email          String
-  phone          String
-  preferredDates String? // Start-end date range or description
-  pax            Int? // Number of passengers
-  budget         Int? // Budget in paise/cents
-  message        String?                 @db.Text
-  attachments    Json? // Array of file keys/URLs
-  status         CustomTourRequestStatus @default(NEW)
-  internalNotes  String?                 @db.Text // Admin notes
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
-
-  @@index([status])
-  @@index([email])
-  @@index([createdAt])
+enum DocScope {
+  PER_TRAVELLER
+  PER_APPLICATION
 }
 
-model TeamMember {
-  id          String   @id @default(cuid())
-  name        String
-  title       String?
-  slug        String?  @unique
-  bio         String?  @db.Text
-  email       String?  @unique
-  phone       String?
-  photoKey    String?
-  photoUrl    String?
-  resumeKey   String?
-  resumeUrl   String?
-  socialLinks Json?
-  isActive    Boolean  @default(true)
-  isFeatured  Boolean  @default(false)
-  sortOrder   Int      @default(0)
-  createdBy   String?
-  updatedBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([isActive, isFeatured])
-  @@index([sortOrder])
+enum EntryType {
+  SINGLE
+  DOUBLE
+  MULTIPLE
 }
 
-model SitePolicy {
-  id        String   @id @default(cuid())
-  key       String   @unique // "refund_cancellation"
-  title     String
-  content   String   @db.Text // HTML/Markdown
-  version   String // e.g. "refund-v1"
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([key])
+enum ReviewType {
+  VISA
+  TOUR
 }
 
-model BookingDocument {
-  id              String            @id @default(cuid())
-  booking         Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  bookingId       String
-  traveller       BookingTraveller? @relation(fields: [travellerId], references: [id], onDelete: Cascade)
-  travellerId     String?
-  type            String // 'passport','adhar','pan','photo','insurance', etc.
-  key             String // S3/MinIO key
-  fileName        String?
-  fileSize        Int? // size in bytes
-  status          String            @default("PENDING") // PENDING, APPROVED, REJECTED
-  rejectionReason String?
-  uploadedAt      DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
-  @@index([bookingId])
-  @@index([travellerId])
-  @@index([status])
+enum StayType {
+  SHORT_STAY
+  LONG_STAY
 }
 
-model PasswordReset {
-  id           String    @id @default(cuid())
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId       String
-  tokenHash    String // hashed token saved with bcrypt
-  expiresAt    DateTime
-  used         Boolean   @default(false)
-  ip           String?
-  userAgent    String?
-  createdAt    DateTime  @default(now())
-  otp          String? // 6-digit OTP for password reset
-  otpExpiresAt DateTime? // OTP expiration time (usually 10 minutes)
-
-  @@index([userId])
-  @@index([expiresAt])
-  @@index([used])
-  @@index([otp])
-  @@index([otpExpiresAt])
+enum UserRole {
+  CUSTOMER
+  STAFF_ADMIN
+  SUPER_ADMIN
 }
 
-model EmailEvent {
-  id           String   @id @default(cuid())
-  type         String // "bounce" | "complaint"
-  email        String
-  details      Json     @default("{}")
-  count        Int      @default(1)
-  lastOccurred DateTime @default(now()) @map("last_occurred")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  @@unique([email, type], map: "email_events_email_type_key")
-  @@index([email], map: "email_events_email_idx")
-  @@index([type], map: "email_events_type_idx")
-  @@map("email_events")
-}
-
-model GuestApplication {
-  id               String   @id @default(cuid())
-  guestId          String   // Session-based guest identifier
-  country          String
-  visaType         String
-  visaId           String?
-  selectedSubTypeId String?
-  travelDate       DateTime?
-  tripType         String?
-  nationality      String?
-  purposeOfTravel  String?
-  stepCompleted    Int      @default(1) // Last completed step (1-7)
-  formData         Json     // Store all form data as JSON
-  expiresAt        DateTime // Expires after 24 hours
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@index([guestId])
-  @@index([expiresAt])
-  @@map("guest_applications")
-}
-
-model PromoCode {
-  id                  String   @id @default(cuid())
-  code                String   @unique // e.g., "SUMMER2024", "WELCOME10"
-  description         String?  // Admin notes/description
-  discountType        String   // "PERCENTAGE" | "FIXED_AMOUNT" | "FREE"
-  discountValue       Int      // Percentage (0-100) or amount in paise
-  minPurchaseAmount   Int?     // Minimum order value to apply (in paise)
-  maxDiscountAmount   Int?     // Maximum discount cap (for percentage discounts)
-  applicableTo        String   @default("BOTH") // "VISAS" | "TOURS" | "BOTH"
-  
-  // Specific restrictions
-  visaIds             String[] // Specific visa IDs (empty = all visas)
-  countryIds          String[] // Specific country IDs (empty = all countries)
-  tourIds             String[] // Specific tour IDs (empty = all tours)
-  
-  // Usage limits
-  maxUses             Int?     // Total times this code can be used (null = unlimited)
-  maxUsesPerUser      Int      @default(1) // Times a single user can use it
-  currentUses         Int      @default(0) // Current usage count
-  
-  // User restrictions
-  restrictedUserIds   String[] // Specific users allowed (empty = all users)
-  restrictedEmails    String[] // Specific emails allowed
-  newUsersOnly        Boolean  @default(false) // Only for first-time users
-  
-  // Validity
-  validFrom           DateTime // Start date/time
-  validUntil          DateTime // End date/time
-  isActive            Boolean  @default(true) // Admin can enable/disable
-  
-  // Metadata
-  createdBy           String?  // Admin user ID who created
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  
-  // Relations
-  usages              PromoCodeUsage[]
-  applications        Application[]
-  bookings            Booking[]
-  payments            Payment[]
-  
-  @@index([code])
-  @@index([isActive, validFrom, validUntil])
-  @@index([applicableTo])
-}
-
-model PromoCodeUsage {
-  id           String    @id @default(cuid())
-  promoCode    PromoCode @relation(fields: [promoCodeId], references: [id])
-  promoCodeId  String
-  user         User      @relation(fields: [userId], references: [id])
-  userId       String
-  application  Application? @relation(fields: [applicationId], references: [id])
-  applicationId String?
-  booking      Booking?    @relation(fields: [bookingId], references: [id])
-  bookingId    String?
-  payment      Payment?    @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-  paymentId    String?     @unique
-  
-  // Discount details
-  originalAmount  Int     // Amount before discount
-  discountAmount  Int     // Actual discount applied
-  finalAmount     Int     // Amount after discount
-  
-  // Metadata
-  usedAt         DateTime @default(now())
-  ipAddress      String?
-  userAgent      String?
-  
-  @@index([promoCodeId])
-  @@index([userId])
-  @@index([applicationId])
-  @@index([bookingId])
-  @@index([paymentId])
+enum VisaMode {
+  EVISA
+  STICKER
+  VOA
+  VFS
+  ETA
+  OTHER
 }
