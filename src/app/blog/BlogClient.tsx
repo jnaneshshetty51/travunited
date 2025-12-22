@@ -145,12 +145,6 @@ export function BlogClient({ posts }: { posts: BlogClientPost[] }) {
                         ? formatDate(post.publishedAt)
                         : "Upcoming"}
                     </span>
-                    {post.readTime && (
-                      <>
-                        <span>•</span>
-                        <span>{post.readTime}</span>
-                      </>
-                    )}
                   </div>
                   <h3 className="text-xl font-bold text-neutral-900 mb-2 line-clamp-2">{post.title}</h3>
                   <p className="text-neutral-600 mb-4 line-clamp-3">{post.excerpt || "Read the full story →"}</p>

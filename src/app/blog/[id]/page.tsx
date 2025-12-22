@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Calendar, Clock, Tag } from "lucide-react";
+import { ArrowLeft, Calendar, Tag } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { Metadata } from "next";
@@ -164,12 +164,6 @@ export default async function BlogPostPage({ params }: { params: { id: string } 
                 <Calendar size={16} className="mr-2" />
                 <span>{publishedDate}</span>
               </div>
-              {post.readTime && (
-                <div className="flex items-center">
-                  <Clock size={16} className="mr-2" />
-                  <span>{post.readTime}</span>
-                </div>
-              )}
             </div>
             <h1 className="text-3xl md:text-4xl font-bold mb-4">{post.title}</h1>
             <div className="flex items-center justify-between">
