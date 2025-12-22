@@ -204,13 +204,45 @@ export async function POST(req: Request) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("[Signup] Unexpected error:", {
+    const errorDetails = {
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
-    });
+      name: error instanceof Error ? error.name : undefined,
+      code: (error as any)?.code,
+      meta: (error as any)?.meta,
+    };
+    
+    console.error("[Signup] ❌ Unexpected error in outer catch:", JSON.stringify(errorDetails, null, 2));
+    
+    // Check if it's a database error that wasn't caught
+    if ((error as any)?.code?.startsWith('P')) {
+      const isConnectionError = 
+        (error as any)?.code === 'P1001' || // Can't reach database server
+        (error as any)?.code === 'P1002' || // Database server doesn't exist
+        (error as any)?.code === 'P1003' || // Database does not exist
+        (error as any)?.message?.includes('connection') ||
+        (error as any)?.message?.includes('timeout') ||
+        (error as any)?.message?.includes('ECONNREFUSED');
+      
+      const errorMessage = isConnectionError
+        ? "Unable to connect to database. Please try again later."
+        : process.env.NODE_ENV === "development"
+          ? `Database error: ${(error as any)?.message || String(error)} (Code: ${(error as any)?.code || 'N/A'})`
+          : "Database error. Please try again.";
+      
+      return NextResponse.json(
+        { error: errorMessage },
+        { status: 500 }
+      );
+    }
+    
+    // Return more specific error in development
+    const errorMessage = process.env.NODE_ENV === "development"
+      ? `Unexpected error: ${error instanceof Error ? error.message : String(error)}`
+      : "An unexpected error occurred. Please try again.";
     
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: errorMessage },
       { status: 500 }
     );
   }
