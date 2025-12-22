@@ -13,11 +13,20 @@ CREATE TABLE IF NOT EXISTS "email_events" (
 );
 
 -- CreateIndex
-CREATE INDEX "email_events_email_idx" ON "email_events"("email");
+CREATE INDEX IF NOT EXISTS "email_events_email_idx" ON "email_events"("email");
 
 -- CreateIndex
-CREATE INDEX "email_events_type_idx" ON "email_events"("type");
+CREATE INDEX IF NOT EXISTS "email_events_type_idx" ON "email_events"("type");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "email_events_email_type_key" ON "email_events"("email", "type");
+-- For UNIQUE INDEX, we need to check if it exists first
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes 
+        WHERE indexname = 'email_events_email_type_key'
+    ) THEN
+        CREATE UNIQUE INDEX "email_events_email_type_key" ON "email_events"("email", "type");
+    END IF;
+END $$;
 
