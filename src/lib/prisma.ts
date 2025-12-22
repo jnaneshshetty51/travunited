@@ -10,6 +10,7 @@ export const prisma =
   global.prisma ??
   new PrismaClient({
     // log: ['query'], // optional
+    errorFormat: 'minimal',
   });
 
 if (process.env.NODE_ENV !== "production") {

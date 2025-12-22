@@ -14,14 +14,7 @@ CREATE TABLE IF NOT EXISTS "PasswordReset" (
     CONSTRAINT "PasswordReset_pkey" PRIMARY KEY ("id")
 );
 
--- Create indexes if they don't exist
-CREATE INDEX IF NOT EXISTS "PasswordReset_userId_idx" ON "PasswordReset"("userId");
-CREATE INDEX IF NOT EXISTS "PasswordReset_expiresAt_idx" ON "PasswordReset"("expiresAt");
-CREATE INDEX IF NOT EXISTS "PasswordReset_used_idx" ON "PasswordReset"("used");
-CREATE INDEX IF NOT EXISTS "PasswordReset_otp_idx" ON "PasswordReset"("otp");
-CREATE INDEX IF NOT EXISTS "PasswordReset_otpExpiresAt_idx" ON "PasswordReset"("otpExpiresAt");
-
--- Add OTP columns if table exists but columns don't
+-- Add OTP columns if table exists but columns don't (do this BEFORE creating indexes)
 DO $$ 
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'PasswordReset') THEN
@@ -34,6 +27,23 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'PasswordReset' AND column_name = 'otpExpiresAt') THEN
             ALTER TABLE "PasswordReset" ADD COLUMN "otpExpiresAt" TIMESTAMP(3);
         END IF;
+    END IF;
+END $$;
+
+-- Create indexes if they don't exist (AFTER ensuring columns exist)
+CREATE INDEX IF NOT EXISTS "PasswordReset_userId_idx" ON "PasswordReset"("userId");
+CREATE INDEX IF NOT EXISTS "PasswordReset_expiresAt_idx" ON "PasswordReset"("expiresAt");
+CREATE INDEX IF NOT EXISTS "PasswordReset_used_idx" ON "PasswordReset"("used");
+
+-- Create OTP-related indexes conditionally (only if columns exist)
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'PasswordReset' AND column_name = 'otp') THEN
+        CREATE INDEX IF NOT EXISTS "PasswordReset_otp_idx" ON "PasswordReset"("otp");
+    END IF;
+    
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'PasswordReset' AND column_name = 'otpExpiresAt') THEN
+        CREATE INDEX IF NOT EXISTS "PasswordReset_otpExpiresAt_idx" ON "PasswordReset"("otpExpiresAt");
     END IF;
 END $$;
 

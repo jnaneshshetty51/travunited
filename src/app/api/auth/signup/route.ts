@@ -68,14 +68,23 @@ export async function POST(req: Request) {
         meta: dbError?.meta,
         name: dbError?.name,
         cause: dbError?.cause,
-        stack: dbError?.stack,
       };
       console.error("[Signup] ❌ Database error checking existing user:", JSON.stringify(errorDetails, null, 2));
       
-      // Return more specific error in development
-      const errorMessage = process.env.NODE_ENV === "development" 
-        ? `Database error: ${dbError?.message || String(dbError)} (Code: ${dbError?.code || 'N/A'})`
-        : "Database error. Please try again.";
+      // Check for common database connection errors
+      const isConnectionError = 
+        dbError?.code === 'P1001' || // Can't reach database server
+        dbError?.code === 'P1002' || // Database server doesn't exist
+        dbError?.code === 'P1003' || // Database does not exist
+        dbError?.message?.includes('connection') ||
+        dbError?.message?.includes('timeout') ||
+        dbError?.message?.includes('ECONNREFUSED');
+      
+      const errorMessage = isConnectionError
+        ? "Unable to connect to database. Please try again later."
+        : process.env.NODE_ENV === "development" 
+          ? `Database error: ${dbError?.message || String(dbError)} (Code: ${dbError?.code || 'N/A'})`
+          : "Database error. Please try again.";
       
       return NextResponse.json(
         { error: errorMessage },
