@@ -128,6 +128,11 @@ const visaModeLabels: Record<string, string> = {
   VOA: "Visa on Arrival",
   VFS: "VFS Appointment",
   ETA: "ETA",
+  PRE_ENROLLMENT: "Pre Enrollment",
+  ARRIVAL_CARD: "Arrival Card",
+  VISA_FREE_ENTRY: "Visa Free Entry",
+  SCHENGEN_VISA: "Schengen Visa",
+  APPOINTMENTS: "Appointments",
   OTHER: "Other",
 };
 

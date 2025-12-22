@@ -106,6 +106,11 @@ const VISA_MODE_OPTIONS = [
   { value: "VOA", label: "Visa on Arrival (VOA)" },
   { value: "VFS", label: "VFS Appointment" },
   { value: "ETA", label: "ETA" },
+  { value: "PRE_ENROLLMENT", label: "Pre Enrollment" },
+  { value: "ARRIVAL_CARD", label: "Arrival Card" },
+  { value: "VISA_FREE_ENTRY", label: "Visa Free Entry" },
+  { value: "SCHENGEN_VISA", label: "Schengen Visa" },
+  { value: "APPOINTMENTS", label: "Appointments" },
   { value: "OTHER", label: "Other" },
 ];
 const STAY_TYPE_OPTIONS = [
