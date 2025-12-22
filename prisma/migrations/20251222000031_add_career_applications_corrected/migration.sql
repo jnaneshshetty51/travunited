@@ -1,5 +1,9 @@
 -- CreateEnum
-CREATE TYPE "CareerApplicationStatus" AS ENUM ('NEW', 'REVIEWED', 'SHORTLISTED', 'REJECTED', 'ON_HOLD');
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'CareerApplicationStatus') THEN
+        CREATE TYPE "CareerApplicationStatus" AS ENUM ('NEW', 'REVIEWED', 'SHORTLISTED', 'REJECTED', 'ON_HOLD');
+    END IF;
+END $$;
 
 -- CreateTable
 CREATE TABLE "CareerApplication" (
