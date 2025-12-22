@@ -6,7 +6,7 @@ DO $$ BEGIN
 END $$;
 
 -- CreateTable
-CREATE TABLE "CareerApplication" (
+CREATE TABLE IF NOT EXISTS "CareerApplication" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
@@ -26,14 +26,14 @@ CREATE TABLE "CareerApplication" (
 );
 
 -- CreateIndex
-CREATE INDEX "CareerApplication_status_idx" ON "CareerApplication"("status");
+CREATE INDEX IF NOT EXISTS "CareerApplication_status_idx" ON "CareerApplication"("status");
 
 -- CreateIndex
-CREATE INDEX "CareerApplication_positionTitle_idx" ON "CareerApplication"("positionTitle");
+CREATE INDEX IF NOT EXISTS "CareerApplication_positionTitle_idx" ON "CareerApplication"("positionTitle");
 
 -- CreateIndex
-CREATE INDEX "CareerApplication_email_idx" ON "CareerApplication"("email");
+CREATE INDEX IF NOT EXISTS "CareerApplication_email_idx" ON "CareerApplication"("email");
 
 -- CreateIndex
-CREATE INDEX "CareerApplication_createdAt_idx" ON "CareerApplication"("createdAt");
+CREATE INDEX IF NOT EXISTS "CareerApplication_createdAt_idx" ON "CareerApplication"("createdAt");
 
